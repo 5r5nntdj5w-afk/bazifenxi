@@ -1586,11 +1586,15 @@
             <p class="text-sm text-gray-600 mb-4">选择一个事项标签，查看所有相关案例，进行专项研究和对比分析。</p>
             
             <div class="border rounded p-4">
-                <!-- 标签选择下拉框 -->
-                <div class="mb-4">
-                    <label class="text-sm font-medium text-gray-700 mr-2">选择事项标签:</label>
+                <!-- 标签选择下拉框（二级联动） -->
+                <div class="mb-4 flex flex-wrap gap-3 items-center">
+                    <label class="text-sm font-medium text-gray-700">选择标签分类:</label>
+                    <select id="research-category-select" class="p-2 border rounded text-sm inline-block min-w-[150px]">
+                        <option value="">-- 请选择分类 --</option>
+                    </select>
+                    <label class="text-sm font-medium text-gray-700">选择事项标签:</label>
                     <select id="research-tag-select" class="p-2 border rounded text-sm inline-block min-w-[200px]">
-                        <option value="">-- 请选择事项标签 --</option>
+                        <option value="">-- 请先选择分类 --</option>
                     </select>
                 </div>
                 
@@ -8049,30 +8053,64 @@ function getAllTagCategories() {
     
     // ==================== 事项研究界面渲染 ====================
     
-    // 渲染事项研究页面的标签列表(改为下拉框)
+    // 渲染事项研究页面的标签列表(二级联动)
     function renderResearchTagList() {
-        const researchTagSelect = document.getElementById('research-tag-select');
-        if (!researchTagSelect) return;
+        const categorySelect = document.getElementById('research-category-select');
+        const tagSelect = document.getElementById('research-tag-select');
+        if (!categorySelect || !tagSelect) return;
         
+        const categories = getAllTagCategories();
         const tags = getAllTags();
         const stats = getTagStats();
         
-        researchTagSelect.innerHTML = `
-            <option value="">-- 请选择事项标签 --</option>
-            ${tags.map(tag => {
-                const usageCount = stats[tag.id] || 0;
-                return `<option value="${tag.id}">${tag.icon} ${tag.name} (${usageCount})</option>`;
-            }).join('')}
+        // 渲染分类下拉框
+        categorySelect.innerHTML = `
+            <option value="">-- 请选择分类 --</option>
+            ${categories.map(cat => `<option value="${cat.name}">${cat.icon} ${cat.name}</option>`).join('')}
         `;
         
-        // 如果已有选中的标签，设置下拉框选中
-        if (currentResearchTag) {
-            researchTagSelect.value = currentResearchTag.id;
+        // 根据分类过滤标签的函数
+        function renderTagsByCategory(categoryName) {
+            if (!categoryName) {
+                tagSelect.innerHTML = '<option value="">-- 请先选择分类 --</option>';
+                tagSelect.disabled = true;
+                return;
+            }
+            
+            const filteredTags = tags.filter(tag => tag.category === categoryName);
+            tagSelect.innerHTML = `
+                <option value="">-- 请选择事项标签 --</option>
+                ${filteredTags.map(tag => {
+                    const usageCount = stats[tag.id] || 0;
+                    return `<option value="${tag.id}">${tag.icon} ${tag.name} (${usageCount})</option>`;
+                }).join('')}
+            `;
+            tagSelect.disabled = false;
+            
+            // 如果当前选中的标签属于该分类，自动选中
+            if (currentResearchTag && currentResearchTag.category === categoryName) {
+                tagSelect.value = currentResearchTag.id;
+            } else {
+                tagSelect.value = '';
+            }
         }
         
-        // 绑定选择事件
-        researchTagSelect.onchange = () => {
-            const tagId = researchTagSelect.value;
+        // 绑定分类选择事件
+        categorySelect.onchange = () => {
+            const categoryName = categorySelect.value;
+            renderTagsByCategory(categoryName);
+            
+            // 如果切换分类，清除之前选中的标签
+            if (!categoryName || (currentResearchTag && currentResearchTag.category !== categoryName)) {
+                currentResearchTag = null;
+                selectedResearchCases = [];
+                renderResearchCaseList();
+            }
+        };
+        
+        // 绑定标签选择事件
+        tagSelect.onchange = () => {
+            const tagId = tagSelect.value;
             if (tagId) {
                 const tag = getTagById(tagId);
                 if (tag) {
@@ -8086,6 +8124,15 @@ function getAllTagCategories() {
                 renderResearchCaseList();
             }
         };
+        
+        // 初始化时，如果已有选中的标签，自动选择对应的分类
+        if (currentResearchTag) {
+            categorySelect.value = currentResearchTag.category;
+            renderTagsByCategory(currentResearchTag.category);
+        } else {
+            tagSelect.innerHTML = '<option value="">-- 请先选择分类 --</option>';
+            tagSelect.disabled = true;
+        }
     }
     
     // 渲染事项研究概览
