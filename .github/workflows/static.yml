@@ -6,11 +6,21 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
       
       - name: Replace secrets
         env:
@@ -22,8 +32,8 @@ jobs:
           sed -i "s/%SUPABASE_KEY%/$SUPABASE_KEY/g" index.html
           sed -i "s/%ADMIN_EMAIL%/$ADMIN_EMAIL/g" index.html
       
-      - name: Commit changes
-        uses: EndBug/add-and-commit@v9
-        with:
-          message: 'Deploy with secrets injected'
-          branch: main
+      - name: Commit and push
+        run: |
+          git add index.html
+          git commit -m "Deploy with secrets injected"
+          git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
