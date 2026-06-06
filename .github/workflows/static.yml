@@ -8,20 +8,14 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      
-      - name: Configure Git
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
       
       - name: Replace secrets
         env:
@@ -29,14 +23,12 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
-          echo "Replacing secrets..."
           sed -i "s#%SUPABASE_URL%#$SUPABASE_URL#g" index.html
           sed -i "s#%SUPABASE_KEY%#$SUPABASE_KEY#g" index.html
           sed -i "s#%ADMIN_EMAIL%#$ADMIN_EMAIL#g" index.html
-          echo "Secrets replaced successfully!"
       
-      - name: Commit and push
-        run: |
-          git add index.html
-          git diff --quiet && git diff --staged --quiet || git commit -m "Deploy with secrets injected"
-          git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
