@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       
       - name: Configure Git
         run: |
@@ -28,12 +29,15 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
+          echo "Replacing secrets..."
           sed -i "s/%SUPABASE_URL%/$SUPABASE_URL/g" index.html
           sed -i "s/%SUPABASE_KEY%/$SUPABASE_KEY/g" index.html
           sed -i "s/%ADMIN_EMAIL%/$ADMIN_EMAIL/g" index.html
+          echo "Secrets replaced successfully!"
+          cat index.html | grep -A 3 "FALLBACK_CONFIG"
       
       - name: Commit and push
         run: |
           git add index.html
-          git commit -m "Deploy with secrets injected"
+          git diff --quiet && git diff --staged --quiet || git commit -m "Deploy with secrets injected"
           git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
