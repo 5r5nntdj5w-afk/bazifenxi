@@ -1425,6 +1425,7 @@
                 <div class="flex gap-2">
                     <button id="manage-category" class="px-3 py-2 bg-gray-200 rounded text-sm">管理分类</button>
                     <button id="manage-difficulty" class="px-3 py-2 bg-gray-200 rounded text-sm">管理难度</button>
+                    <button id="refresh-cases-btn" class="px-3 py-2 bg-amber-600 text-white rounded text-sm flex items-center gap-1">🔄 刷新案例</button>
                     <button id="add-case-btn" class="px-4 py-2 bg-green-600 text-white rounded">添加案例</button>
                 </div>
             </div>
@@ -1777,7 +1778,10 @@
                     <div id="current-user-info" class="text-sm text-blue-700">
                         <p>未登录</p>
                     </div>
-                    <button id="btn-logout" class="mt-3 px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">退出登录</button>
+                    <div class="flex gap-3 mt-3">
+                        <button id="btn-refresh-data" class="px-4 py-2 bg-amber-600 text-white rounded text-sm hover:bg-amber-700">🔄 刷新数据</button>
+                        <button id="btn-logout" class="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">退出登录</button>
+                    </div>
                 </div>
                 
                 <!-- 管理员控制面板 -->
@@ -11825,6 +11829,14 @@ function getAllTagCategories() {
             if (e.key === 'Enter') loadCases();
         };
         
+        // 刷新案例按钮
+        const refreshCasesBtn = document.getElementById('refresh-cases-btn');
+        if (refreshCasesBtn) {
+            refreshCasesBtn.onclick = async () => {
+                await refreshCloudData();
+            };
+        }
+        
         // 筛选条件变化
         DOM.caseCategory.onchange = function() { currentCasePage = 1; loadCases(); };
         DOM.caseDifficulty.onchange = function() { currentCasePage = 1; loadCases(); };
@@ -14479,6 +14491,52 @@ async function loadDataFromSupabase() {
     }
 }
 
+// 统一刷新云端数据函数 - 用于手动刷新页面数据
+async function refreshCloudData() {
+    if (!currentUser || !supabaseClient) {
+        showAuthMessage('请先登录', 'error');
+        return;
+    }
+    
+    const refreshBtn = document.getElementById('refresh-cases-btn');
+    const originalText = refreshBtn?.innerHTML;
+    
+    try {
+        // 显示加载状态
+        if (refreshBtn) {
+            refreshBtn.innerHTML = '🔄 刷新中...';
+            refreshBtn.disabled = true;
+        }
+        
+        showAuthMessage('正在从云端同步数据...', 'info');
+        
+        // 清空缓存，强制从云端重新加载
+        cache.rules = [];
+        caseCache.cases = [];
+        
+        // 调用数据加载函数，强制刷新
+        await loadDataFromSupabase(true, true);
+        
+        showAuthMessage('数据刷新完成！', 'success');
+        
+        // 如果当前在案例库页面，刷新列表
+        if (currentPage === 'case') {
+            currentCasePage = 1;
+            loadCases();
+        }
+        
+    } catch (error) {
+        console.error('刷新数据失败:', error);
+        showAuthMessage('刷新失败：' + error.message, 'error');
+    } finally {
+        // 恢复按钮状态
+        if (refreshBtn) {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+        }
+    }
+}
+
 // 将本地已有标签批量同步到云端（用于登录后将旧标签上传）
 async function syncLocalTagsToCloud() {
     if (!currentUser || !supabaseClient) return;
@@ -17055,6 +17113,14 @@ function initLoginManagement() {
                     alert('退出登录失败，请重试');
                 }
             }
+        };
+    }
+    
+    // 刷新数据按钮
+    const refreshDataBtn = document.getElementById('btn-refresh-data');
+    if (refreshDataBtn) {
+        refreshDataBtn.onclick = async function() {
+            await refreshCloudData();
         };
     }
     
