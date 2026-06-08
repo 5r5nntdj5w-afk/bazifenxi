@@ -14279,10 +14279,56 @@ async function loadDataFromSupabase() {
 
         // 标签同步：从云端下载标签到本地
         try {
-            const { data: cloudTags, error: tagsError } = await supabaseClient
+            // 1. 获取公开标签、系统标签、用户自己的标签
+            let { data: cloudTags, error: tagsError } = await supabaseClient
                 .from('event_tags')
                 .select('*')
                 .or(`is_public.eq.true,is_system.eq.true,user_id.eq.${currentUser.id}`);
+            
+            // 2. 额外获取公开案例中使用的所有标签（解决管理员创建的公开案例使用私有标签的问题）
+            try {
+                const { data: publicCases, error: casesError } = await supabaseClient
+                    .from('cases')
+                    .select('timeline')
+                    .eq('is_public', true);
+                
+                if (!casesError && publicCases && publicCases.length > 0) {
+                    // 从公开案例中提取所有标签ID
+                    const tagIdsInPublicCases = new Set();
+                    publicCases.forEach(c => {
+                        if (c.timeline && Array.isArray(c.timeline)) {
+                            c.timeline.forEach(t => {
+                                if (t.tagIds && Array.isArray(t.tagIds)) {
+                                    t.tagIds.forEach(tagId => tagIdsInPublicCases.add(tagId));
+                                }
+                            });
+                        }
+                    });
+                    
+                    // 如果有标签ID，额外获取这些标签
+                    if (tagIdsInPublicCases.size > 0) {
+                        const tagIdsArray = Array.from(tagIdsInPublicCases);
+                        const { data: additionalTags, error: additionalTagsError } = await supabaseClient
+                            .from('event_tags')
+                            .select('*')
+                            .in('id', tagIdsArray);
+                        
+                        if (!additionalTagsError && additionalTags && additionalTags.length > 0) {
+                            // 合并标签，去重
+                            const existingIds = new Set((cloudTags || []).map(t => t.id));
+                            additionalTags.forEach(tag => {
+                                if (!existingIds.has(tag.id)) {
+                                    if (!cloudTags) cloudTags = [];
+                                    cloudTags.push(tag);
+                                    existingIds.add(tag.id);
+                                }
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('获取公开案例标签失败:', e);
+            }
             
             if (!tagsError && cloudTags && cloudTags.length > 0) {
                 // 读取本地标签
