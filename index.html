@@ -14177,7 +14177,15 @@ async function loadDataFromSupabase() {
         console.log('从云端获取到的案例数量:', cases.length);
         
         // 基于ID映射同步案例
-        for (const c of cases) {
+        console.log('同步前 caseCache.cases 数量:', caseCache.cases.length);
+        
+        // 直接使用新数组替换，避免引用问题
+        const newCases = [...caseCache.cases];
+        
+        for (let i = 0; i < cases.length; i++) {
+            const c = cases[i];
+            console.log(`处理案例 ${i+1}/${cases.length}: id=${c.id}, title=${c.title}`);
+            
             // 查找是否有本地ID对应这个云端ID
             const localId = getLocalIdByCloudId(idMapping, 'cases', c.id);
             
@@ -14216,34 +14224,30 @@ async function loadDataFromSupabase() {
             // 优先检查是否有映射
             if (localId) {
                 // 本地已有对应数据，更新它
-                const index = caseCache.cases.findIndex(item => item.id === localId);
+                const index = newCases.findIndex(item => item.id === localId);
                 if (index !== -1) {
-                    caseCache.cases[index] = caseData;
+                    newCases[index] = caseData;
+                } else {
+                    // 映射存在但本地没有，添加新数据
+                    newCases.push(caseData);
                 }
             } else {
                 // 没有映射，先尝试通过 cloudId 匹配
-                const cloudIndex = caseCache.cases.findIndex(item => item.cloudId === c.id);
+                const cloudIndex = newCases.findIndex(item => item.cloudId === c.id);
                 if (cloudIndex !== -1) {
                     // 找到匹配的 cloudId，更新它并建立映射
-                    caseCache.cases[cloudIndex] = caseData;
+                    newCases[cloudIndex] = caseData;
                     setCloudId(idMapping, 'cases', caseData.id, c.id);
                 } else {
-                    // 本地没有对应数据，检查是否已存在（通过内容哈希）
-                    const localIndex = caseCache.cases.findIndex(item => 
-                        getCaseContentHash(item) === getCaseContentHash(caseData)
-                    );
-                    if (localIndex !== -1) {
-                        // 本地有相同内容，更新它并建立映射
-                        caseCache.cases[localIndex] = caseData;
-                        setCloudId(idMapping, 'cases', caseData.id, c.id);
-                    } else {
-                        // 本地完全没有，添加新数据
-                        caseCache.cases.push(caseData);
-                        setCloudId(idMapping, 'cases', caseData.id, c.id);
-                    }
+                    // 本地完全没有，添加新数据
+                    newCases.push(caseData);
+                    setCloudId(idMapping, 'cases', caseData.id, c.id);
                 }
             }
         }
+        
+        // 更新缓存
+        caseCache.cases = newCases;
         
         console.log('同步后 caseCache.cases 数量:', caseCache.cases.length);
         
