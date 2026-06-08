@@ -14167,11 +14167,14 @@ function cleanLocalDuplicateData() {
 async function loadDataFromSupabase() {
     try {
         console.log('正在从Supabase加载数据...');
+        console.log('currentUser:', currentUser ? currentUser.email : '未登录');
+        console.log('supabaseClient:', supabaseClient ? '已连接' : '未连接');
         
         // 获取ID映射表
         const idMapping = getIdMapping();
         
         const cases = await getSupabaseCases();
+        console.log('从云端获取到的案例数量:', cases.length);
         
         // 基于ID映射同步案例
         for (const c of cases) {
@@ -14241,6 +14244,8 @@ async function loadDataFromSupabase() {
                 }
             }
         }
+        
+        console.log('同步后 caseCache.cases 数量:', caseCache.cases.length);
         
         if (caseCache.categories.length === 0) {
             caseCache.categories = ['事业', '财运', '婚姻', '健康', '性格'];
@@ -14515,13 +14520,19 @@ async function refreshCloudData() {
         }
         
         // 调用数据加载函数，强制刷新
+        console.log('开始刷新云端数据...');
+        console.log('刷新前 caseCache.cases 数量:', caseCache.cases.length);
+        
         await loadDataFromSupabase();
         
+        console.log('刷新后 caseCache.cases 数量:', caseCache.cases.length);
+        
         // 刷新成功提示
-        alert('数据刷新完成！');
+        alert('数据刷新完成！\n案例数量: ' + caseCache.cases.length);
         
         // 如果当前在案例库页面，刷新列表
         if (typeof currentPage !== 'undefined' && currentPage === 'case') {
+            console.log('当前在案例库页面，调用 loadCases()');
             if (typeof currentCasePage !== 'undefined') currentCasePage = 1;
             if (typeof loadCases === 'function') loadCases();
         }
