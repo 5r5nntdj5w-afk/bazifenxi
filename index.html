@@ -14494,12 +14494,14 @@ async function loadDataFromSupabase() {
 // 统一刷新云端数据函数 - 用于手动刷新页面数据
 async function refreshCloudData() {
     if (!currentUser || !supabaseClient) {
-        showAuthMessage('请先登录', 'error');
+        alert('请先登录');
         return;
     }
     
     const refreshBtn = document.getElementById('refresh-cases-btn');
-    const originalText = refreshBtn?.innerHTML;
+    const refreshDataBtn = document.getElementById('btn-refresh-data');
+    const originalText = refreshBtn?.innerHTML || '🔄 刷新案例';
+    const originalDataText = refreshDataBtn?.innerHTML || '🔄 刷新数据';
     
     try {
         // 显示加载状态
@@ -14507,32 +14509,35 @@ async function refreshCloudData() {
             refreshBtn.innerHTML = '🔄 刷新中...';
             refreshBtn.disabled = true;
         }
-        
-        showAuthMessage('正在从云端同步数据...', 'info');
-        
-        // 清空缓存，强制从云端重新加载
-        cache.rules = [];
-        caseCache.cases = [];
+        if (refreshDataBtn) {
+            refreshDataBtn.innerHTML = '🔄 刷新中...';
+            refreshDataBtn.disabled = true;
+        }
         
         // 调用数据加载函数，强制刷新
-        await loadDataFromSupabase(true, true);
+        await loadDataFromSupabase();
         
-        showAuthMessage('数据刷新完成！', 'success');
+        // 刷新成功提示
+        alert('数据刷新完成！');
         
         // 如果当前在案例库页面，刷新列表
-        if (currentPage === 'case') {
-            currentCasePage = 1;
-            loadCases();
+        if (typeof currentPage !== 'undefined' && currentPage === 'case') {
+            if (typeof currentCasePage !== 'undefined') currentCasePage = 1;
+            if (typeof loadCases === 'function') loadCases();
         }
         
     } catch (error) {
         console.error('刷新数据失败:', error);
-        showAuthMessage('刷新失败：' + error.message, 'error');
+        alert('刷新失败：' + error.message);
     } finally {
         // 恢复按钮状态
         if (refreshBtn) {
             refreshBtn.innerHTML = originalText;
             refreshBtn.disabled = false;
+        }
+        if (refreshDataBtn) {
+            refreshDataBtn.innerHTML = originalDataText;
+            refreshDataBtn.disabled = false;
         }
     }
 }
