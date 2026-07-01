@@ -5759,17 +5759,18 @@
             // 构建操作按钮
             let actionButtons = '';
             
-            // 公开/私有切换按钮
-            if (permLevel === 3) {
+            // 公开/私有切换按钮（仅管理员可见）
+            if (permLevel === 3 && isAdminUser) {
                 actionButtons += `<button class="public-btn px-2 py-1 bg-gray-500 text-white rounded text-xs">转为私有</button>`;
             } else if (permLevel === 1 && isAdminUser) {
                 actionButtons += `<button class="public-btn px-2 py-1 bg-orange-500 text-white rounded text-xs">设为公开</button>`;
-            } else if (permLevel === 0 && (isAdminUser || isOwner)) {
+            } else if (permLevel === 0 && isAdminUser) {
                 actionButtons += `<button class="public-btn px-2 py-1 bg-orange-500 text-white rounded text-xs">设为公开</button>`;
             }
             
-            // 复制按钮（加密等级仅管理员可复制）
-            if (permLevel === 2 && !isAdminUser) {
+            // 复制按钮（仅管理员、公开可转私有断语、用户自己的私有断语可复制）
+            const canCopy = isAdminUser || permLevel === 3 || (permLevel === 0 && isOwner);
+            if (!canCopy) {
                 actionButtons += `<button class="copy-btn px-2 py-1 bg-gray-400 text-white rounded text-xs cursor-not-allowed" disabled>复制</button>`;
             } else {
                 actionButtons += `<button class="copy-btn px-2 py-1 bg-green-500 text-white rounded text-xs">复制</button>`;
