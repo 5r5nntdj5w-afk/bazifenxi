@@ -4196,6 +4196,7 @@
         const rg=data.ri.t;
         for(let k in data){
             const item=data[k];
+            if(k === 'gender') continue;
             if(item.t){ 
                 wu[WU_XING[item.t]]++; 
                 const s=getExactShen(item.t,rg); 
@@ -4899,6 +4900,7 @@
         
         for(let k in data){
             const item=data[k];
+            if (k === 'gender') continue; // gender是字符串属性，跳过DOM更新
             if(item.t) {
                 const tianWuXing = WU_XING[item.t];
                 const tianColor = getWuXingColor(tianWuXing);
