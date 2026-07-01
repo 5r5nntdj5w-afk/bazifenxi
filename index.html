@@ -692,6 +692,104 @@
             <div class="mb-2 sm:mb-4">
                 <h4 class="text-base sm:text-lg font-bold text-amber-800 mb-2 text-center">⚖️ 十神关系图</h4>
                 
+                <!-- 数量调节面板（可折叠） -->
+                <div class="mb-3">
+                    <button id="toggle-adjust-panel" class="w-full px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors flex items-center justify-center gap-2">
+                        <span>🔧</span>
+                        <span>数量调节</span>
+                        <span id="adjust-panel-arrow">▼</span>
+                    </button>
+                    <div id="adjust-panel" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                            <!-- 比劫 -->
+                            <div class="text-center">
+                                <div class="font-bold text-green-700 text-sm mb-1">比劫</div>
+                                <div class="flex items-center justify-center gap-1 mb-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="tian" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-tian-bijie">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500 mb-1">天干</div>
+                                <div class="flex items-center justify-center gap-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="di" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-di-bijie">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <!-- 食伤 -->
+                            <div class="text-center">
+                                <div class="font-bold text-red-600 text-sm mb-1">食伤</div>
+                                <div class="flex items-center justify-center gap-1 mb-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="tian" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-tian-shishang">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500 mb-1">天干</div>
+                                <div class="flex items-center justify-center gap-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="di" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-di-shishang">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <!-- 财星 -->
+                            <div class="text-center">
+                                <div class="font-bold text-amber-700 text-sm mb-1">财星</div>
+                                <div class="flex items-center justify-center gap-1 mb-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="tian" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-tian-caixing">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500 mb-1">天干</div>
+                                <div class="flex items-center justify-center gap-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="di" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-di-caixing">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <!-- 官杀 -->
+                            <div class="text-center">
+                                <div class="font-bold text-yellow-500 text-sm mb-1">官杀</div>
+                                <div class="flex items-center justify-center gap-1 mb-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="tian" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-tian-guansha">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500 mb-1">天干</div>
+                                <div class="flex items-center justify-center gap-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="di" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-di-guansha">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <!-- 印星 -->
+                            <div class="text-center">
+                                <div class="font-bold text-blue-600 text-sm mb-1">印星</div>
+                                <div class="flex items-center justify-center gap-1 mb-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="tian" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-tian-yinxing">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500 mb-1">天干</div>
+                                <div class="flex items-center justify-center gap-1">
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="di" data-op="dec">-</button>
+                                    <span class="w-8 text-center text-sm" id="adjust-di-yinxing">0</span>
+                                    <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex justify-center">
+                            <button id="reset-adjust" class="px-4 py-1.5 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 transition-colors">
+                                🔄 恢复默认
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 生克关系图 -->
                 <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">
                     <!-- 中心说明 -->
@@ -2137,6 +2235,104 @@
                 <div class="mt-4">
                     <h4 class="text-base sm:text-lg font-bold text-amber-800 mb-2 text-center">⚖️ 十神关系图</h4>
                     
+                    <!-- 数量调节面板（可折叠） -->
+                    <div class="mb-3">
+                        <button id="toggle-adjust-panel-view" class="w-full px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors flex items-center justify-center gap-2">
+                            <span>🔧</span>
+                            <span>数量调节</span>
+                            <span id="adjust-panel-arrow-view">▼</span>
+                        </button>
+                        <div id="adjust-panel-view" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                                <!-- 比劫 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-green-700 text-sm mb-1">比劫</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-bijie-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-bijie-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 食伤 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-red-600 text-sm mb-1">食伤</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-shishang-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-shishang-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 财星 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-amber-700 text-sm mb-1">财星</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-caixing-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-caixing-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 官杀 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-yellow-500 text-sm mb-1">官杀</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-guansha-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-guansha-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 印星 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-blue-600 text-sm mb-1">印星</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-yinxing-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-yinxing-view">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex justify-center">
+                                <button id="reset-adjust-view" class="px-4 py-1.5 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 transition-colors">
+                                    🔄 恢复默认
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 生克关系图 -->
                     <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">
                         <!-- 生克关系连接线（动态绘制） -->
@@ -2314,7 +2510,14 @@
         categories: JSON.parse(localStorage.getItem(CATEGORY_KEY) || '[]'),
         history: JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'),
         statsCache: null,
-        verifications: JSON.parse(localStorage.getItem(VERIFICATION_KEY) || '[]') // 验证记录
+        verifications: JSON.parse(localStorage.getItem(VERIFICATION_KEY) || '[]'),
+        statsOffset: {
+            比劫: {tian: 0, di: 0},
+            食伤: {tian: 0, di: 0},
+            财星: {tian: 0, di: 0},
+            官杀: {tian: 0, di: 0},
+            印星: {tian: 0, di: 0}
+        }
     };
     let editIndex = -1;
     let currentFilterCategory = 'all';
@@ -2593,6 +2796,7 @@
         initVerification();
         initMiningEvents();
         initDataManagement();
+        initStatsAdjust();
     }
 
     // 修复页面结构问题 - 确保page-tag和page-research在正确的位置
@@ -2613,6 +2817,164 @@
             mainContent.appendChild(pageResearch);
             console.log('初始化：已将page-research从page-case移出');
         }
+    }
+    
+    // 十神数量调节功能
+    function initStatsAdjust() {
+        const panels = [
+            { toggleId: 'toggle-adjust-panel', panelId: 'adjust-panel', arrowId: 'adjust-panel-arrow' },
+            { toggleId: 'toggle-adjust-panel-view', panelId: 'adjust-panel-view', arrowId: 'adjust-panel-arrow-view' },
+            { toggleId: 'toggle-adjust-panel-research', panelId: 'adjust-panel-research', arrowId: 'adjust-panel-arrow-research' },
+            { toggleId: 'toggle-adjust-panel-compare', panelId: 'adjust-panel-compare', arrowId: 'adjust-panel-arrow-compare' },
+            { toggleId: 'toggle-adjust-panel-detail', panelId: 'adjust-panel-detail', arrowId: 'adjust-panel-arrow-detail' }
+        ];
+        
+        panels.forEach(p => {
+            const toggleBtn = document.getElementById(p.toggleId);
+            const panel = document.getElementById(p.panelId);
+            const arrow = document.getElementById(p.arrowId);
+            if (toggleBtn && panel && arrow) {
+                toggleBtn.onclick = () => {
+                    panel.classList.toggle('hidden');
+                    arrow.textContent = panel.classList.contains('hidden') ? '▼' : '▲';
+                };
+            }
+        });
+        
+        const resetBtns = ['reset-adjust', 'reset-adjust-view', 'reset-adjust-research', 'reset-adjust-compare', 'reset-adjust-detail'];
+        resetBtns.forEach(btnId => {
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                btn.onclick = () => {
+                    cache.statsOffset = {
+                        比劫: {tian: 0, di: 0},
+                        食伤: {tian: 0, di: 0},
+                        财星: {tian: 0, di: 0},
+                        官杀: {tian: 0, di: 0},
+                        印星: {tian: 0, di: 0}
+                    };
+                    updateAdjustDisplay();
+                    updateAllShenCardNumbers();
+                    if (typeof calcAll === 'function') {
+                        calcAll();
+                    }
+                };
+            }
+        });
+        
+        updateAdjustDisplay();
+    }
+    
+    function updateAllShenCardNumbers() {
+        const offset = cache.statsOffset || {};
+        const groups = ['bijie', 'shishang', 'caixing', 'guansha', 'yinxing'];
+        const chineseNames = { 'bijie': '比劫', 'shishang': '食伤', 'caixing': '财星', 'guansha': '官杀', 'yinxing': '印星' };
+        const prefixes = ['', '-view', '-research', '-compare', '-detail'];
+        
+        prefixes.forEach(prefix => {
+            groups.forEach(name => {
+                const chineseName = chineseNames[name];
+                const groupOffset = offset[chineseName] || {tian: 0, di: 0};
+                
+                const tianSpan = document.getElementById('research-shen-tian-' + name + prefix);
+                const diSpan = document.getElementById('research-shen-di-' + name + prefix);
+                const totalSpan = document.getElementById('research-shen-total-' + name + prefix);
+                
+                if (tianSpan && diSpan && totalSpan) {
+                    const baseTian = parseInt(tianSpan.dataset.base || tianSpan.textContent) || 0;
+                    const baseDi = parseInt(diSpan.dataset.base || diSpan.textContent) || 0;
+                    
+                    let newTian = baseTian + groupOffset.tian;
+                    let newDi = baseDi + groupOffset.di;
+                    if (newTian < 0) newTian = 0;
+                    if (newDi < 0) newDi = 0;
+                    
+                    tianSpan.textContent = newTian;
+                    diSpan.textContent = newDi;
+                    totalSpan.textContent = newTian + newDi;
+                }
+            });
+        });
+        
+        groups.forEach(name => {
+            const chineseName = chineseNames[name];
+            const groupOffset = offset[chineseName] || {tian: 0, di: 0};
+            
+            const tianSpan = document.getElementById('shen-tian-' + name);
+            const diSpan = document.getElementById('shen-di-' + name);
+            const totalSpan = document.getElementById('shen-total-' + name);
+            
+            if (tianSpan && diSpan && totalSpan) {
+                const baseTian = parseInt(tianSpan.dataset.base || tianSpan.textContent) || 0;
+                const baseDi = parseInt(diSpan.dataset.base || diSpan.textContent) || 0;
+                
+                let newTian = baseTian + groupOffset.tian;
+                let newDi = baseDi + groupOffset.di;
+                if (newTian < 0) newTian = 0;
+                if (newDi < 0) newDi = 0;
+                
+                tianSpan.textContent = newTian;
+                diSpan.textContent = newDi;
+                totalSpan.textContent = newTian + newDi;
+            }
+        });
+    }
+    
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.adjust-btn');
+        if (!btn) return;
+        
+        const group = btn.dataset.group;
+        const type = btn.dataset.type;
+        const op = btn.dataset.op;
+        
+        if (!group || !type || !op) return;
+        
+        if (!cache.statsOffset[group]) {
+            cache.statsOffset[group] = {tian: 0, di: 0};
+        }
+        
+        if (op === 'inc') {
+            cache.statsOffset[group][type]++;
+        } else if (op === 'dec') {
+            cache.statsOffset[group][type]--;
+            if (cache.statsOffset[group][type] < -99) {
+                cache.statsOffset[group][type] = -99;
+            }
+        }
+        
+        updateAdjustDisplay();
+        updateAllShenCardNumbers();
+        
+        if (typeof calcAll === 'function') {
+            calcAll();
+        }
+    });
+    
+    function updateAdjustDisplay() {
+        const prefixes = ['', '-view', '-research', '-compare', '-detail'];
+        const groups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        const types = ['tian', 'di'];
+        
+        prefixes.forEach(prefix => {
+            groups.forEach(group => {
+                const offset = cache.statsOffset[group] || {tian: 0, di: 0};
+                types.forEach(type => {
+                    const idMap = {
+                        '比劫': 'bijie',
+                        '食伤': 'shishang',
+                        '财星': 'caixing',
+                        '官杀': 'guansha',
+                        '印星': 'yinxing'
+                    };
+                    const elId = `adjust-${type}-${idMap[group]}${prefix}`;
+                    const el = document.getElementById(elId);
+                    if (el) {
+                        el.textContent = offset[type];
+                    }
+                });
+            });
+        });
     }
 
     // 复制断语
@@ -4023,6 +4385,17 @@
             if(group) groupDi[group]++;
         });
         
+        // 应用用户调整的偏移量
+        const offset = window.cache?.statsOffset || {};
+        const groups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        groups.forEach(groupName => {
+            const groupOffset = offset[groupName] || {tian: 0, di: 0};
+            groupTian[groupName] += groupOffset.tian;
+            if (groupTian[groupName] < 0) groupTian[groupName] = 0;
+            groupDi[groupName] += groupOffset.di;
+            if (groupDi[groupName] < 0) groupDi[groupName] = 0;
+        });
+        
         // 更新十神关系图 - 十神对应的五行
         document.getElementById('view-wu-bijie').textContent = shenWuXing.比劫;
         document.getElementById('view-wu-shishang').textContent = shenWuXing.食伤;
@@ -4067,25 +4440,23 @@
         updateShenCardColor('view-shen-yinxing', shenWuXing.印星);
         
         // 更新十神数量
-        document.getElementById('view-shen-tian-bijie').textContent = groupTian.比劫;
-        document.getElementById('view-shen-di-bijie').textContent = groupDi.比劫;
-        document.getElementById('view-shen-total-bijie').textContent = groupTian.比劫 + groupDi.比劫;
-        
-        document.getElementById('view-shen-tian-shishang').textContent = groupTian.食伤;
-        document.getElementById('view-shen-di-shishang').textContent = groupDi.食伤;
-        document.getElementById('view-shen-total-shishang').textContent = groupTian.食伤 + groupDi.食伤;
-        
-        document.getElementById('view-shen-tian-caixing').textContent = groupTian.财星;
-        document.getElementById('view-shen-di-caixing').textContent = groupDi.财星;
-        document.getElementById('view-shen-total-caixing').textContent = groupTian.财星 + groupDi.财星;
-        
-        document.getElementById('view-shen-tian-guansha').textContent = groupTian.官杀;
-        document.getElementById('view-shen-di-guansha').textContent = groupDi.官杀;
-        document.getElementById('view-shen-total-guansha').textContent = groupTian.官杀 + groupDi.官杀;
-        
-        document.getElementById('view-shen-tian-yinxing').textContent = groupTian.印星;
-        document.getElementById('view-shen-di-yinxing').textContent = groupDi.印星;
-        document.getElementById('view-shen-total-yinxing').textContent = groupTian.印星 + groupDi.印星;
+        const shenGroups = ['bijie', 'shishang', 'caixing', 'guansha', 'yinxing'];
+        const chineseGroups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        shenGroups.forEach((name, idx) => {
+            const cn = chineseGroups[idx];
+            const tSpan = document.getElementById('view-shen-tian-' + name);
+            const dSpan = document.getElementById('view-shen-di-' + name);
+            const totalSpan = document.getElementById('view-shen-total-' + name);
+            if (tSpan) {
+                tSpan.dataset.base = groupTian[cn];
+                tSpan.textContent = groupTian[cn];
+            }
+            if (dSpan) {
+                dSpan.dataset.base = groupDi[cn];
+                dSpan.textContent = groupDi[cn];
+            }
+            if (totalSpan) totalSpan.textContent = groupTian[cn] + groupDi[cn];
+        });
         
         // 定位十神卡片
         setTimeout(positionViewShenCards, 50);
@@ -4260,6 +4631,32 @@
         // 计算十神对应的五行（由日主决定）
         const riGanWuXing = WU_XING[rg] || '木';
         const shenWuXing = getShenWuXing(riGanWuXing);
+        
+        // 应用用户调整的偏移量
+        const offset = cache.statsOffset || {};
+        const groups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        groups.forEach(groupName => {
+            const groupOffset = offset[groupName] || {tian: 0, di: 0};
+            const wuXing = shenWuXing[groupName] || '';
+            
+            // 应用到 groupTian
+            groupTian[groupName] += groupOffset.tian;
+            if (groupTian[groupName] < 0) groupTian[groupName] = 0;
+            
+            // 应用到 groupDi
+            groupDi[groupName] += groupOffset.di;
+            if (groupDi[groupName] < 0) groupDi[groupName] = 0;
+            
+            // 应用到 groupCount
+            groupCount[groupName] += groupOffset.tian + groupOffset.di;
+            if (groupCount[groupName] < 0) groupCount[groupName] = 0;
+            
+            // 应用到 wuCount（根据十神对应的五行自动推算）
+            if (wuXing && wu[wuXing] !== undefined) {
+                wu[wuXing] += groupOffset.tian + groupOffset.di;
+                if (wu[wuXing] < 0) wu[wuXing] = 0;
+            }
+        });
         
         cache.statsCache = {wuCount:wu, shenCount:shen, groupCount:group, shenTian, shenDi, groupTian, groupDi, shenWuXing};
         return cache.statsCache;
@@ -4889,25 +5286,23 @@
         updateShenCardColor('shen-yinxing', shenWuXing.印星);
         
         // 更新十神数量
-        document.getElementById('shen-tian-bijie').textContent = groupTian.比劫;
-        document.getElementById('shen-di-bijie').textContent = groupDi.比劫;
-        document.getElementById('shen-total-bijie').textContent = groupCount.比劫;
-        
-        document.getElementById('shen-tian-shishang').textContent = groupTian.食伤;
-        document.getElementById('shen-di-shishang').textContent = groupDi.食伤;
-        document.getElementById('shen-total-shishang').textContent = groupCount.食伤;
-        
-        document.getElementById('shen-tian-caixing').textContent = groupTian.财星;
-        document.getElementById('shen-di-caixing').textContent = groupDi.财星;
-        document.getElementById('shen-total-caixing').textContent = groupCount.财星;
-        
-        document.getElementById('shen-tian-guansha').textContent = groupTian.官杀;
-        document.getElementById('shen-di-guansha').textContent = groupDi.官杀;
-        document.getElementById('shen-total-guansha').textContent = groupCount.官杀;
-        
-        document.getElementById('shen-tian-yinxing').textContent = groupTian.印星;
-        document.getElementById('shen-di-yinxing').textContent = groupDi.印星;
-        document.getElementById('shen-total-yinxing').textContent = groupCount.印星;
+        const shenGroups = ['bijie', 'shishang', 'caixing', 'guansha', 'yinxing'];
+        const chineseGroups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        shenGroups.forEach((name, idx) => {
+            const cn = chineseGroups[idx];
+            const tSpan = document.getElementById('shen-tian-' + name);
+            const dSpan = document.getElementById('shen-di-' + name);
+            const totalSpan = document.getElementById('shen-total-' + name);
+            if (tSpan) {
+                tSpan.dataset.base = groupTian[cn];
+                tSpan.textContent = groupTian[cn];
+            }
+            if (dSpan) {
+                dSpan.dataset.base = groupDi[cn];
+                dSpan.textContent = groupDi[cn];
+            }
+            if (totalSpan) totalSpan.textContent = groupCount[cn];
+        });
         
         // 获取十神所属的组名
         function getShenGroupName(shen) {
@@ -9427,6 +9822,18 @@ function getAllTagCategories() {
             groupCount[g] = groupTian[g] + groupDi[g];
         }
         
+        const offset = window.cache?.statsOffset || {};
+        const groups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        groups.forEach(groupName => {
+            const groupOffset = offset[groupName] || {tian: 0, di: 0};
+            groupTian[groupName] += groupOffset.tian;
+            if (groupTian[groupName] < 0) groupTian[groupName] = 0;
+            groupDi[groupName] += groupOffset.di;
+            if (groupDi[groupName] < 0) groupDi[groupName] = 0;
+            groupCount[groupName] += groupOffset.tian + groupOffset.di;
+            if (groupCount[groupName] < 0) groupCount[groupName] = 0;
+        });
+        
         const getShenColorClass = (shen) => {
             const group = getShenGroupName(shen);
             if(!group) return 'text-gray-600';
@@ -9529,6 +9936,105 @@ function getAllTagCategories() {
                 
                 <div class="mb-3 mt-3">
                     <h4 class="text-base sm:text-lg font-bold text-amber-800 mb-2 text-center">⚖️ 十神关系图</h4>
+                    
+                    <!-- 数量调节面板（可折叠） -->
+                    <div class="mb-3">
+                        <button id="toggle-adjust-panel-research" class="w-full px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors flex items-center justify-center gap-2">
+                            <span>🔧</span>
+                            <span>数量调节</span>
+                            <span id="adjust-panel-arrow-research">▼</span>
+                        </button>
+                        <div id="adjust-panel-research" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                                <!-- 比劫 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-green-700 text-sm mb-1">比劫</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-bijie-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-bijie-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 食伤 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-red-600 text-sm mb-1">食伤</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-shishang-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-shishang-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 财星 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-amber-700 text-sm mb-1">财星</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-caixing-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-caixing-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="财星" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 官杀 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-yellow-500 text-sm mb-1">官杀</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-guansha-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-guansha-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                                <!-- 印星 -->
+                                <div class="text-center">
+                                    <div class="font-bold text-blue-600 text-sm mb-1">印星</div>
+                                    <div class="flex items-center justify-center gap-1 mb-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="tian" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-tian-yinxing-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mb-1">天干</div>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="di" data-op="dec">-</button>
+                                        <span class="w-8 text-center text-sm" id="adjust-di-yinxing-research">0</span>
+                                        <button class="adjust-btn w-6 h-6 bg-gray-200 rounded hover:bg-gray-300 text-gray-700" data-group="印星" data-type="di" data-op="inc">+</button>
+                                    </div>
+                                    <div class="text-xs text-gray-500">地支</div>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex justify-center">
+                                <button id="reset-adjust-research" class="px-4 py-1.5 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 transition-colors">
+                                    🔄 恢复默认
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">
                         <div class="absolute top-1 sm:top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10">
                             <div class="flex items-center gap-1 justify-center bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
@@ -9541,8 +10047,8 @@ function getAllTagCategories() {
                             <div id="research-shen-bijie" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${bijieColors.text} text-sm">比劫<span class="${bijieColors.text} ml-1">${shenWuXing['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie">${groupTian['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie">${groupDi['比劫']}</span></div>
+                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
+                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
                                     <div class="${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${bijieColors.textLabel} text-sm">总数: <span id="research-shen-total-bijie">${groupCount['比劫']}</span></span>
                                     </div>
@@ -9551,8 +10057,8 @@ function getAllTagCategories() {
                             <div id="research-shen-shishang" class="absolute text-center z-10">
                                 <div class="mobile-card ${shishangColors.bg} border-2 ${shishangColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${shishangColors.text} text-sm">食伤<span class="${shishangColors.text} ml-1">${shenWuXing['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang">${groupTian['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang">${groupDi['食伤']}</span></div>
+                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
+                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
                                     <div class="${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${shishangColors.textLabel} text-sm">总数: <span id="research-shen-total-shishang">${groupCount['食伤']}</span></span>
                                     </div>
@@ -9561,8 +10067,8 @@ function getAllTagCategories() {
                             <div id="research-shen-caixing" class="absolute text-center z-10">
                                 <div class="mobile-card ${caixingColors.bg} border-2 ${caixingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${caixingColors.text} text-sm">财星<span class="${caixingColors.text} ml-1">${shenWuXing['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing">${groupTian['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing">${groupDi['财星']}</span></div>
+                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
+                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
                                     <div class="${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${caixingColors.textLabel} text-sm">总数: <span id="research-shen-total-caixing">${groupCount['财星']}</span></span>
                                     </div>
@@ -9571,8 +10077,8 @@ function getAllTagCategories() {
                             <div id="research-shen-guansha" class="absolute text-center z-10">
                                 <div class="mobile-card ${guanshaColors.bg} border-2 ${guanshaColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${guanshaColors.text} text-sm">官杀<span class="${guanshaColors.text} ml-1">${shenWuXing['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha">${groupTian['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha">${groupDi['官杀']}</span></div>
+                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
+                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
                                     <div class="${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${guanshaColors.textLabel} text-sm">总数: <span id="research-shen-total-guansha">${groupCount['官杀']}</span></span>
                                     </div>
@@ -9581,8 +10087,8 @@ function getAllTagCategories() {
                             <div id="research-shen-yinxing" class="absolute text-center z-10">
                                 <div class="mobile-card ${yinxingColors.bg} border-2 ${yinxingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${yinxingColors.text} text-sm">印星<span class="${yinxingColors.text} ml-1">${shenWuXing['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing">${groupTian['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing">${groupDi['印星']}</span></div>
+                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
+                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
                                     <div class="${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${yinxingColors.textLabel} text-sm">总数: <span id="research-shen-total-yinxing">${groupCount['印星']}</span></span>
                                     </div>
@@ -9896,6 +10402,18 @@ function getAllTagCategories() {
             groupCount[g] = groupTian[g] + groupDi[g];
         }
         
+        const offset = window.cache?.statsOffset || {};
+        const groups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        groups.forEach(groupName => {
+            const groupOffset = offset[groupName] || {tian: 0, di: 0};
+            groupTian[groupName] += groupOffset.tian;
+            if (groupTian[groupName] < 0) groupTian[groupName] = 0;
+            groupDi[groupName] += groupOffset.di;
+            if (groupDi[groupName] < 0) groupDi[groupName] = 0;
+            groupCount[groupName] += groupOffset.tian + groupOffset.di;
+            if (groupCount[groupName] < 0) groupCount[groupName] = 0;
+        });
+        
         // 获取十神对应五行颜色
         const getShenColorClass = (shen) => {
             const group = getShenGroupName(shen);
@@ -10005,6 +10523,92 @@ function getAllTagCategories() {
                     </table>
                 </div>
                 
+                <div class="mb-3">
+                    <button id="toggle-adjust-panel-detail" class="w-full py-2 bg-blue-50 text-blue-700 rounded-lg font-bold text-sm hover:bg-blue-100 border border-blue-200 flex items-center justify-center gap-2">
+                        🔧 数量调节 <span id="adjust-panel-arrow-detail">▼</span>
+                    </button>
+                    <div id="adjust-panel-detail" class="hidden mt-2 p-3 bg-white rounded-lg border border-blue-200">
+                        <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                            <div class="text-center">
+                                <div class="font-bold text-green-700">比劫</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-bijie-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-bijie-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-red-700">食伤</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-shishang-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-shishang-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-yellow-700">财星</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-caixing-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-caixing-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-purple-700">官杀</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-guansha-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-guansha-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-blue-700">印星</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-yinxing-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-yinxing-detail" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                        </div>
+                        <button id="reset-adjust-detail" class="mt-3 w-full py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 text-sm font-bold">🔄 恢复默认</button>
+                    </div>
+                </div>
+                
                 <!-- 十神关系图 -->
                 <div class="mb-4 mt-4">
                     <h4 class="text-lg font-bold text-amber-800 mb-3 text-center">⚖️ 十神关系图</h4>
@@ -10029,8 +10633,8 @@ function getAllTagCategories() {
                             <div id="research-shen-bijie-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${bijieColors.text} text-sm">比劫<span id="research-wu-bijie-detail" class="${bijieColors.text} ml-1">${shenWuXing['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie-detail">${groupTian['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie-detail">${groupDi['比劫']}</span></div>
+                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie-detail" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
+                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie-detail" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
                                     <div class="${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${bijieColors.textLabel} text-sm">总数: <span id="research-shen-total-bijie-detail">${groupCount['比劫']}</span></span>
                                     </div>
@@ -10041,8 +10645,8 @@ function getAllTagCategories() {
                             <div id="research-shen-shishang-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${shishangColors.bg} border-2 ${shishangColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${shishangColors.text} text-sm">食伤<span id="research-wu-shishang-detail" class="${shishangColors.text} ml-1">${shenWuXing['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang-detail">${groupTian['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang-detail">${groupDi['食伤']}</span></div>
+                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang-detail" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
+                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang-detail" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
                                     <div class="${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${shishangColors.textLabel} text-sm">总数: <span id="research-shen-total-shishang-detail">${groupCount['食伤']}</span></span>
                                     </div>
@@ -10053,8 +10657,8 @@ function getAllTagCategories() {
                             <div id="research-shen-caixing-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${caixingColors.bg} border-2 ${caixingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${caixingColors.text} text-sm">财星<span id="research-wu-caixing-detail" class="${caixingColors.text} ml-1">${shenWuXing['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing-detail">${groupTian['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing-detail">${groupDi['财星']}</span></div>
+                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing-detail" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
+                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing-detail" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
                                     <div class="${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${caixingColors.textLabel} text-sm">总数: <span id="research-shen-total-caixing-detail">${groupCount['财星']}</span></span>
                                     </div>
@@ -10065,8 +10669,8 @@ function getAllTagCategories() {
                             <div id="research-shen-guansha-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${guanshaColors.bg} border-2 ${guanshaColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${guanshaColors.text} text-sm">官杀<span id="research-wu-guansha-detail" class="${guanshaColors.text} ml-1">${shenWuXing['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha-detail">${groupTian['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha-detail">${groupDi['官杀']}</span></div>
+                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha-detail" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
+                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha-detail" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
                                     <div class="${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${guanshaColors.textLabel} text-sm">总数: <span id="research-shen-total-guansha-detail">${groupCount['官杀']}</span></span>
                                     </div>
@@ -10077,8 +10681,8 @@ function getAllTagCategories() {
                             <div id="research-shen-yinxing-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${yinxingColors.bg} border-2 ${yinxingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${yinxingColors.text} text-sm">印星<span id="research-wu-yinxing-detail" class="${yinxingColors.text} ml-1">${shenWuXing['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing-detail">${groupTian['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing-detail">${groupDi['印星']}</span></div>
+                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing-detail" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
+                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing-detail" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
                                     <div class="${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${yinxingColors.textLabel} text-sm">总数: <span id="research-shen-total-yinxing-detail">${groupCount['印星']}</span></span>
                                     </div>
@@ -10251,9 +10855,16 @@ function getAllTagCategories() {
             const tianSpan = document.getElementById('research-shen-tian-' + name + '-detail');
             const diSpan = document.getElementById('research-shen-di-' + name + '-detail');
             const totalSpan = document.getElementById('research-shen-total-' + name + '-detail');
-            if (tianSpan) tianSpan.textContent = initGroupTian[chineseName];
-            if (diSpan) diSpan.textContent = initGroupDi[chineseName];
-            if (totalSpan) totalSpan.textContent = initGroupTian[chineseName] + initGroupDi[chineseName];
+            const offset = cache.statsOffset?.[chineseName] || {tian: 0, di: 0};
+            if (tianSpan) {
+                tianSpan.dataset.base = initGroupTian[chineseName];
+                tianSpan.textContent = initGroupTian[chineseName] + offset.tian;
+            }
+            if (diSpan) {
+                diSpan.dataset.base = initGroupDi[chineseName];
+                diSpan.textContent = initGroupDi[chineseName] + offset.di;
+            }
+            if (totalSpan) totalSpan.textContent = initGroupTian[chineseName] + initGroupDi[chineseName] + offset.tian + offset.di;
         });
         
         // 定位十神卡片
@@ -10371,9 +10982,16 @@ function getAllTagCategories() {
                         const tianSpan = document.getElementById('research-shen-tian-' + name);
                         const diSpan = document.getElementById('research-shen-di-' + name);
                         const totalSpan = document.getElementById('research-shen-total-' + name);
-                        if (tianSpan) tianSpan.textContent = curGroupTian[chineseName];
-                        if (diSpan) diSpan.textContent = curGroupDi[chineseName];
-                        if (totalSpan) totalSpan.textContent = curGroupTian[chineseName] + curGroupDi[chineseName];
+                        const offset = cache.statsOffset?.[chineseName] || {tian: 0, di: 0};
+                        if (tianSpan) {
+                            tianSpan.dataset.base = curGroupTian[chineseName];
+                            tianSpan.textContent = curGroupTian[chineseName] + offset.tian;
+                        }
+                        if (diSpan) {
+                            diSpan.dataset.base = curGroupDi[chineseName];
+                            diSpan.textContent = curGroupDi[chineseName] + offset.di;
+                        }
+                        if (totalSpan) totalSpan.textContent = curGroupTian[chineseName] + curGroupDi[chineseName] + offset.tian + offset.di;
                     });
                     
                     // 重新定位十神卡片
@@ -10385,6 +11003,10 @@ function getAllTagCategories() {
             });
         });
         
+        setTimeout(() => {
+            initStatsAdjust();
+            updateAllShenCardNumbers();
+        }, 50);
     }
     
     // 显示研究对比弹窗
@@ -10632,6 +11254,16 @@ function getAllTagCategories() {
             if(group) groupDi[group]++;
         }
         
+        const offset = window.cache?.statsOffset || {};
+        const groups = ['比劫', '食伤', '财星', '官杀', '印星'];
+        groups.forEach(groupName => {
+            const groupOffset = offset[groupName] || {tian: 0, di: 0};
+            groupTian[groupName] += groupOffset.tian;
+            if (groupTian[groupName] < 0) groupTian[groupName] = 0;
+            groupDi[groupName] += groupOffset.di;
+            if (groupDi[groupName] < 0) groupDi[groupName] = 0;
+        });
+        
         const getShenColorClass = (shen) => {
             const group = getShenGroupName(shen);
             if(!group) return 'text-gray-600';
@@ -10725,6 +11357,92 @@ function getAllTagCategories() {
                     </table>
                 </div>
                 
+                <div class="mb-3">
+                    <button id="toggle-adjust-panel-compare" class="w-full py-2 bg-blue-50 text-blue-700 rounded-lg font-bold text-sm hover:bg-blue-100 border border-blue-200 flex items-center justify-center gap-2">
+                        🔧 数量调节 <span id="adjust-panel-arrow-compare">▼</span>
+                    </button>
+                    <div id="adjust-panel-compare" class="hidden mt-2 p-3 bg-white rounded-lg border border-blue-200">
+                        <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                            <div class="text-center">
+                                <div class="font-bold text-green-700">比劫</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-bijie-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-bijie-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-red-700">食伤</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-shishang-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-shishang-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-yellow-700">财星</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-caixing-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-caixing-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="财星" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-purple-700">官杀</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-guansha-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-guansha-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-bold text-blue-700">印星</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="tian" data-op="dec">-</button>
+                                    <span id="adjust-tian-yinxing-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">天干</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="di" data-op="dec">-</button>
+                                    <span id="adjust-di-yinxing-compare" class="text-sm font-bold w-4 text-center">0</span>
+                                    <button class="adjust-btn w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold" data-group="印星" data-type="di" data-op="inc">+</button>
+                                </div>
+                                <div class="text-xs text-gray-500">地支</div>
+                            </div>
+                        </div>
+                        <button id="reset-adjust-compare" class="mt-3 w-full py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 text-sm font-bold">🔄 恢复默认</button>
+                    </div>
+                </div>
+                
                 <div class="mb-3 mt-3">
                     <h4 class="text-base sm:text-lg font-bold text-amber-800 mb-2 text-center">⚖️ 十神关系图</h4>
                     <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">
@@ -10739,8 +11457,8 @@ function getAllTagCategories() {
                             <div id="research-shen-bijie-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${bijieColors.text} text-sm">比劫<span id="research-wu-bijie-compare" class="${bijieColors.text} ml-1">${shenWuXing['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie-compare">${groupTian['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie-compare">${groupDi['比劫']}</span></div>
+                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie-compare" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
+                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie-compare" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
                                     <div class="${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${bijieColors.textLabel} text-sm">总数: <span id="research-shen-total-bijie-compare">${groupTian['比劫'] + groupDi['比劫']}</span></span>
                                     </div>
@@ -10749,8 +11467,8 @@ function getAllTagCategories() {
                             <div id="research-shen-shishang-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${shishangColors.bg} border-2 ${shishangColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${shishangColors.text} text-sm">食伤<span id="research-wu-shishang-compare" class="${shishangColors.text} ml-1">${shenWuXing['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang-compare">${groupTian['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang-compare">${groupDi['食伤']}</span></div>
+                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang-compare" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
+                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang-compare" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
                                     <div class="${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${shishangColors.textLabel} text-sm">总数: <span id="research-shen-total-shishang-compare">${groupTian['食伤'] + groupDi['食伤']}</span></span>
                                     </div>
@@ -10759,8 +11477,8 @@ function getAllTagCategories() {
                             <div id="research-shen-caixing-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${caixingColors.bg} border-2 ${caixingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${caixingColors.text} text-sm">财星<span id="research-wu-caixing-compare" class="${caixingColors.text} ml-1">${shenWuXing['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing-compare">${groupTian['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing-compare">${groupDi['财星']}</span></div>
+                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing-compare" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
+                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing-compare" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
                                     <div class="${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${caixingColors.textLabel} text-sm">总数: <span id="research-shen-total-caixing-compare">${groupTian['财星'] + groupDi['财星']}</span></span>
                                     </div>
@@ -10769,8 +11487,8 @@ function getAllTagCategories() {
                             <div id="research-shen-guansha-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${guanshaColors.bg} border-2 ${guanshaColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${guanshaColors.text} text-sm">官杀<span id="research-wu-guansha-compare" class="${guanshaColors.text} ml-1">${shenWuXing['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha-compare">${groupTian['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha-compare">${groupDi['官杀']}</span></div>
+                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha-compare" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
+                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha-compare" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
                                     <div class="${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${guanshaColors.textLabel} text-sm">总数: <span id="research-shen-total-guansha-compare">${groupTian['官杀'] + groupDi['官杀']}</span></span>
                                     </div>
@@ -10779,8 +11497,8 @@ function getAllTagCategories() {
                             <div id="research-shen-yinxing-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${yinxingColors.bg} border-2 ${yinxingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${yinxingColors.text} text-sm">印星<span id="research-wu-yinxing-compare" class="${yinxingColors.text} ml-1">${shenWuXing['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing-compare">${groupTian['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing-compare">${groupDi['印星']}</span></div>
+                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing-compare" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
+                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing-compare" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
                                     <div class="${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${yinxingColors.textLabel} text-sm">总数: <span id="research-shen-total-yinxing-compare">${groupTian['印星'] + groupDi['印星']}</span></span>
                                     </div>
@@ -10847,20 +11565,33 @@ function getAllTagCategories() {
             
             ['bijie', 'shishang', 'caixing', 'guansha', 'yinxing'].forEach(name => {
                 const cn = groupNameMap[name];
+                const offset = cache.statsOffset?.[cn] || {tian: 0, di: 0};
                 // 更新不带 -compare 后缀的元素（排盘详情页面）
                 const tSpan = document.getElementById('research-shen-tian-' + name);
                 const dSpan = document.getElementById('research-shen-di-' + name);
                 const tTotal = document.getElementById('research-shen-total-' + name);
-                if (tSpan) tSpan.textContent = allGroupTian[cn];
-                if (dSpan) dSpan.textContent = allGroupDi[cn];
-                if (tTotal) tTotal.textContent = allGroupTian[cn] + allGroupDi[cn];
+                if (tSpan) {
+                    tSpan.dataset.base = allGroupTian[cn];
+                    tSpan.textContent = allGroupTian[cn] + offset.tian;
+                }
+                if (dSpan) {
+                    dSpan.dataset.base = allGroupDi[cn];
+                    dSpan.textContent = allGroupDi[cn] + offset.di;
+                }
+                if (tTotal) tTotal.textContent = allGroupTian[cn] + allGroupDi[cn] + offset.tian + offset.di;
                 // 更新带 -compare 后缀的元素（对比分析页面）
                 const tSpanCompare = document.getElementById('research-shen-tian-' + name + '-compare');
                 const dSpanCompare = document.getElementById('research-shen-di-' + name + '-compare');
                 const tTotalCompare = document.getElementById('research-shen-total-' + name + '-compare');
-                if (tSpanCompare) tSpanCompare.textContent = allGroupTian[cn];
-                if (dSpanCompare) dSpanCompare.textContent = allGroupDi[cn];
-                if (tTotalCompare) tTotalCompare.textContent = allGroupTian[cn] + allGroupDi[cn];
+                if (tSpanCompare) {
+                    tSpanCompare.dataset.base = allGroupTian[cn];
+                    tSpanCompare.textContent = allGroupTian[cn] + offset.tian;
+                }
+                if (dSpanCompare) {
+                    dSpanCompare.dataset.base = allGroupDi[cn];
+                    dSpanCompare.textContent = allGroupDi[cn] + offset.di;
+                }
+                if (tTotalCompare) tTotalCompare.textContent = allGroupTian[cn] + allGroupDi[cn] + offset.tian + offset.di;
             });
         }
         
@@ -10992,7 +11723,11 @@ function getAllTagCategories() {
         }
         updateShenCounts();
         
-        setTimeout(() => positionResearchShenCards('research-shen-container-compare'), 300);
+        setTimeout(() => {
+            positionResearchShenCards('research-shen-container-compare');
+            initStatsAdjust();
+            updateAllShenCardNumbers();
+        }, 300);
     }
     
     // ==================== 规则挖掘相关变量 ====================
