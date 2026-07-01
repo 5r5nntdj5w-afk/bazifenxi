@@ -1098,6 +1098,33 @@
                         <option value="干支数量-戌">戌数量</option>
                         <option value="干支数量-亥">亥数量</option>
                         </optgroup>
+                        <optgroup label="【精确匹配】性别判断">
+                        <option value="性别">性别</option>
+                        </optgroup>
+                        <optgroup label="【精确匹配】五行数量对比判断">
+                        <option value="五行数量对比-木">木五行数量</option>
+                        <option value="五行数量对比-火">火五行数量</option>
+                        <option value="五行数量对比-土">土五行数量</option>
+                        <option value="五行数量对比-金">金五行数量</option>
+                        <option value="五行数量对比-水">水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【精确匹配】十神数量对比判断">
+                        <option value="十神数量对比-比肩">比肩数量</option>
+                        <option value="十神数量对比-劫财">劫财数量</option>
+                        <option value="十神数量对比-食神">食神数量</option>
+                        <option value="十神数量对比-伤官">伤官数量</option>
+                        <option value="十神数量对比-正财">正财数量</option>
+                        <option value="十神数量对比-偏财">偏财数量</option>
+                        <option value="十神数量对比-正官">正官数量</option>
+                        <option value="十神数量对比-七杀">七杀数量</option>
+                        <option value="十神数量对比-正印">正印数量</option>
+                        <option value="十神数量对比-偏印">偏印数量</option>
+                        <option value="十神数量对比-比劫">比劫数量</option>
+                        <option value="十神数量对比-食伤">食伤数量</option>
+                        <option value="十神数量对比-财星">财星数量</option>
+                        <option value="十神数量对比-官杀">官杀数量</option>
+                        <option value="十神数量对比-印星">印星数量</option>
+                        </optgroup>
                         <optgroup label="【包含匹配】五行判断">
                         <option value="包含-八字天干五行">八字天干五行</option>
                         <option value="包含-八字地支五行">八字地支五行</option>
@@ -4564,6 +4591,32 @@
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
             }
+            else if(c.field === '性别'){
+                const gender = data.gender || '';
+                if(c.val === '不限') res = true;
+                else if(c.op === 'eq') res = gender === c.val;
+                else if(c.op === 'ne') res = gender !== c.val;
+            }
+            else if(c.field.startsWith('五行数量对比-')){
+                const name = c.field.replace('五行数量对比-', '');
+                const cnt1 = stats.wuCount[name] || 0;
+                const cnt2 = stats.wuCount[c.val] || 0;
+                if(c.op === 'eq') res = cnt1 == cnt2;
+                else if(c.op === 'ge') res = cnt1 >= cnt2;
+                else if(c.op === 'gt') res = cnt1 > cnt2;
+                else if(c.op === 'le') res = cnt1 <= cnt2;
+                else if(c.op === 'lt') res = cnt1 < cnt2;
+            }
+            else if(c.field.startsWith('十神数量对比-')){
+                const name = c.field.replace('十神数量对比-', '');
+                const cnt1 = stats.shenCount[name] || stats.groupCount[name] || 0;
+                const cnt2 = stats.shenCount[c.val] || stats.groupCount[c.val] || 0;
+                if(c.op === 'eq') res = cnt1 == cnt2;
+                else if(c.op === 'ge') res = cnt1 >= cnt2;
+                else if(c.op === 'gt') res = cnt1 > cnt2;
+                else if(c.op === 'le') res = cnt1 <= cnt2;
+                else if(c.op === 'lt') res = cnt1 < cnt2;
+            }
             else if(c.field.startsWith('包含-')){
                 const fieldType = c.field.replace('包含-', '');
                 const targetValues = c.val.split(',').filter(v => v);
@@ -4741,7 +4794,8 @@
             shi:{t:document.querySelector('.tiangan[data-type="shi"]').value,d:document.querySelector('.dizhi[data-type="shi"]').value},
             dayun:{t:document.querySelector('.tiangan[data-type="dayun"]').value,d:document.querySelector('.dizhi[data-type="dayun"]').value},
             liunian:{t:document.querySelector('.tiangan[data-type="liunian"]').value,d:document.querySelector('.dizhi[data-type="liunian"]').value},
-            liuyue:{t:document.querySelector('.tiangan[data-type="liuyue"]').value,d:document.querySelector('.dizhi[data-type="liuyue"]').value}
+            liuyue:{t:document.querySelector('.tiangan[data-type="liuyue"]').value,d:document.querySelector('.dizhi[data-type="liuyue"]').value},
+            gender: document.getElementById('birth-gender')?.value === '1' ? '男' : '女'
         };
         if(!data.ri.t){ clearCalc(); return; }
         DOM.statPanel.classList.remove('hidden');
@@ -5116,6 +5170,25 @@
                 valSel.classList.remove('hidden');
                 GROUPED_SHEN.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}</option>`; });
             }
+            else if(field === '性别'){
+                opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
+                valSel.classList.remove('hidden');
+                valSel.innerHTML = '<option value="">请选择性别</option><option value="男">男</option><option value="女">女</option><option value="不限">不限</option>';
+            }
+            else if(field.startsWith('五行数量对比-')){
+                opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                valSel.classList.remove('hidden');
+                valSel.innerHTML = '<option value="">请选择值</option>';
+                WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
+            }
+            else if(field.startsWith('十神数量对比-')){
+                opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                valSel.classList.remove('hidden');
+                valSel.innerHTML = '<option value="">请选择值</option>';
+                // 所有十神类型（区分阴阳+不区分阴阳）
+                const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
+                allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
+            }
             else if(field.includes('数量')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                 valSel.classList.remove('hidden');
@@ -5207,6 +5280,25 @@
                     opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                     valSel.classList.remove('hidden');
                     GROUPED_SHEN.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}</option>`; });
+                }
+                else if(field === '性别'){
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
+                    valSel.classList.remove('hidden');
+                    valSel.innerHTML = '<option value="">请选择性别</option><option value="男">男</option><option value="女">女</option><option value="不限">不限</option>';
+                }
+                else if(field.startsWith('五行数量对比-')){
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                    valSel.classList.remove('hidden');
+                    valSel.innerHTML = '<option value="">请选择值</option>';
+                    WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
+                }
+                else if(field.startsWith('十神数量对比-')){
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                    valSel.classList.remove('hidden');
+                    valSel.innerHTML = '<option value="">请选择值</option>';
+                    // 所有十神类型（区分阴阳+不区分阴阳）
+                    const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
+                    allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
                 }
                 else if(field.includes('数量')){
                     opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
