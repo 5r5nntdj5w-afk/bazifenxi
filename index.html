@@ -16459,7 +16459,9 @@ async function syncCloudToLocal() {
                 conditions: rule.conditions || [],
                 duanyu: rule.duanyu_text,
                 createTime: rule.create_time,
-                isPublic: isPublic // 标记来源
+                isPublic: isPublic, // 标记来源
+                permissionLevel: rule.permission_level !== undefined ? rule.permission_level : (isPublic ? 3 : 0),
+                ownerId: rule.owner_id || rule.user_id || ''
             };
 
             if (localId) {
