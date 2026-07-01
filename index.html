@@ -5949,29 +5949,32 @@
                     }
                 };
             }
-            div.querySelector('.del-btn').onclick = async () => {
-                if(confirm('确定删除？')){
-                    try {
-                        var deleteIndex = cache.rules.findIndex(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
-                        const ruleToDelete = cache.rules[deleteIndex];
-                        // 只有当 id 存在且不为 undefined/null/空字符串时才尝试删除云端数据
-                        if (ruleToDelete.id && ruleToDelete.id !== 'undefined' && ruleToDelete.id !== 'null') {
-                            try {
-                                await deleteSupabaseDuanyu(ruleToDelete.id);
-                            } catch (error) {
-                                console.warn('删除云端断语失败（可能是本地数据）:', error);
-                                // 继续删除本地数据
+            const delBtn = div.querySelector('.del-btn');
+            if (delBtn) {
+                delBtn.onclick = async () => {
+                    if(confirm('确定删除？')){
+                        try {
+                            var deleteIndex = cache.rules.findIndex(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
+                            const ruleToDelete = cache.rules[deleteIndex];
+                            // 只有当 id 存在且不为 undefined/null/空字符串时才尝试删除云端数据
+                            if (ruleToDelete.id && ruleToDelete.id !== 'undefined' && ruleToDelete.id !== 'null') {
+                                try {
+                                    await deleteSupabaseDuanyu(ruleToDelete.id);
+                                } catch (error) {
+                                    console.warn('删除云端断语失败（可能是本地数据）:', error);
+                                    // 继续删除本地数据
+                                }
                             }
+                            cache.rules = cache.rules.filter((_,i)=>i!==deleteIndex);
+                            localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+                            reloadAll();
+                        } catch (error) {
+                            console.error('删除断语失败:', error);
+                            alert('删除断语失败：' + error.message);
                         }
-                        cache.rules = cache.rules.filter((_,i)=>i!==deleteIndex);
-                        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
-                        reloadAll();
-                    } catch (error) {
-                        console.error('删除断语失败:', error);
-                        alert('删除断语失败：' + error.message);
                     }
-                }
-            };
+                };
+            }
             DOM.ruleList.appendChild(div);
         });
         
