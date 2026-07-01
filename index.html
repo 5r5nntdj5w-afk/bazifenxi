@@ -1191,6 +1191,15 @@
                 </div>
             </template>
             <textarea id="rule-duanyu" rows="3" class="w-full p-2 border rounded" placeholder="请输入匹配成功后的断语..."></textarea>
+            <div class="flex items-center gap-2 mt-2" id="permission-level-container">
+                <span class="text-xs text-gray-500">权限等级：</span>
+                <select id="rule-permission-level" class="p-1 border rounded text-xs">
+                    <option value="0">🔒 私有（仅自己可见）</option>
+                    <option value="1">🔓 公开只读（不可转私有）</option>
+                    <option value="2">🔐 公开加密（条件隐藏）</option>
+                    <option value="3">🌍 公开可转私有</option>
+                </select>
+            </div>
         </div>
 
         <div class="bg-white p-4 rounded shadow">
@@ -2637,6 +2646,13 @@
                 return;
             }
 
+            // 水印机制：非管理员复制时追加用户水印
+            if (currentUser && !isAdmin(currentUser.email)) {
+                const now = new Date();
+                const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                text += `\n【水印: ${currentUser.email} | ${timeStr}】`;
+            }
+
             try {
                 await navigator.clipboard.writeText(text);
                 const btnText = DOM.copyDuanyu.innerHTML;
@@ -3302,6 +3318,11 @@
             const tabLoginEl = document.getElementById('tab-login');
             if (tabLoginEl) {
                 tabLoginEl.className = 'nav-btn nav-btn-default';
+            }
+            // 权限等级选择器仅管理员可见
+            const permContainer = document.getElementById('permission-level-container');
+            if (permContainer) {
+                permContainer.style.display = (currentUser && isAdmin(currentUser.email)) ? 'flex' : 'none';
             }
             loadCategories(); 
             reloadAll();
@@ -5353,6 +5374,12 @@
             DOM.customCategory.classList.add('hidden');
             DOM.ruleDuanyu.value = '';
             
+            // 重置权限等级为私有
+            const permLevelSel = document.getElementById('rule-permission-level');
+            if (permLevelSel) {
+                permLevelSel.value = '0';
+            }
+            
             // 重置根容器，只保留一个初始条件组
             const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
             rootContainer.innerHTML = '';
@@ -5418,6 +5445,12 @@
     }
     
     function initSaveRule() {
+        // 权限等级选择器仅管理员可见
+        const permContainer = document.getElementById('permission-level-container');
+        if (permContainer) {
+            permContainer.style.display = (currentUser && isAdmin(currentUser.email)) ? 'flex' : 'none';
+        }
+        
         DOM.saveRule.onclick = async function() {
             let category = DOM.ruleCategory.value;
             if (category === '自定义') {
@@ -5454,8 +5487,12 @@
             const duanyu = DOM.ruleDuanyu.value.trim();
             if (!duanyu) return alert('请输入断语！');
 
+            // 获取权限等级（管理员可见该选项，普通用户不可见时默认为0）
+            const permissionLevelSel = document.getElementById('rule-permission-level');
+            const permissionLevel = permissionLevelSel ? parseInt(permissionLevelSel.value) : 0;
+
             const now = new Date().toISOString(); // 使用ISO格式时间，包含毫秒
-            const duanyuData = { category, conditions: conditionGroup, duanyu };
+            const duanyuData = { category, conditions: conditionGroup, duanyu, permissionLevel };
             
             try {
                 if (editIndex >= 0) {
@@ -5466,6 +5503,7 @@
                     cache.rules[editIndex] = { 
                         ...duanyuData, 
                         id: oldRule.id,
+                        isPublic: permissionLevel > 0,
                         createTime: oldRule.createTime || now,
                         updateTime: now 
                     };
@@ -5474,6 +5512,7 @@
                     cache.rules.push({
                         ...duanyuData,
                         id: newDuanyu.id,
+                        isPublic: permissionLevel > 0,
                         createTime: newDuanyu.create_time || now
                     });
                 }
@@ -5689,36 +5728,79 @@
         pageData.forEach((rule, idx) => {
             const div = document.createElement('div');
             div.className='p-3 border rounded bg-gray-50';
-            let condText = conditionsToText(rule.conditions);
-            // 显示时间：有修改时间显示修改时间，否则显示创建时间
             const showTime = rule.updateTime || rule.createTime;
             const timeLabel = rule.updateTime ? '修改时间' : '创建时间';
             
-            // 判断是否为公开断语（系统预设）
-            const isPublic = rule.isPublic === true || rule.is_public === true;
-            const sourceLabel = isPublic ? '<span class="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-xs">系统</span>' : '<span class="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-xs">私有</span>';
-            const publicBtnText = isPublic ? '转为私有' : '设为公开';
-            const publicBtnClass = isPublic ? 'public-btn px-2 py-1 bg-gray-500 text-white rounded text-xs' : 'public-btn px-2 py-1 bg-orange-500 text-white rounded text-xs';
+            // 权限等级判断
+            const permLevel = rule.permissionLevel !== undefined ? rule.permissionLevel : (rule.isPublic === true || rule.is_public === true ? 3 : 0);
+            const isAdminUser = currentUser && isAdmin(currentUser.email);
+            const isOwner = currentUser && (rule.ownerId === currentUser.id || rule.userId === currentUser.id || !rule.ownerId);
+            
+            // 权限等级标签
+            const permLabels = {
+                0: '<span class="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-xs">私有</span>',
+                1: '<span class="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-xs">公开只读</span>',
+                2: '<span class="px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs">🔐 公开加密</span>',
+                3: '<span class="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-xs">公开</span>'
+            };
+            const sourceLabel = permLabels[permLevel] || permLabels[0];
+            
+            // 条件文本（加密等级隐藏条件）
+            let condText;
+            if (permLevel === 2 && !isAdminUser) {
+                condText = '🔒 该断语条件已加密，仅管理员可见';
+            } else {
+                condText = conditionsToText(rule.conditions);
+            }
+            
+            // 是否可转为私有（管理员或公开可转私有等级）
+            const canTogglePrivate = isAdminUser || (permLevel === 3 && isOwner);
+            
+            // 构建操作按钮
+            let actionButtons = '';
+            
+            // 公开/私有切换按钮
+            if (permLevel === 3) {
+                actionButtons += `<button class="public-btn px-2 py-1 bg-gray-500 text-white rounded text-xs">转为私有</button>`;
+            } else if (permLevel === 1 && isAdminUser) {
+                actionButtons += `<button class="public-btn px-2 py-1 bg-orange-500 text-white rounded text-xs">设为公开</button>`;
+            } else if (permLevel === 0 && (isAdminUser || isOwner)) {
+                actionButtons += `<button class="public-btn px-2 py-1 bg-orange-500 text-white rounded text-xs">设为公开</button>`;
+            }
+            
+            // 复制按钮（加密等级仅管理员可复制）
+            if (permLevel === 2 && !isAdminUser) {
+                actionButtons += `<button class="copy-btn px-2 py-1 bg-gray-400 text-white rounded text-xs cursor-not-allowed" disabled>复制</button>`;
+            } else {
+                actionButtons += `<button class="copy-btn px-2 py-1 bg-green-500 text-white rounded text-xs">复制</button>`;
+            }
+            
+            // 编辑按钮（管理员或拥有者可编辑；加密等级只有管理员可编辑）
+            const canEdit = isAdminUser || (isOwner && permLevel !== 2);
+            if (canEdit) {
+                actionButtons += `<button class="edit-btn px-2 py-1 bg-blue-500 text-white rounded text-xs">编辑</button>`;
+            }
+            // 删除按钮（管理员或拥有者可删除）
+            if (isAdminUser || isOwner) {
+                actionButtons += `<button class="del-btn px-2 py-1 bg-red-500 text-white rounded text-xs">删除</button>`;
+            }
             
             div.innerHTML = `
                 <div class="flex justify-between items-start">
-                    <div class="flex gap-3">
-                        <input type="checkbox" class="rule-checkbox mt-1" data-duanyu="${rule.duanyu}" data-category="${rule.category}">
-                        <div>
+                    <div class="flex gap-3 flex-1 min-w-0">
+                        <input type="checkbox" class="rule-checkbox mt-1 flex-shrink-0" data-duanyu="${rule.duanyu}" data-category="${rule.category}">
+                        <div class="min-w-0">
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="font-bold">【${rule.category}】</span>
                                 ${sourceLabel}
                             </div>
-                            <div class="text-sm">条件：${condText}</div>
-                            <div class="text-green-700">断语：${rule.duanyu}</div>
+                            <div class="text-sm break-words">条件：${condText}</div>
+                            <div class="text-green-700 break-words">断语：${rule.duanyu}</div>
                             <div class="text-xs text-gray-500">${timeLabel}：${showTime}</div>
                         </div>
                     </div>
-                    <div class="flex flex-col gap-1">
-                        <button class="${publicBtnClass}" data-index="${idx}">${publicBtnText}</button>
-                        <button class="copy-btn px-2 py-1 bg-green-500 text-white rounded text-xs">复制</button>
-                        <button class="edit-btn px-2 py-1 bg-blue-500 text-white rounded text-xs">编辑</button>
-                        <button class="del-btn px-2 py-1 bg-red-500 text-white rounded text-xs">删除</button>
+                    <div class="flex flex-col gap-1 flex-shrink-0 ml-2">
+                        ${actionButtons}
                     </div>
                 </div>
             `;
@@ -5739,106 +5821,134 @@
                 }
                 updateSelectionUI();
             };
+            
             // 公开/私有切换
-            div.querySelector('.public-btn').onclick = async () => {
-                try {
-                    const ruleToUpdate = cache.rules.find(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
-                    if (!ruleToUpdate) return;
-                    
-                    const newIsPublic = !(ruleToUpdate.isPublic === true || ruleToUpdate.is_public === true);
-                    ruleToUpdate.isPublic = newIsPublic;
-                    ruleToUpdate.updateTime = new Date().toISOString();
-                    
-                    // 如果有云端ID，更新云端
-                    if (ruleToUpdate.id && ruleToUpdate.id !== 'undefined' && ruleToUpdate.id !== 'null') {
-                        try {
-                            await supabaseClient
-                                .from('duanyu')
-                                .update({ is_public: newIsPublic })
-                                .eq('id', ruleToUpdate.id);
-                        } catch (error) {
-                            console.warn('更新云端公开状态失败:', error);
+            const publicBtn = div.querySelector('.public-btn');
+            if (publicBtn) {
+                publicBtn.onclick = async () => {
+                    try {
+                        const ruleToUpdate = cache.rules.find(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
+                        if (!ruleToUpdate) return;
+                        
+                        // 计算新的权限等级
+                        const currentLevel = ruleToUpdate.permissionLevel !== undefined ? ruleToUpdate.permissionLevel : (ruleToUpdate.isPublic === true || ruleToUpdate.is_public === true ? 3 : 0);
+                        let newLevel;
+                        if (currentLevel >= 1) {
+                            newLevel = 0; // 公开→私有
+                        } else {
+                            newLevel = 3; // 私有→公开可转私有
                         }
+                        ruleToUpdate.permissionLevel = newLevel;
+                        ruleToUpdate.isPublic = newLevel > 0;
+                        ruleToUpdate.updateTime = new Date().toISOString();
+                        
+                        // 如果有云端ID，更新云端
+                        if (ruleToUpdate.id && ruleToUpdate.id !== 'undefined' && ruleToUpdate.id !== 'null') {
+                            try {
+                                await supabaseClient
+                                    .from('duanyu')
+                                    .update({ 
+                                        is_public: newLevel > 0,
+                                        permission_level: newLevel
+                                    })
+                                    .eq('id', ruleToUpdate.id);
+                            } catch (error) {
+                                console.warn('更新云端权限状态失败:', error);
+                            }
+                        }
+                        
+                        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+                        reloadAll();
+                        alert(newLevel > 0 ? '已设为公开断语' : '已设为私有断语');
+                    } catch (error) {
+                        console.error('切换公开状态失败:', error);
+                        alert('切换公开状态失败：' + error.message);
                     }
-                    
+                };
+            }
+            
+            // 复制（带水印）
+            const copyBtn = div.querySelector('.copy-btn');
+            if (copyBtn && !copyBtn.disabled) {
+                copyBtn.onclick = () => {
+                    var copyRule = {
+                        category: rule.category,
+                        conditions: JSON.parse(JSON.stringify(rule.conditions)),
+                        duanyu: '（复制）' + rule.duanyu,
+                        createTime: new Date().toISOString()
+                    };
+                    cache.rules.push(copyRule);
                     localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
                     reloadAll();
-                    alert(newIsPublic ? '已设为公开断语（系统预设）' : '已设为私有断语');
-                } catch (error) {
-                    console.error('切换公开状态失败:', error);
-                    alert('切换公开状态失败：' + error.message);
-                }
-            };
-            // 复制
-            div.querySelector('.copy-btn').onclick = () => {
-                var copyRule = {
-                    category: rule.category,
-                    conditions: JSON.parse(JSON.stringify(rule.conditions)),
-                    duanyu: '（复制）' + rule.duanyu,
-                    createTime: new Date().toISOString() // 使用ISO格式时间，包含毫秒
                 };
-                cache.rules.push(copyRule);
-                localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
-                reloadAll();
-            };
+            }
+            
             // 编辑
-            div.querySelector('.edit-btn').onclick = () => {
-                editIndex = cache.rules.findIndex(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
-                DOM.ruleCategory.value = rule.category;
-                DOM.ruleDuanyu.value = rule.duanyu;
-                
-                // 清空现有条件组
-                const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
-                rootContainer.innerHTML = '';
-                
-                // 检查是否为新的条件组格式
-                if (rule.conditions && rule.conditions.children) {
-                    // 新格式：嵌套条件组
-                    renderConditionGroup(rule.conditions, rootContainer);
-                } else if (Array.isArray(rule.conditions)) {
-                    // 旧格式：线性条件数组，转换为新的条件组格式
-                    const initialGroup = createConditionGroupElement('and', true);
-                    rootContainer.appendChild(initialGroup);
-                    const groupChildren = initialGroup.querySelector('.group-children');
+            const editBtn = div.querySelector('.edit-btn');
+            if (editBtn) {
+                editBtn.onclick = () => {
+                    editIndex = cache.rules.findIndex(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
+                    DOM.ruleCategory.value = rule.category;
+                    DOM.ruleDuanyu.value = rule.duanyu;
                     
-                    rule.conditions.forEach((c, i) => {
-                        const item = createConditionItemElement();
-                        groupChildren.appendChild(item);
-                        bindItemEvents(item);
+                    // 设置权限等级
+                    const permLevelSel = document.getElementById('rule-permission-level');
+                    if (permLevelSel) {
+                        permLevelSel.value = rule.permissionLevel !== undefined ? rule.permissionLevel : (rule.isPublic === true || rule.is_public === true ? 3 : 0);
+                    }
+                    
+                    // 清空现有条件组
+                    const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
+                    rootContainer.innerHTML = '';
+                
+                    // 检查是否为新的条件组格式
+                    if (rule.conditions && rule.conditions.children) {
+                        // 新格式：嵌套条件组
+                        renderConditionGroup(rule.conditions, rootContainer);
+                    } else if (Array.isArray(rule.conditions)) {
+                        // 旧格式：线性条件数组，转换为新的条件组格式
+                        const initialGroup = createConditionGroupElement('and', true);
+                        rootContainer.appendChild(initialGroup);
+                        const groupChildren = initialGroup.querySelector('.group-children');
                         
-                        const fieldSel = item.querySelector('.condition-field');
-                        const opSel = item.querySelector('.condition-op');
-                        const logicSel = item.querySelector('.condition-logic');
-                        const valSel = item.querySelector('.condition-val-select');
-                        const valInput = item.querySelector('.condition-val-input');
-                        const valCheckbox = item.querySelector('.condition-val-checkbox');
-                        
-                        fieldSel.value = c.field || '';
-                        
-                        // 触发onchange初始化值控件
-                        if (fieldSel.onchange) {
-                            fieldSel.onchange();
-                        }
-                        
-                        // onchange之后再设置op和logic
-                        opSel.value = c.op || 'eq';
-                        logicSel.value = c.logic || 'and';
-                        
-                        // 设置值
-                        if (!valCheckbox.classList.contains('hidden') && c.val) {
-                            const values = c.val.split(',').filter(v => v);
-                            valCheckbox.querySelectorAll('input').forEach(cb => {
-                                cb.checked = values.includes(cb.value);
-                            });
-                        } else if (!valSel.classList.contains('hidden')) {
-                            valSel.value = c.val || '';
-                        } else {
-                            valInput.value = c.val || '';
-                        }
-                    });
-                }
-            };
-            // 删除
+                        rule.conditions.forEach((c, i) => {
+                            const item = createConditionItemElement();
+                            groupChildren.appendChild(item);
+                            bindItemEvents(item);
+                            
+                            const fieldSel = item.querySelector('.condition-field');
+                            const opSel = item.querySelector('.condition-op');
+                            const logicSel = item.querySelector('.condition-logic');
+                            const valSel = item.querySelector('.condition-val-select');
+                            const valInput = item.querySelector('.condition-val-input');
+                            const valCheckbox = item.querySelector('.condition-val-checkbox');
+                            
+                            fieldSel.value = c.field || '';
+                            
+                            // 触发onchange初始化值控件
+                            if (fieldSel.onchange) {
+                                fieldSel.onchange();
+                            }
+                            
+                            // onchange之后再设置op和logic
+                            opSel.value = c.op || 'eq';
+                            logicSel.value = c.logic || 'and';
+                            
+                            // 设置值
+                            if (!valCheckbox.classList.contains('hidden') && c.val) {
+                                const values = c.val.split(',').filter(v => v);
+                                valCheckbox.querySelectorAll('input').forEach(cb => {
+                                    cb.checked = values.includes(cb.value);
+                                });
+                            } else if (!valSel.classList.contains('hidden')) {
+                                valSel.value = c.val || '';
+                            } else {
+                                valInput.value = c.val || '';
+                            }
+                        });
+                    }
+                };
+            }
             div.querySelector('.del-btn').onclick = async () => {
                 if(confirm('确定删除？')){
                     try {
@@ -7000,10 +7110,12 @@
             .from('duanyu')
             .insert([{
                 user_id: currentUser.id,
+                owner_id: currentUser.id,
                 category: duanyuData.category,
                 conditions: duanyuData.conditions,
                 duanyu_text: duanyuData.duanyu,
-                is_public: duanyuData.isPublic === true
+                is_public: (duanyuData.permissionLevel || 0) > 0,
+                permission_level: duanyuData.permissionLevel || 0
             }])
             .select();
         if (error) throw error;
@@ -7069,7 +7181,8 @@
                 category: duanyuData.category,
                 conditions: duanyuData.conditions,
                 duanyu_text: duanyuData.duanyu,
-                is_public: duanyuData.isPublic === true,
+                is_public: (duanyuData.permissionLevel || 0) > 0,
+                permission_level: duanyuData.permissionLevel || 0,
                 update_time: new Date().toISOString()
             })
             .eq('id', duanyuId)
@@ -14366,7 +14479,9 @@ async function loadDataFromSupabase() {
                 conditions: d.conditions,
                 duanyu: d.duanyu_text,
                 createTime: d.create_time,
-                isPublic: d.is_public === true // 保留公开状态
+                isPublic: d.is_public === true, // 保留公开状态
+                permissionLevel: d.permission_level !== undefined ? d.permission_level : (d.is_public === true ? 3 : 0),
+                ownerId: d.owner_id || d.user_id || ''
             };
             
             if (localId) {
