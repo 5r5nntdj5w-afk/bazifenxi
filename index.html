@@ -4647,9 +4647,9 @@
             groupDi[groupName] += groupOffset.di;
             if (groupDi[groupName] < 0) groupDi[groupName] = 0;
             
-            // 应用到 groupCount
-            groupCount[groupName] += groupOffset.tian + groupOffset.di;
-            if (groupCount[groupName] < 0) groupCount[groupName] = 0;
+            // 应用到 group
+            group[groupName] += groupOffset.tian + groupOffset.di;
+            if (group[groupName] < 0) group[groupName] = 0;
             
             // 应用到 wuCount（根据十神对应的五行自动推算）
             if (wuXing && wu[wuXing] !== undefined) {
