@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -2821,26 +2821,6 @@
     
     // 十神数量调节功能
     function initStatsAdjust() {
-        const panels = [
-            { toggleId: 'toggle-adjust-panel', panelId: 'adjust-panel', arrowId: 'adjust-panel-arrow' },
-            { toggleId: 'toggle-adjust-panel-view', panelId: 'adjust-panel-view', arrowId: 'adjust-panel-arrow-view' },
-            { toggleId: 'toggle-adjust-panel-research', panelId: 'adjust-panel-research', arrowId: 'adjust-panel-arrow-research' },
-            { toggleId: 'toggle-adjust-panel-compare', panelId: 'adjust-panel-compare', arrowId: 'adjust-panel-arrow-compare' },
-            { toggleId: 'toggle-adjust-panel-detail', panelId: 'adjust-panel-detail', arrowId: 'adjust-panel-arrow-detail' }
-        ];
-        
-        panels.forEach(p => {
-            const toggleBtn = document.getElementById(p.toggleId);
-            const panel = document.getElementById(p.panelId);
-            const arrow = document.getElementById(p.arrowId);
-            if (toggleBtn && panel && arrow) {
-                toggleBtn.onclick = () => {
-                    panel.classList.toggle('hidden');
-                    arrow.textContent = panel.classList.contains('hidden') ? '▼' : '▲';
-                };
-            }
-        });
-        
         const resetBtns = ['reset-adjust', 'reset-adjust-view', 'reset-adjust-research', 'reset-adjust-compare', 'reset-adjust-detail'];
         resetBtns.forEach(btnId => {
             const btn = document.getElementById(btnId);
@@ -2918,9 +2898,47 @@
                 totalSpan.textContent = newTian + newDi;
             }
         });
+        
+        // 处理案例库页面(view)的十神卡片
+        groups.forEach(name => {
+            const chineseName = chineseNames[name];
+            const groupOffset = offset[chineseName] || {tian: 0, di: 0};
+            
+            const tianSpan = document.getElementById('view-shen-tian-' + name);
+            const diSpan = document.getElementById('view-shen-di-' + name);
+            const totalSpan = document.getElementById('view-shen-total-' + name);
+            
+            if (tianSpan && diSpan && totalSpan) {
+                const baseTian = parseInt(tianSpan.dataset.base || tianSpan.textContent) || 0;
+                const baseDi = parseInt(diSpan.dataset.base || diSpan.textContent) || 0;
+                
+                let newTian = baseTian + groupOffset.tian;
+                let newDi = baseDi + groupOffset.di;
+                if (newTian < 0) newTian = 0;
+                if (newDi < 0) newDi = 0;
+                
+                tianSpan.textContent = newTian;
+                diSpan.textContent = newDi;
+                totalSpan.textContent = newTian + newDi;
+            }
+        });
     }
     
     document.addEventListener('click', (e) => {
+        // 处理折叠/展开按钮
+        const toggleBtn = e.target.closest('[id^="toggle-adjust-panel"]');
+        if (toggleBtn) {
+            const suffix = toggleBtn.id.replace('toggle-adjust-panel', '');
+            const panel = document.getElementById('adjust-panel' + suffix);
+            const arrow = document.getElementById('adjust-panel-arrow' + suffix);
+            if (panel && arrow) {
+                panel.classList.toggle('hidden');
+                arrow.textContent = panel.classList.contains('hidden') ? '▼' : '▲';
+            }
+            return;
+        }
+        
+        // 处理 +/- 调节按钮
         const btn = e.target.closest('.adjust-btn');
         if (!btn) return;
         
@@ -4447,12 +4465,13 @@
             const tSpan = document.getElementById('view-shen-tian-' + name);
             const dSpan = document.getElementById('view-shen-di-' + name);
             const totalSpan = document.getElementById('view-shen-total-' + name);
+            const vOffset = (cache.statsOffset?.[cn]) || {tian: 0, di: 0};
             if (tSpan) {
-                tSpan.dataset.base = groupTian[cn];
+                tSpan.dataset.base = groupTian[cn] - vOffset.tian;
                 tSpan.textContent = groupTian[cn];
             }
             if (dSpan) {
-                dSpan.dataset.base = groupDi[cn];
+                dSpan.dataset.base = groupDi[cn] - vOffset.di;
                 dSpan.textContent = groupDi[cn];
             }
             if (totalSpan) totalSpan.textContent = groupTian[cn] + groupDi[cn];
@@ -5293,12 +5312,13 @@
             const tSpan = document.getElementById('shen-tian-' + name);
             const dSpan = document.getElementById('shen-di-' + name);
             const totalSpan = document.getElementById('shen-total-' + name);
+            const grpOffset = (cache.statsOffset?.[cn]) || {tian: 0, di: 0};
             if (tSpan) {
-                tSpan.dataset.base = groupTian[cn];
+                tSpan.dataset.base = groupTian[cn] - grpOffset.tian;
                 tSpan.textContent = groupTian[cn];
             }
             if (dSpan) {
-                dSpan.dataset.base = groupDi[cn];
+                dSpan.dataset.base = groupDi[cn] - grpOffset.di;
                 dSpan.textContent = groupDi[cn];
             }
             if (totalSpan) totalSpan.textContent = groupCount[cn];
