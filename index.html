@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -5556,7 +5556,7 @@
         
         for(let k in data){
             const item=data[k];
-            if (k === 'gender') continue; // gender是字符串属性，跳过DOM更新
+            if (k === 'gender' || k === 'hasBirthData' || k === 'effectiveAge') continue; // 跳过非八字属性
             if(item.t) {
                 const tianWuXing = WU_XING[item.t];
                 const tianColor = getWuXingColor(tianWuXing);
