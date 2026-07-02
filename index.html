@@ -3063,21 +3063,53 @@
     
     // 动态调整数量调节十神卡片颜色，与十神关系图卡片颜色保持一致
     function updateAdjustCardColors() {
-        const shenWuXing = cache.shenWuXing;
-        if (!shenWuXing) return;
+        // 面板后缀 → 十神天干 span ID 前缀映射
+        const panelSuffixToIdPrefix = {
+            '': 'shen-tian-',
+            '-view': 'view-shen-tian-',
+            '-research': 'research-shen-tian-',
+            '-detail': 'research-shen-tian-',
+            '-compare': 'research-shen-tian-'
+        };
+        // detail/compare 需要额外追加面板后缀
+        const suffixNeedsAppend = ['-detail', '-compare'];
         
-        const groupMap = {
-            '比劫': '比劫',
-            '食伤': '食伤',
-            '财星': '财星',
-            '官杀': '官杀',
-            '印星': '印星'
+        // 十神组名 → ID 中的名称片段
+        const groupToName = {
+            '比劫': 'bijie', '食伤': 'shishang', '财星': 'caixing',
+            '官杀': 'guansha', '印星': 'yinxing'
+        };
+        
+        // CSS 颜色名 → 五行映射（用于从十神关系图卡片中反向推导五行）
+        const colorToWuXing = {
+            'green': '木', 'red': '火', 'stone': '土',
+            'amber': '土', 'yellow': '金', 'blue': '水'
         };
         
         document.querySelectorAll('.adjust-card').forEach(card => {
             const group = card.dataset.shenGroup;
             if (!group) return;
-            const wuxing = shenWuXing[group];
+            
+            // 找到所属面板
+            const panel = card.closest('[id^="adjust-panel"]');
+            if (!panel) return;
+            const suffix = panel.id.replace('adjust-panel', ''); // '', '-view', '-research' 等
+            
+            // 构建十神天干 span 的 ID
+            const groupName = groupToName[group];
+            if (!groupName) return;
+            const baseId = (panelSuffixToIdPrefix[suffix] || 'shen-tian-') + groupName;
+            const tianSpanId = suffixNeedsAppend.includes(suffix) ? baseId + suffix : baseId;
+            
+            // 获取天干 span → 父元素（带 text-*-* 颜色类的 div） → 提取色调
+            const tianSpan = document.getElementById(tianSpanId);
+            if (!tianSpan) return;
+            const parentDiv = tianSpan.parentElement;
+            if (!parentDiv) return;
+            const match = parentDiv.className.match(/text-(\w+)-\d+/);
+            if (!match) return;
+            
+            const wuxing = colorToWuXing[match[1]];
             if (!wuxing) return;
             const colors = getWuXingColor(wuxing);
             
@@ -9288,6 +9320,10 @@ function getAllTagCategories() {
             setupTimelineEditEvents(paipanResult, caseData, year);
             
             setupDayunAndLiunianHandlers(paipanResult, caseData, year, result);
+            
+            // 研究页面数量调节面板已渲染，绑定重置按钮事件
+            initStatsAdjust();
+            updateAllShenCardNumbers();
         }, 100);
     }
     
@@ -11062,6 +11098,10 @@ function getAllTagCategories() {
             }
             if (totalSpan) totalSpan.textContent = initGroupTian[chineseName] + initGroupDi[chineseName] + offset.tian + offset.di;
         });
+        
+        // 详情弹窗数量调节面板已渲染，绑定重置按钮事件
+        initStatsAdjust();
+        updateAllShenCardNumbers();
         
         // 定位十神卡片
         setTimeout(() => positionResearchShenCards('research-shen-container-detail'), 300);
