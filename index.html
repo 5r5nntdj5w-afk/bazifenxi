@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -6067,7 +6067,7 @@
                     }
                     val = Array.from(checkedBoxes).map(cb => cb.value).join(',');
                 } else {
-                    val = valSel.hidden ? valInput.value.trim() : valSel.value;
+                    val = valSel.classList.contains('hidden') ? valInput.value.trim() : valSel.value;
                 }
                 
                 if (!field || !val) {
