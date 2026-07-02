@@ -5225,6 +5225,17 @@
                 else if(c.op === 'eq') res = gender === c.val;
                 else if(c.op === 'ne') res = gender !== c.val;
             }
+            else if (c.field === '年龄') {
+                if (data.effectiveAge == null) {
+                    res = false;
+                } else {
+                    const e = data.effectiveAge, v = Number(c.val);
+                    if (c.op === 'ge') res = e >= v;
+                    else if (c.op === 'gt') res = e > v;
+                    else if (c.op === 'le') res = e <= v;
+                    else if (c.op === 'lt') res = e < v;
+                }
+            }
             else if(c.field.startsWith('五行数量对比-')){
                 const name = c.field.replace('五行数量对比-', '');
                 const cnt1 = stats.wuCount[name] || 0;
