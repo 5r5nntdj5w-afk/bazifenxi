@@ -2896,8 +2896,10 @@
                     };
                     updateAdjustDisplay();
                     updateAllShenCardNumbers();
-                    if (typeof calcAll === 'function') {
-                        calcAll();
+                    try {
+                        if (typeof calcAll === 'function') calcAll();
+                    } catch(e) {
+                        console.warn('重置后 calcAll 执行异常（非主页面正常现象）:', e);
                     }
                 };
             }
@@ -9859,6 +9861,7 @@ function getAllTagCategories() {
         };
         
         const shenWuXing = getShenWuXing(rgWuXing);
+        if (window.cache) window.cache.shenWuXing = shenWuXing;
         
         const getShenCardColors = (groupName) => {
             const wuxing = shenWuXing[groupName];
@@ -10440,6 +10443,7 @@ function getAllTagCategories() {
         };
         
         const shenWuXing = getShenWuXing(rgWuXing);
+        if (window.cache) window.cache.shenWuXing = shenWuXing;
         
         // 计算十神卡片的动态颜色
         const getShenCardColors = (groupName) => {
@@ -11352,6 +11356,7 @@ function getAllTagCategories() {
             '官杀': keWo,
             '印星': shengWo
         };
+        if (window.cache) window.cache.shenWuXing = shenWuXing;
         
         const getShenCardColors = (groupName) => {
             return getWuXingColor(shenWuXing[groupName]);
