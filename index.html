@@ -725,110 +725,110 @@
                         <span id="adjust-panel-arrow">▼</span>
                     </button>
                     <div id="adjust-panel" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
-                        <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll">
-                            <!-- 比劫 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-green-50 rounded-lg py-1.5 px-1 border border-green-200">
-                                <div class="font-bold text-green-700 text-xs leading-tight">比劫</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-green-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-bijie">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
+                            <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                                <!-- 比劫 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-bijie">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-bijie">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-green-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-bijie">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                <!-- 食伤 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="食伤">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">食伤</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-shishang">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-shishang">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 财星 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="财星">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">财星</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-caixing">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-caixing">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 官杀 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="官杀">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">官杀</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-guansha">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-guansha">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 印星 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="印星">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">印星</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-yinxing">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-yinxing">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="inc">+</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <!-- 食伤 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-red-50 rounded-lg py-1.5 px-1 border border-red-200">
-                                <div class="font-bold text-red-600 text-xs leading-tight">食伤</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-red-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-shishang">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-red-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-shishang">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 财星 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-amber-50 rounded-lg py-1.5 px-1 border border-amber-200">
-                                <div class="font-bold text-amber-700 text-xs leading-tight">财星</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-amber-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-caixing">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-amber-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-caixing">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 官杀 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-yellow-50 rounded-lg py-1.5 px-1 border border-yellow-200">
-                                <div class="font-bold text-yellow-600 text-xs leading-tight">官杀</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-yellow-500 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-guansha">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-yellow-500 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-guansha">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 印星 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-blue-50 rounded-lg py-1.5 px-1 border border-blue-200">
-                                <div class="font-bold text-blue-600 text-xs leading-tight">印星</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-blue-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-yinxing">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-blue-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-yinxing">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex justify-center mt-2">
-                            <button id="reset-adjust" class="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
+                            <button id="reset-adjust" class="flex-shrink-0 px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
                         </div>
                     </div>
                 </div>
@@ -2286,110 +2286,110 @@
                             <span id="adjust-panel-arrow-view">▼</span>
                         </button>
                         <div id="adjust-panel-view" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
-                            <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll">
-                                <!-- 比劫 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-green-50 rounded-lg py-1.5 px-1 border border-green-200">
-                                    <div class="font-bold text-green-700 text-xs leading-tight">比劫</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-green-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-bijie-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                            <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
+                                <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                                    <!-- 比劫 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-bijie-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-bijie-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-green-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-bijie-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                    <!-- 食伤 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="食伤">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">食伤</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-shishang-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-shishang-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 财星 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="财星">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">财星</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-caixing-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-caixing-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 官杀 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="官杀">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">官杀</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-guansha-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-guansha-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 印星 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="印星">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">印星</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-yinxing-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-yinxing-view">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="inc">+</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <!-- 食伤 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-red-50 rounded-lg py-1.5 px-1 border border-red-200">
-                                    <div class="font-bold text-red-600 text-xs leading-tight">食伤</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-red-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-shishang-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-red-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-shishang-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- 财星 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-amber-50 rounded-lg py-1.5 px-1 border border-amber-200">
-                                    <div class="font-bold text-amber-700 text-xs leading-tight">财星</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-amber-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-caixing-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-amber-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-caixing-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- 官杀 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-yellow-50 rounded-lg py-1.5 px-1 border border-yellow-200">
-                                    <div class="font-bold text-yellow-600 text-xs leading-tight">官杀</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-yellow-500 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-guansha-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-yellow-500 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-guansha-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- 印星 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-blue-50 rounded-lg py-1.5 px-1 border border-blue-200">
-                                    <div class="font-bold text-blue-600 text-xs leading-tight">印星</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-blue-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-yinxing-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-blue-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-yinxing-view">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex justify-center mt-2">
-                                <button id="reset-adjust-view" class="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
+                                <button id="reset-adjust-view" class="flex-shrink-0 px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
                             </div>
                         </div>
                     </div>
@@ -2539,12 +2539,12 @@
     // 根据五行获取颜色类（全局函数）
     function getWuXingColor(wuxing) {
         switch(wuxing) {
-            case '火': return { text: 'text-red-600', bg: 'bg-red-50', bgLight: 'bg-red-50', border: 'border-red-300' };
-            case '土': return { text: 'text-stone-600', bg: 'bg-stone-100', bgLight: 'bg-stone-50', border: 'border-stone-400' };
-            case '金': return { text: 'text-yellow-600', bg: 'bg-yellow-50', bgLight: 'bg-yellow-50', border: 'border-yellow-300' };
-            case '水': return { text: 'text-blue-600', bg: 'bg-blue-50', bgLight: 'bg-blue-50', border: 'border-blue-300' };
-            case '木': return { text: 'text-green-600', bg: 'bg-green-50', bgLight: 'bg-green-50', border: 'border-green-300' };
-            default: return { text: 'text-gray-600', bg: 'bg-gray-50', bgLight: 'bg-gray-50', border: 'border-gray-300' };
+            case '火': return { text: 'text-red-600', bg: 'bg-red-50', bgLight: 'bg-red-50', border: 'border-red-300', btnBg: 'bg-red-200', btnHover: 'hover:bg-red-300', label: 'text-red-400' };
+            case '土': return { text: 'text-stone-600', bg: 'bg-stone-100', bgLight: 'bg-stone-50', border: 'border-stone-400', btnBg: 'bg-stone-200', btnHover: 'hover:bg-stone-300', label: 'text-stone-400' };
+            case '金': return { text: 'text-yellow-600', bg: 'bg-yellow-50', bgLight: 'bg-yellow-50', border: 'border-yellow-300', btnBg: 'bg-yellow-200', btnHover: 'hover:bg-yellow-300', label: 'text-yellow-400' };
+            case '水': return { text: 'text-blue-600', bg: 'bg-blue-50', bgLight: 'bg-blue-50', border: 'border-blue-300', btnBg: 'bg-blue-200', btnHover: 'hover:bg-blue-300', label: 'text-blue-400' };
+            case '木': return { text: 'text-green-600', bg: 'bg-green-50', bgLight: 'bg-green-50', border: 'border-green-300', btnBg: 'bg-green-200', btnHover: 'hover:bg-green-300', label: 'text-green-400' };
+            default: return { text: 'text-gray-600', bg: 'bg-gray-50', bgLight: 'bg-gray-50', border: 'border-gray-300', btnBg: 'bg-gray-200', btnHover: 'hover:bg-gray-300', label: 'text-gray-400' };
         }
     }
     
@@ -2983,6 +2983,9 @@
                 totalSpan.textContent = newTian + newDi;
             }
         });
+        
+        // 更新数量调节卡片颜色
+        updateAdjustCardColors();
     }
     
     document.addEventListener('click', (e) => {
@@ -3052,6 +3055,65 @@
                         el.textContent = offset[type];
                     }
                 });
+            });
+        });
+    }
+    
+    // 动态调整数量调节十神卡片颜色，与十神关系图卡片颜色保持一致
+    function updateAdjustCardColors() {
+        const shenWuXing = cache.shenWuXing;
+        if (!shenWuXing) return;
+        
+        const groupMap = {
+            '比劫': '比劫',
+            '食伤': '食伤',
+            '财星': '财星',
+            '官杀': '官杀',
+            '印星': '印星'
+        };
+        
+        document.querySelectorAll('.adjust-card').forEach(card => {
+            const group = card.dataset.shenGroup;
+            if (!group) return;
+            const wuxing = shenWuXing[group];
+            if (!wuxing) return;
+            const colors = getWuXingColor(wuxing);
+            
+            // 卡片背景和边框
+            card.className = card.className
+                .replace(/bg-\w+-\d+/g, '')
+                .replace(/border-\w+-\d+/g, '');
+            card.classList.add(colors.bgLight, colors.border);
+            
+            // 名称颜色
+            const nameEl = card.querySelector('.adjust-card-name');
+            if (nameEl) {
+                nameEl.className = nameEl.className
+                    .replace(/text-\w+-\d+/g, '');
+                nameEl.classList.add(colors.text);
+            }
+            
+            // 标签颜色（天/地）
+            card.querySelectorAll('.adjust-card-label').forEach(el => {
+                el.className = el.className
+                    .replace(/text-\w+-\d+/g, '');
+                el.classList.add(colors.label);
+            });
+            
+            // 按钮颜色
+            card.querySelectorAll('.adjust-card-btn').forEach(el => {
+                el.className = el.className
+                    .replace(/bg-\w+-\d+/g, '')
+                    .replace(/hover:bg-\w+-\d+/g, '')
+                    .replace(/text-\w+-\d+/g, '');
+                el.classList.add(colors.btnBg, colors.btnHover, colors.text);
+            });
+            
+            // 数值颜色
+            card.querySelectorAll('.adjust-card-value').forEach(el => {
+                el.className = el.className
+                    .replace(/text-\w+-\d+/g, '');
+                el.classList.add(colors.text);
             });
         });
     }
@@ -4422,6 +4484,7 @@
             };
         };
         const shenWuXing = getShenWuXing(rgWuXing);
+        if (window.cache) window.cache.shenWuXing = shenWuXing;
         
         // 统计天干十神
         const tianShenList = [
@@ -5299,6 +5362,7 @@
         if(!data.ri.t){ clearCalc(); return; }
         DOM.statPanel.classList.remove('hidden');
         const {wuCount, shenCount, groupCount, groupTian, groupDi, shenWuXing}=getStats(data);
+        cache.shenWuXing = shenWuXing;
         
         // 根据五行获取颜色类
         function getWuXingColor(wuxing) {
@@ -10026,110 +10090,110 @@ function getAllTagCategories() {
                             <span id="adjust-panel-arrow-research">▼</span>
                         </button>
                         <div id="adjust-panel-research" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
-                            <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll">
-                                <!-- 比劫 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-green-50 rounded-lg py-1.5 px-1 border border-green-200">
-                                    <div class="font-bold text-green-700 text-xs leading-tight">比劫</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-green-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-bijie-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                            <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
+                                <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                                    <!-- 比劫 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-bijie-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-bijie-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-green-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-bijie-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                    <!-- 食伤 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="食伤">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">食伤</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-shishang-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-shishang-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 财星 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="财星">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">财星</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-caixing-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-caixing-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 官杀 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="官杀">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">官杀</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-guansha-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-guansha-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 印星 -->
+                                    <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="印星">
+                                        <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">印星</div>
+                                        <div class="flex items-center justify-between px-0.5 mt-1">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-yinxing-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                            <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                            <div class="flex items-center gap-px">
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="dec">−</button>
+                                                <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-yinxing-research">0</span>
+                                                <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="inc">+</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <!-- 食伤 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-red-50 rounded-lg py-1.5 px-1 border border-red-200">
-                                    <div class="font-bold text-red-600 text-xs leading-tight">食伤</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-red-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-shishang-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-red-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-shishang-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- 财星 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-amber-50 rounded-lg py-1.5 px-1 border border-amber-200">
-                                    <div class="font-bold text-amber-700 text-xs leading-tight">财星</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-amber-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-caixing-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-amber-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-caixing-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- 官杀 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-yellow-50 rounded-lg py-1.5 px-1 border border-yellow-200">
-                                    <div class="font-bold text-yellow-600 text-xs leading-tight">官杀</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-yellow-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-guansha-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-yellow-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-guansha-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- 印星 -->
-                                <div class="flex-shrink-0 w-[88px] text-center bg-blue-50 rounded-lg py-1.5 px-1 border border-blue-200">
-                                    <div class="font-bold text-blue-600 text-xs leading-tight">印星</div>
-                                    <div class="flex items-center justify-between px-0.5 mt-1">
-                                        <span class="text-[9px] text-blue-400 w-3 leading-none">天</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-yinxing-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                        <span class="text-[9px] text-blue-400 w-3 leading-none">地</span>
-                                        <div class="flex items-center gap-px">
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="dec">−</button>
-                                            <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-yinxing-research">0</span>
-                                            <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="inc">+</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex justify-center mt-2">
-                                <button id="reset-adjust-research" class="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
+                                <button id="reset-adjust-research" class="flex-shrink-0 px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
                             </div>
                         </div>
                     </div>
@@ -10629,110 +10693,110 @@ function getAllTagCategories() {
                         <span id="adjust-panel-arrow-detail">▼</span>
                     </button>
                     <div id="adjust-panel-detail" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
-                        <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll">
-                            <!-- 比劫 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-green-50 rounded-lg py-1.5 px-1 border border-green-200">
-                                <div class="font-bold text-green-700 text-xs leading-tight">比劫</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-green-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-bijie-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
+                            <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                                <!-- 比劫 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-bijie-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-bijie-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-green-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-bijie-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                <!-- 食伤 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="食伤">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">食伤</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-shishang-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-shishang-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 财星 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="财星">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">财星</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-caixing-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-caixing-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 官杀 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="官杀">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">官杀</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-guansha-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-guansha-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 印星 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="印星">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">印星</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-yinxing-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-yinxing-detail">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="inc">+</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <!-- 食伤 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-red-50 rounded-lg py-1.5 px-1 border border-red-200">
-                                <div class="font-bold text-red-600 text-xs leading-tight">食伤</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-red-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-shishang-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-red-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-shishang-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 财星 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-amber-50 rounded-lg py-1.5 px-1 border border-amber-200">
-                                <div class="font-bold text-amber-700 text-xs leading-tight">财星</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-amber-500 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-caixing-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-amber-500 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-caixing-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 官杀 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-yellow-50 rounded-lg py-1.5 px-1 border border-yellow-200">
-                                <div class="font-bold text-yellow-600 text-xs leading-tight">官杀</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-yellow-500 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-guansha-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-yellow-500 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-guansha-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 印星 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-blue-50 rounded-lg py-1.5 px-1 border border-blue-200">
-                                <div class="font-bold text-blue-600 text-xs leading-tight">印星</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-blue-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-yinxing-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-blue-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-yinxing-detail">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex justify-center mt-2">
-                            <button id="reset-adjust-detail" class="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
+                            <button id="reset-adjust-detail" class="flex-shrink-0 px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
                         </div>
                     </div>
                 </div>
@@ -11492,110 +11556,110 @@ function getAllTagCategories() {
                         <span id="adjust-panel-arrow-compare">▼</span>
                     </button>
                     <div id="adjust-panel-compare" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
-                        <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll">
-                            <!-- 比劫 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-green-50 rounded-lg py-1.5 px-1 border border-green-200">
-                                <div class="font-bold text-green-700 text-xs leading-tight">比劫</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-green-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-bijie-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
+                            <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                                <!-- 比劫 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-bijie-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-bijie-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-green-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-bijie-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-green-200 rounded text-green-700 text-[10px] leading-none hover:bg-green-300" data-group="比劫" data-type="di" data-op="inc">+</button>
+                                <!-- 食伤 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="食伤">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">食伤</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-shishang-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-shishang-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="食伤" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 财星 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="财星">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">财星</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-caixing-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-caixing-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="财星" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 官杀 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="官杀">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">官杀</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-guansha-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-guansha-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="官杀" data-type="di" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 印星 -->
+                                <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="印星">
+                                    <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">印星</div>
+                                    <div class="flex items-center justify-between px-0.5 mt-1">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">天</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-tian-yinxing-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="tian" data-op="inc">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between px-0.5 mt-0.5">
+                                        <span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">地</span>
+                                        <div class="flex items-center gap-px">
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="dec">−</button>
+                                            <span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-di-yinxing-compare">0</span>
+                                            <button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="印星" data-type="di" data-op="inc">+</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <!-- 食伤 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-red-50 rounded-lg py-1.5 px-1 border border-red-200">
-                                <div class="font-bold text-red-600 text-xs leading-tight">食伤</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-red-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-shishang-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-red-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-shishang-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-red-200 rounded text-red-600 text-[10px] leading-none hover:bg-red-300" data-group="食伤" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 财星 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-amber-50 rounded-lg py-1.5 px-1 border border-amber-200">
-                                <div class="font-bold text-amber-700 text-xs leading-tight">财星</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-amber-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-caixing-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-amber-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-caixing-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-amber-200 rounded text-amber-700 text-[10px] leading-none hover:bg-amber-300" data-group="财星" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 官杀 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-yellow-50 rounded-lg py-1.5 px-1 border border-yellow-200">
-                                <div class="font-bold text-yellow-600 text-xs leading-tight">官杀</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-yellow-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-guansha-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-yellow-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-guansha-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-yellow-200 rounded text-yellow-600 text-[10px] leading-none hover:bg-yellow-300" data-group="官杀" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 印星 -->
-                            <div class="flex-shrink-0 w-[88px] text-center bg-blue-50 rounded-lg py-1.5 px-1 border border-blue-200">
-                                <div class="font-bold text-blue-600 text-xs leading-tight">印星</div>
-                                <div class="flex items-center justify-between px-0.5 mt-1">
-                                    <span class="text-[9px] text-blue-400 w-3 leading-none">天</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-tian-yinxing-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="tian" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between px-0.5 mt-0.5">
-                                    <span class="text-[9px] text-blue-400 w-3 leading-none">地</span>
-                                    <div class="flex items-center gap-px">
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="dec">−</button>
-                                        <span class="w-5 text-center text-[10px] font-bold" id="adjust-di-yinxing-compare">0</span>
-                                        <button class="adjust-btn w-5 h-5 flex items-center justify-center bg-blue-200 rounded text-blue-600 text-[10px] leading-none hover:bg-blue-300" data-group="印星" data-type="di" data-op="inc">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex justify-center mt-2">
-                            <button id="reset-adjust-compare" class="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
+                            <button id="reset-adjust-compare" class="flex-shrink-0 px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>
                         </div>
                     </div>
                 </div>
