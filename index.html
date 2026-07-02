@@ -1242,6 +1242,9 @@
                         <optgroup label="【精确匹配】性别判断">
                         <option value="性别">性别</option>
                         </optgroup>
+                        <optgroup label="【比较判断】年龄判断">
+                        <option value="年龄">年龄</option>
+                        </optgroup>
                         <optgroup label="【精确匹配】五行数量对比判断">
                         <option value="五行数量对比-木">木五行数量</option>
                         <option value="五行数量对比-火">火五行数量</option>
@@ -5834,6 +5837,14 @@
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择性别</option><option value="男">男</option><option value="女">女</option><option value="不限">不限</option>';
+            }
+            else if (field === '年龄') {
+                opSel.innerHTML = '<option value="gt">大于</option><option value="ge">大于等于</option><option value="lt">小于</option><option value="le">小于等于</option>';
+                valInput.classList.remove('hidden');
+                valInput.value = '18';
+                valInput.min = '0';
+                valInput.max = '150';
+                valInput.placeholder = '输入年龄';
             }
             else if(field.startsWith('五行数量对比-')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
