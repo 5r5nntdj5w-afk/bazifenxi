@@ -1,4 +1,4 @@
-﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3331,6 +3331,7 @@
         // 清除出生日期记录（当手动修改八字时）
         function clearBirthData() {
             window.lastPaipanData = null;
+            window.currentDaYun = null;
         }
 
         // 更新流年列表
@@ -3718,6 +3719,7 @@
                                 
                                 // 更新当前大运
                                 currentDaYun = dayun;
+                                window.currentDaYun = dayun;
                                 
                                 // 填充八字输入区的大运
                                 const dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
