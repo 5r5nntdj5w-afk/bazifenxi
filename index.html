@@ -1419,8 +1419,8 @@
                         <tr class="bg-amber-50">
                             <th class="p-2 text-left">类别</th>
                             <th class="p-2 text-center">启用</th>
-                            <th class="p-2 text-center">运算符</th>
-                            <th class="p-2 text-center">年龄值</th>
+                            <th class="p-2 text-center">最小年龄</th>
+                            <th class="p-2 text-center">最大年龄</th>
                             <th class="p-2 text-left text-gray-400 text-xs">当前设置说明</th>
                         </tr>
                     </thead>
@@ -5368,11 +5368,11 @@
             if (isMatch && data.hasBirthData && data.effectiveAge != null) {
                 const ageCfg = cache.categoryAgeConfig?.[rule.category];
                 if (ageCfg?.active) {
-                    const e = data.effectiveAge, v = ageCfg.val;
-                    if      (ageCfg.op === 'ge') isMatch = e >= v;
-                    else if (ageCfg.op === 'gt') isMatch = e > v;
-                    else if (ageCfg.op === 'le') isMatch = e <= v;
-                    else if (ageCfg.op === 'lt') isMatch = e < v;
+                    const e = data.effectiveAge;
+                    const min = ageCfg.min !== '' && ageCfg.min !== undefined ? Number(ageCfg.min) : null;
+                    const max = ageCfg.max !== '' && ageCfg.max !== undefined ? Number(ageCfg.max) : null;
+                    if (min !== null && e < min) isMatch = false;
+                    if (max !== null && e > max) isMatch = false;
                 }
             }
             
@@ -6649,6 +6649,26 @@
     }
     
     // 渲染类别年龄限制配置面板
+    // 兼容旧格式：将 { active, op, val } 转为 { active, min, max }
+    function normalizeAgeConfig(cfg) {
+        if (!cfg) return { active: false, min: 18, max: '' };
+        // 已经是新格式
+        if (cfg.min !== undefined) return cfg;
+        // 旧格式转换
+        if (cfg.op !== undefined && cfg.val !== undefined) {
+            if (cfg.op === 'ge' || cfg.op === 'gt') {
+                cfg.min = cfg.val;
+                cfg.max = '';
+            } else {
+                cfg.min = '';
+                cfg.max = cfg.val;
+            }
+            delete cfg.op;
+            delete cfg.val;
+        }
+        return cfg;
+    }
+
     function renderAgeConfigPanel() {
         const tbody = document.getElementById('age-config-body');
         if (!tbody) return;
@@ -6670,9 +6690,11 @@
         
         let html = '';
         categories.forEach(cat => {
-            // 确保每个类别有默认配置
+            // 确保每个类别有默认配置，并兼容旧格式
             if (!cache.categoryAgeConfig[cat]) {
-                cache.categoryAgeConfig[cat] = { active: false, op: 'ge', val: 18 };
+                cache.categoryAgeConfig[cat] = { active: false, min: 18, max: '' };
+            } else {
+                cache.categoryAgeConfig[cat] = normalizeAgeConfig(cache.categoryAgeConfig[cat]);
             }
             const cfg = cache.categoryAgeConfig[cat];
             const desc = getAgeConfigDesc(cat, cfg);
@@ -6683,15 +6705,10 @@
                     <input type="checkbox" class="age-cfg-active" data-category="${cat}" ${cfg.active ? 'checked' : ''}>
                 </td>
                 <td class="p-2 text-center">
-                    <select class="age-cfg-op border rounded p-1 text-sm" data-category="${cat}">
-                        <option value="ge" ${cfg.op === 'ge' ? 'selected' : ''}>≥</option>
-                        <option value="gt" ${cfg.op === 'gt' ? 'selected' : ''}>＞</option>
-                        <option value="le" ${cfg.op === 'le' ? 'selected' : ''}>≤</option>
-                        <option value="lt" ${cfg.op === 'lt' ? 'selected' : ''}>＜</option>
-                    </select>
+                    <input type="number" class="age-cfg-min border rounded p-1 w-16 text-sm text-center" data-category="${cat}" value="${cfg.min}" min="0" max="150" placeholder="--">
                 </td>
                 <td class="p-2 text-center">
-                    <input type="number" class="age-cfg-val border rounded p-1 w-16 text-sm text-center" data-category="${cat}" value="${cfg.val}" min="0" max="150">
+                    <input type="number" class="age-cfg-max border rounded p-1 w-16 text-sm text-center" data-category="${cat}" value="${cfg.max}" min="0" max="150" placeholder="--">
                 </td>
                 <td class="p-2 text-xs text-gray-400">${desc}</td>
             </tr>`;
@@ -6710,21 +6727,21 @@
                 refreshAgeConfigDesc(cat);
             });
         });
-        tbody.querySelectorAll('.age-cfg-op').forEach(sel => {
-            sel.addEventListener('change', function() {
+        tbody.querySelectorAll('.age-cfg-min').forEach(inp => {
+            inp.addEventListener('change', function() {
                 const cat = this.dataset.category;
                 if (!cache.categoryAgeConfig[cat]) return;
-                cache.categoryAgeConfig[cat].op = this.value;
+                cache.categoryAgeConfig[cat].min = this.value === '' ? '' : parseInt(this.value) || 0;
                 localStorage.setItem(AGE_CONFIG_KEY, JSON.stringify(cache.categoryAgeConfig));
                 syncAgeConfigToCloud();
                 refreshAgeConfigDesc(cat);
             });
         });
-        tbody.querySelectorAll('.age-cfg-val').forEach(inp => {
+        tbody.querySelectorAll('.age-cfg-max').forEach(inp => {
             inp.addEventListener('change', function() {
                 const cat = this.dataset.category;
                 if (!cache.categoryAgeConfig[cat]) return;
-                cache.categoryAgeConfig[cat].val = parseInt(this.value) || 0;
+                cache.categoryAgeConfig[cat].max = this.value === '' ? '' : parseInt(this.value) || 0;
                 localStorage.setItem(AGE_CONFIG_KEY, JSON.stringify(cache.categoryAgeConfig));
                 syncAgeConfigToCloud();
                 refreshAgeConfigDesc(cat);
@@ -6735,8 +6752,12 @@
     // 生成类别年龄配置的描述文字
     function getAgeConfigDesc(category, cfg) {
         if (!cfg || !cfg.active) return '未启用，无年龄限制';
-        const opMap = { ge: '≥', gt: '＞', le: '≤', lt: '＜' };
-        return `有出生时间+选中流年/大运时，年龄${opMap[cfg.op] || '≥'}${cfg.val}岁的断语才匹配`;
+        const min = cfg.min !== '' && cfg.min !== undefined ? parseInt(cfg.min) : null;
+        const max = cfg.max !== '' && cfg.max !== undefined ? parseInt(cfg.max) : null;
+        if (min !== null && max !== null) return `年龄在 ${min} ~ ${max} 岁之间的断语才匹配`;
+        if (min !== null) return `年龄 ≥ ${min} 岁的断语才匹配`;
+        if (max !== null) return `年龄 ≤ ${max} 岁的断语才匹配`;
+        return '已启用，但未设置年龄范围';
     }
     
     // 刷新单行描述
