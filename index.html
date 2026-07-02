@@ -1404,6 +1404,31 @@
             </div>
         </div>
         
+        <!-- 类别年龄限制配置面板 -->
+        <div class="bg-white p-4 rounded shadow">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-bold text-amber-800">🎂 类别年龄限制配置</h3>
+                <span class="text-xs text-gray-400">有出生时间+选中流年/大运时生效，手动输入八字自动跳过</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-amber-50">
+                            <th class="p-2 text-left">类别</th>
+                            <th class="p-2 text-center">启用</th>
+                            <th class="p-2 text-center">运算符</th>
+                            <th class="p-2 text-center">年龄值</th>
+                            <th class="p-2 text-left text-gray-400 text-xs">当前设置说明</th>
+                        </tr>
+                    </thead>
+                    <tbody id="age-config-body"></tbody>
+                </table>
+            </div>
+            <div class="mt-2 text-xs text-gray-400">
+                💡 未启用的类别不受年龄限制；类别动态从规则中获取，当无规则时此处无配置项
+            </div>
+        </div>
+        
         <!-- 准确率统计面板 -->
         <div class="bg-white p-4 rounded shadow">
             <div class="flex justify-between items-center mb-4">
@@ -2564,6 +2589,7 @@
     const CATEGORY_KEY='bazi_categories'; 
     const HISTORY_KEY='bazi_history_final';
     const VERIFICATION_KEY='bazi_verifications'; // 断语验证记录
+    const AGE_CONFIG_KEY='bazi_age_config'; // 类别年龄限制配置
     
     let DOM = {};
     let cache = {
@@ -2572,6 +2598,7 @@
         history: JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'),
         statsCache: null,
         verifications: JSON.parse(localStorage.getItem(VERIFICATION_KEY) || '[]'),
+        categoryAgeConfig: JSON.parse(localStorage.getItem(AGE_CONFIG_KEY) || '{}'),
         statsOffset: {
             比劫: {tian: 0, di: 0},
             食伤: {tian: 0, di: 0},
@@ -5321,6 +5348,18 @@
                 }
             }
             
+            // 年龄检查（有出生时间+有效年龄时按类别顶层配置过滤）
+            if (isMatch && data.hasBirthData && data.effectiveAge !== null) {
+                const ageCfg = cache.categoryAgeConfig?.[rule.category];
+                if (ageCfg?.active) {
+                    const e = data.effectiveAge, v = ageCfg.val;
+                    if      (ageCfg.op === 'ge') isMatch = e >= v;
+                    else if (ageCfg.op === 'gt') isMatch = e > v;
+                    else if (ageCfg.op === 'le') isMatch = e <= v;
+                    else if (ageCfg.op === 'lt') isMatch = e < v;
+                }
+            }
+            
             if(isMatch) {
                 if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
                 matchedByCategory[rule.category].push(rule.duanyu);
@@ -5393,6 +5432,28 @@
             liuyue:{t:document.querySelector('.tiangan[data-type="liuyue"]').value,d:document.querySelector('.dizhi[data-type="liuyue"]').value},
             gender: document.getElementById('birth-gender')?.value === '1' ? '男' : '女'
         };
+        // 是否有出生时间（自动排盘检测）
+        data.hasBirthData = !!(window.lastPaipanData && 
+            data.nian.t === window.lastPaipanData.bazi?.nian?.t &&
+            data.nian.d === window.lastPaipanData.bazi?.nian?.d &&
+            data.yue.t === window.lastPaipanData.bazi?.yue?.t &&
+            data.yue.d === window.lastPaipanData.bazi?.yue?.d &&
+            data.ri.t === window.lastPaipanData.bazi?.ri?.t &&
+            data.ri.d === window.lastPaipanData.bazi?.ri?.d &&
+            data.shi.t === window.lastPaipanData.bazi?.shi?.t &&
+            data.shi.d === window.lastPaipanData.bazi?.shi?.d);
+        // 计算有效年龄（流年年龄 > 大运结束年龄 > null）
+        let effectiveAge = null;
+        const activeLiunian = document.querySelector('.liunian-item.active');
+        if (activeLiunian) {
+            const ageText = activeLiunian.querySelector('.liunian-age')?.textContent;
+            if (ageText) effectiveAge = parseInt(ageText);
+        }
+        if (effectiveAge === null && window.currentDaYun) {
+            effectiveAge = window.currentDaYun.getStartAge() + 
+                (window.currentDaYun.getEndYear() - window.currentDaYun.getStartYear());
+        }
+        data.effectiveAge = effectiveAge;
         if(!data.ri.t){ clearCalc(); return; }
         DOM.statPanel.classList.remove('hidden');
         const {wuCount, shenCount, groupCount, groupTian, groupDi, shenWuXing}=getStats(data);
@@ -6558,6 +6619,182 @@
         
         // 渲染准确率统计
         renderAccuracyStats();
+        
+        // 渲染类别年龄配置
+        renderAgeConfigPanel();
+    }
+    
+    // 渲染类别年龄限制配置面板
+    function renderAgeConfigPanel() {
+        const tbody = document.getElementById('age-config-body');
+        if (!tbody) return;
+        
+        // 从规则中提取唯一类别（保持页面展示分类顺序）
+        const seen = new Set();
+        const categories = [];
+        (cache.rules || []).forEach(r => {
+            if (r.category && !seen.has(r.category)) {
+                seen.add(r.category);
+                categories.push(r.category);
+            }
+        });
+        
+        if (categories.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">暂无规则类别，创建规则后自动显示</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        categories.forEach(cat => {
+            // 确保每个类别有默认配置
+            if (!cache.categoryAgeConfig[cat]) {
+                cache.categoryAgeConfig[cat] = { active: false, op: 'ge', val: 18 };
+            }
+            const cfg = cache.categoryAgeConfig[cat];
+            const desc = getAgeConfigDesc(cat, cfg);
+            
+            html += `<tr class="border-b hover:bg-gray-50">
+                <td class="p-2 font-medium text-gray-700">${cat}</td>
+                <td class="p-2 text-center">
+                    <input type="checkbox" class="age-cfg-active" data-category="${cat}" ${cfg.active ? 'checked' : ''}>
+                </td>
+                <td class="p-2 text-center">
+                    <select class="age-cfg-op border rounded p-1 text-sm" data-category="${cat}">
+                        <option value="ge" ${cfg.op === 'ge' ? 'selected' : ''}>≥</option>
+                        <option value="gt" ${cfg.op === 'gt' ? 'selected' : ''}>＞</option>
+                        <option value="le" ${cfg.op === 'le' ? 'selected' : ''}>≤</option>
+                        <option value="lt" ${cfg.op === 'lt' ? 'selected' : ''}>＜</option>
+                    </select>
+                </td>
+                <td class="p-2 text-center">
+                    <input type="number" class="age-cfg-val border rounded p-1 w-16 text-sm text-center" data-category="${cat}" value="${cfg.val}" min="0" max="150">
+                </td>
+                <td class="p-2 text-xs text-gray-400">${desc}</td>
+            </tr>`;
+        });
+        
+        tbody.innerHTML = html;
+        
+        // 绑定变更事件
+        tbody.querySelectorAll('.age-cfg-active').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const cat = this.dataset.category;
+                if (!cache.categoryAgeConfig[cat]) return;
+                cache.categoryAgeConfig[cat].active = this.checked;
+                localStorage.setItem(AGE_CONFIG_KEY, JSON.stringify(cache.categoryAgeConfig));
+                syncAgeConfigToCloud();
+                refreshAgeConfigDesc(cat);
+            });
+        });
+        tbody.querySelectorAll('.age-cfg-op').forEach(sel => {
+            sel.addEventListener('change', function() {
+                const cat = this.dataset.category;
+                if (!cache.categoryAgeConfig[cat]) return;
+                cache.categoryAgeConfig[cat].op = this.value;
+                localStorage.setItem(AGE_CONFIG_KEY, JSON.stringify(cache.categoryAgeConfig));
+                syncAgeConfigToCloud();
+                refreshAgeConfigDesc(cat);
+            });
+        });
+        tbody.querySelectorAll('.age-cfg-val').forEach(inp => {
+            inp.addEventListener('change', function() {
+                const cat = this.dataset.category;
+                if (!cache.categoryAgeConfig[cat]) return;
+                cache.categoryAgeConfig[cat].val = parseInt(this.value) || 0;
+                localStorage.setItem(AGE_CONFIG_KEY, JSON.stringify(cache.categoryAgeConfig));
+                syncAgeConfigToCloud();
+                refreshAgeConfigDesc(cat);
+            });
+        });
+    }
+    
+    // 生成类别年龄配置的描述文字
+    function getAgeConfigDesc(category, cfg) {
+        if (!cfg || !cfg.active) return '未启用，无年龄限制';
+        const opMap = { ge: '≥', gt: '＞', le: '≤', lt: '＜' };
+        return `有出生时间+选中流年/大运时，年龄${opMap[cfg.op] || '≥'}${cfg.val}岁的断语才匹配`;
+    }
+    
+    // 刷新单行描述
+    function refreshAgeConfigDesc(category) {
+        const tbody = document.getElementById('age-config-body');
+        if (!tbody) return;
+        const rows = tbody.querySelectorAll('tr');
+        for (const row of rows) {
+            const firstCell = row.querySelector('td');
+            if (firstCell && firstCell.textContent.trim() === category) {
+                const descCell = row.querySelector('td:last-child');
+                const cfg = cache.categoryAgeConfig[category];
+                if (descCell && cfg) {
+                    descCell.textContent = getAgeConfigDesc(category, cfg);
+                }
+                break;
+            }
+        }
+    }
+    
+    // 同步年龄配置到云端（保存到 site_settings 表）
+    async function syncAgeConfigToCloud() {
+        try {
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) return; // 未登录，不同步
+            
+            const configStr = JSON.stringify(cache.categoryAgeConfig);
+            
+            const { data: existing } = await supabaseClient
+                .from('site_settings')
+                .select('id')
+                .eq('setting_key', 'age_config');
+            
+            if (existing && existing.length > 0) {
+                await supabaseClient
+                    .from('site_settings')
+                    .update({
+                        setting_value: configStr,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing[0].id);
+            } else {
+                await supabaseClient
+                    .from('site_settings')
+                    .insert({
+                        setting_key: 'age_config',
+                        setting_value: configStr,
+                        description: '类别年龄限制配置',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    });
+            }
+        } catch (e) {
+            console.error('同步年龄配置到云端失败:', e);
+        }
+    }
+    
+    // 从云端加载年龄配置（登录时调用，云端优先覆盖本地）
+    async function loadAgeConfigFromCloud() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('site_settings')
+                .select('setting_value')
+                .eq('setting_key', 'age_config');
+            
+            if (error) {
+                console.error('获取云端年龄配置失败:', error);
+                return;
+            }
+            
+            if (data && data.length > 0 && data[0].setting_value) {
+                const remote = JSON.parse(data[0].setting_value);
+                // 云端优先合并到本地
+                Object.keys(remote).forEach(key => {
+                    cache.categoryAgeConfig[key] = remote[key];
+                });
+                localStorage.setItem(AGE_CONFIG_KEY, JSON.stringify(cache.categoryAgeConfig));
+                console.log('已从云端加载年龄配置');
+            }
+        } catch (e) {
+            console.error('加载云端年龄配置异常:', e);
+        }
     }
     
     // 更新断语列表分页信息
@@ -15066,6 +15303,7 @@ async function initApp() {
     if (isLoggedIn) {
         await loadDataFromSupabase();
         await syncLocalTagsToCloud();
+        await loadAgeConfigFromCloud(); // 登录后从云端同步年龄配置
     }
 }
 
