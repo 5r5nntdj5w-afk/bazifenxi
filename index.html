@@ -5349,7 +5349,7 @@
             }
             
             // 年龄检查（有出生时间+有效年龄时按类别顶层配置过滤）
-            if (isMatch && data.hasBirthData && data.effectiveAge !== null) {
+            if (isMatch && data.hasBirthData && data.effectiveAge != null) {
                 const ageCfg = cache.categoryAgeConfig?.[rule.category];
                 if (ageCfg?.active) {
                     const e = data.effectiveAge, v = ageCfg.val;
@@ -5453,7 +5453,7 @@
             effectiveAge = window.currentDaYun.getStartAge() + 
                 (window.currentDaYun.getEndYear() - window.currentDaYun.getStartYear());
         }
-        data.effectiveAge = effectiveAge;
+        if (effectiveAge !== null) data.effectiveAge = effectiveAge;
         if(!data.ri.t){ clearCalc(); return; }
         DOM.statPanel.classList.remove('hidden');
         const {wuCount, shenCount, groupCount, groupTian, groupDi, shenWuXing}=getStats(data);
