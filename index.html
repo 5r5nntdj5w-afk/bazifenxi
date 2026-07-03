@@ -17193,6 +17193,9 @@ async function openEditPaymentModal() {
         let successCount = 0;
         let errorCount = 0;
         
+        // 收集同步数据（保存后用于更新存量用户）
+        const tierSyncData = [];
+        
         for (let i = 0; i < tiers.length; i++) {
             const tierEl = tiers[i];
             const tierId = tierEl.querySelector('input[type="hidden"]').value;
@@ -17221,6 +17224,12 @@ async function openEditPaymentModal() {
                 permissions.rule_categories = [...catsContainer.querySelectorAll('.tier-rule-cat:checked')]
                     .map(cb => cb.value);
             }
+            // 保存该套餐的功能权限签名（不含 rule_categories），供同步时匹配存量用户
+            tierSyncData.push({
+                tierKey,
+                ruleCats: permissions.rule_categories || [],
+                permSignature: { bazi: permissions.bazi, rule: permissions.rule, case: permissions.case, research: permissions.research, tag: permissions.tag, mining: permissions.mining, data: permissions.data }
+            });
             // 将权限JSON编码到features字段中（避免需要新增数据库列）
             const permsStr = JSON.stringify(permissions);
             const encodedFeatures = `<!--PERMS:${permsStr}-->\n${tierFeatures || ''}`;
@@ -17276,31 +17285,34 @@ async function openEditPaymentModal() {
         
         if (errorCount === 0) {
             // 同步已有用户的断语分类权限
-            for (let i = 0; i < tiers.length; i++) {
-                const tierKey = document.getElementById(`tier-key-${i}`)?.value;
-                if (!tierKey) continue;
-                const catsContainer = document.getElementById(`tier-rule-cats-${i}`);
-                let ruleCats = [];
-                if (catsContainer) {
-                    ruleCats = [...catsContainer.querySelectorAll('.tier-rule-cat:checked')].map(cb => cb.value);
-                }
-                try {
-                    const { data: users } = await supabaseClient
-                        .from('user_permissions')
-                        .select('user_id, permissions')
-                        .filter('permissions->>_tier_key', 'eq', tierKey);
-                    if (users && users.length > 0) {
-                        await Promise.all(users.map(user => {
-                            const updatedPerms = { ...user.permissions, rule_categories: ruleCats };
-                            return supabaseClient.from('user_permissions')
-                                .update({ permissions: updatedPerms, updated_at: new Date().toISOString() })
-                                .eq('user_id', user.user_id);
-                        }));
-                        console.log(`同步套餐 "${tierKey}" 的断语分类到 ${users.length} 个用户`);
+            // 优先使用 _tier_key 匹配（新用户），存量用户按功能权限签名匹配
+            try {
+                const { data: allUsers } = await supabaseClient
+                    .from('user_permissions')
+                    .select('user_id, permissions');
+                if (allUsers && allUsers.length > 0) {
+                    for (const { tierKey, ruleCats, permSignature } of tierSyncData) {
+                        if (!tierKey) continue;
+                        const matchedUsers = allUsers.filter(user => {
+                            const p = user.permissions || {};
+                            // 优先 _tier_key 精准匹配
+                            if (p._tier_key === tierKey) return true;
+                            // 兼容存量用户：按功能权限签名匹配
+                            return Object.entries(permSignature).every(([k, v]) => p[k] === v);
+                        });
+                        if (matchedUsers.length > 0) {
+                            await Promise.all(matchedUsers.map(user => {
+                                const updatedPerms = { ...user.permissions, rule_categories: ruleCats };
+                                return supabaseClient.from('user_permissions')
+                                    .update({ permissions: updatedPerms, updated_at: new Date().toISOString() })
+                                    .eq('user_id', user.user_id);
+                            }));
+                            console.log(`同步套餐 "${tierKey}" 的断语分类到 ${matchedUsers.length} 个用户`);
+                        }
                     }
-                } catch (e) {
-                    console.error(`同步套餐 ${tierKey} 的断语分类失败:`, e);
                 }
+            } catch (e) {
+                console.error('同步断语分类权限失败:', e);
             }
             alert(`支付设置保存成功！\n已保存 ${successCount} 个套餐`);
             document.getElementById('edit-payment-modal').remove();
