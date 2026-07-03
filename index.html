@@ -8441,7 +8441,7 @@
             const remoteRules = data.map(row => ({
                 id: row.id,
                 category: row.category || '',
-                duanyu: row.duanyu || '',
+                duanyu: row.duanyu_text || row.duanyu || '',
                 conditions: row.conditions || { logic: 'and', children: [] },
                 permissionLevel: row.permission_level !== undefined && row.permission_level !== null ? row.permission_level : 3,
                 isPublic: row.is_public !== undefined && row.is_public !== null ? row.is_public : true,
