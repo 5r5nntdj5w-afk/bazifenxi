@@ -1360,6 +1360,7 @@
                     <option value="灾祸">灾祸</option>
                 </select>
                 <button id="clear-filter" class="px-3 py-2 bg-gray-200 rounded">清空筛选</button>
+                <button id="manage-categories-btn" class="px-3 py-2 bg-amber-600 text-white rounded text-sm" onclick="openCategoryManager()">📂 分类管理</button>
             </div>
             <div class="flex gap-3 mb-3 flex-wrap items-center">
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -1370,6 +1371,7 @@
                 <button id="clear-selection" class="px-3 py-1 bg-gray-500 text-white rounded text-sm hidden">取消选择</button>
                 <span id="selection-count" class="text-sm text-gray-500 hidden">已选择 0 条</span>
                 <button id="batch-delete" class="px-3 py-1 bg-red-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量删除</button>
+                <button id="batch-reassign" class="px-3 py-1 bg-teal-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量调整分类</button>
                 <button id="batch-export" class="px-3 py-1 bg-purple-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量导出</button>
                 <label id="import-label" class="px-3 py-1 bg-orange-600 text-white rounded text-sm cursor-pointer">
                     导入断语<input type="file" id="import-rule" class="hidden" accept=".json">
@@ -2060,6 +2062,10 @@
                             <div class="font-bold text-gray-700 mb-2">可用功能</div>
                             <div id="perm-list" class="grid grid-cols-2 gap-2 text-sm">
                                 <!-- 由JS动态生成 -->
+                            </div>
+                            <div class="border-t mt-2 pt-2 text-xs text-gray-500">
+                                <span class="font-medium">可匹配的断语分类：</span>
+                                <span id="perm-list-rule-cats">加载中...</span>
                             </div>
                         </div>
                     </div>
@@ -4241,10 +4247,280 @@
         }
     }
 
-    // 分类管理
-    function loadCategories() {
-        const defaultCats = ['格局','事业','财运','婚姻','健康','性格','灾祸'];
-        const allCats = [...defaultCats, ...cache.categories];
+    // ====== 分类管理弹窗 ======
+    window.openCategoryManager = function() {
+        // 收集所有分类及断语数量
+        const catCount = {};
+        (cache.rules || []).forEach(r => {
+            if (r.category) catCount[r.category] = (catCount[r.category] || 0) + 1;
+        });
+        const allCats = [...new Set([...Object.keys(catCount), ...(cache.categories || [])])];
+        
+        if (allCats.length === 0) {
+            alert('暂无分类');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'category-manager-modal';
+        modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto py-8';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-amber-800">📂 分类管理</h3>
+                    <button onclick="document.getElementById('category-manager-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div class="max-h-80 overflow-y-auto space-y-2">
+                    ${allCats.map(cat => `
+                        <div class="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                            <div>
+                                <span class="font-medium">${cat}</span>
+                                <span class="text-xs text-gray-400 ml-2">${catCount[cat] || 0} 条断语</span>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="renameCategory('${cat}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️ 重命名</button>
+                                <button onclick="deleteCategory('${cat}')" class="px-2 py-1 bg-red-500 text-white rounded text-xs">🗑️ 删除</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <input type="text" id="new-cat-input" class="flex-1 p-2 border rounded" placeholder="新分类名称">
+                    <button onclick="addNewCategory()" class="px-3 py-2 bg-teal-600 text-white rounded text-sm">➕ 添加</button>
+                </div>
+                <div class="mt-4 text-right">
+                    <button onclick="document.getElementById('category-manager-modal').remove()" class="px-4 py-2 bg-gray-600 text-white rounded">关闭</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // 重命名分类
+    window.renameCategory = async function(oldName) {
+        const newName = prompt(`将 "${oldName}" 重命名为：`, oldName);
+        if (!newName || newName === oldName) return;
+        
+        // 更新所有该分类的断语
+        const toUpdate = (cache.rules || []).filter(r => r.category === oldName);
+        let successCount = 0;
+        for (const rule of toUpdate) {
+            try {
+                if (rule.id) {
+                    await supabaseClient.from('duanyu').update({ category: newName }).eq('id', rule.id);
+                }
+                rule.category = newName;
+                successCount++;
+            } catch (e) {
+                console.error('重命名失败:', e);
+            }
+        }
+        // 更新 localStorage 中的自定义分类
+        if (cache.categories && cache.categories.includes(oldName)) {
+            const idx = cache.categories.indexOf(oldName);
+            cache.categories[idx] = newName;
+            const updatedCats = [...cache.categories];
+            try {
+                const { data: existing } = await supabaseClient.from('site_settings')
+                    .select('id').eq('setting_key', 'custom_categories');
+                const value = JSON.stringify(updatedCats);
+                if (existing && existing.length > 0) {
+                    await supabaseClient.from('site_settings').update({ setting_value: value }).eq('id', existing[0].id);
+                } else {
+                    await supabaseClient.from('site_settings').insert({
+                        setting_key: 'custom_categories', setting_value: value, description: '自定义断语分类',
+                        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+                    });
+                }
+            } catch (e) { console.error('保存自定义分类失败:', e); }
+            localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
+        }
+        
+        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+        alert(`✅ 已重命名 "${oldName}" → "${newName}"，影响 ${successCount} 条断语`);
+        document.getElementById('category-manager-modal')?.remove();
+        loadCategories();
+        reloadAll();
+    }
+
+    // 删除分类
+    window.deleteCategory = async function(catName) {
+        const count = (cache.rules || []).filter(r => r.category === catName).length;
+        const action = confirm(`分类 "${catName}" 下有 ${count} 条断语。\n\n确定删除此分类？断语仍保留，但分类将被置空。`);
+        if (!action) return;
+        
+        // 清空该分类断语的分类字段
+        const toUpdate = (cache.rules || []).filter(r => r.category === catName);
+        for (const rule of toUpdate) {
+            try {
+                if (rule.id) {
+                    await supabaseClient.from('duanyu').update({ category: '' }).eq('id', rule.id);
+                }
+                rule.category = '';
+            } catch (e) { console.error('删除分类失败:', e); }
+        }
+        // 从自定义分类中移除
+        if (cache.categories && cache.categories.includes(catName)) {
+            const updatedCats = cache.categories.filter(c => c !== catName);
+            cache.categories = updatedCats;
+            try {
+                const { data: existing } = await supabaseClient.from('site_settings')
+                    .select('id').eq('setting_key', 'custom_categories');
+                const value = JSON.stringify(updatedCats);
+                if (existing && existing.length > 0) {
+                    await supabaseClient.from('site_settings').update({ setting_value: value }).eq('id', existing[0].id);
+                } else {
+                    await supabaseClient.from('site_settings').insert({
+                        setting_key: 'custom_categories', setting_value: value, description: '自定义断语分类',
+                        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+                    });
+                }
+            } catch (e) { console.error('保存自定义分类失败:', e); }
+            localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
+        }
+        
+        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+        alert(`✅ 已删除分类 "${catName}"，${count} 条断语的分类已置空`);
+        document.getElementById('category-manager-modal')?.remove();
+        loadCategories();
+        reloadAll();
+    }
+
+    // 添加新分类（从管理弹窗）
+    window.addNewCategory = async function() {
+        const input = document.getElementById('new-cat-input');
+        if (!input) return;
+        const newCat = input.value.trim();
+        if (!newCat) return alert('请输入分类名称！');
+        
+        const allCats = [...new Set([...(cache.rules || []).map(r => r.category).filter(Boolean), ...(cache.categories || [])])];
+        if (allCats.includes(newCat)) return alert('该分类已存在！');
+        
+        const updatedCats = [...(cache.categories || []), newCat];
+        cache.categories = updatedCats;
+        try {
+            const { data: existing } = await supabaseClient.from('site_settings')
+                .select('id').eq('setting_key', 'custom_categories');
+            const value = JSON.stringify(updatedCats);
+            if (existing && existing.length > 0) {
+                await supabaseClient.from('site_settings').update({ setting_value: value }).eq('id', existing[0].id);
+            } else {
+                await supabaseClient.from('site_settings').insert({
+                    setting_key: 'custom_categories', setting_value: value, description: '自定义断语分类',
+                    created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+                });
+            }
+        } catch (e) { console.error('保存自定义分类失败:', e); }
+        localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
+        
+        input.value = '';
+        document.getElementById('category-manager-modal')?.remove();
+        loadCategories();
+        alert(`✅ 已添加分类 "${newCat}"`);
+    }
+
+    // 批量调整分类（选中多条断语后调用）
+    async function openBatchReassign() {
+        if (selectedRulesSet.size === 0) return alert('请先选择要调整的断语');
+        
+        const allCats = [...new Set([...(cache.rules || []).map(r => r.category).filter(Boolean), ...(cache.categories || [])])];
+        if (allCats.length === 0) return alert('暂无可用分类');
+        
+        const target = prompt(`已选择 ${selectedRulesSet.size} 条断语\n\n请输入目标分类名称：\n\n可选分类：${allCats.join('、')}`, allCats[0]);
+        if (!target) return;
+        if (!allCats.includes(target)) {
+            const add = confirm(`分类 "${target}" 不存在，是否创建？`);
+            if (add) {
+                const updatedCats = [...(cache.categories || []), target];
+                cache.categories = updatedCats;
+                try {
+                    const { data: existing } = await supabaseClient.from('site_settings')
+                        .select('id').eq('setting_key', 'custom_categories');
+                    const value = JSON.stringify(updatedCats);
+                    if (existing && existing.length > 0) {
+                        await supabaseClient.from('site_settings').update({ setting_value: value }).eq('id', existing[0].id);
+                    } else {
+                        await supabaseClient.from('site_settings').insert({
+                            setting_key: 'custom_categories', setting_value: value, description: '自定义断语分类',
+                            created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+                        });
+                    }
+                } catch (e) { console.error('保存自定义分类失败:', e); }
+                localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
+            } else {
+                return;
+            }
+        }
+        
+        let count = 0;
+        for (const rule of cache.rules) {
+            const ruleKey = rule.duanyu?.substring(0, 30) || rule.id;
+            if (selectedRulesSet.has(ruleKey) || selectedRulesSet.has(rule.id)) {
+                try {
+                    if (rule.id) {
+                        await supabaseClient.from('duanyu').update({ category: target }).eq('id', rule.id);
+                    }
+                    rule.category = target;
+                    count++;
+                } catch (e) { console.error('批量调整分类失败:', e); }
+            }
+        }
+        
+        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+        selectedRulesSet.clear();
+        updateSelectionUI();
+        loadCategories();
+        reloadAll();
+        alert(`✅ 已将 ${count} 条断语调整到分类 "${target}"`);
+    }
+
+    // 获取当前用户允许的断语分类（需暴露为全局，给 matchRules 使用）
+    window.getCurrentUserAllowedCategories = function() {
+        // 管理员全部可见
+        if (currentUser && isAdmin(currentUser.email)) return getAllRuleCategories();
+        // 从 localStorage 读取用户权限
+        const permStr = localStorage.getItem('user_permissions');
+        if (permStr) {
+            try {
+                const perms = JSON.parse(permStr);
+                if (perms.rule_categories && perms.rule_categories.length > 0) {
+                    return perms.rule_categories;
+                }
+            } catch (e) {}
+        }
+        return getAllRuleCategories();
+    }
+
+    // 分类管理 - 从 cache.rules 动态提取 + Supabase site_settings 自定义分类
+    async function loadCategories() {
+        // 从所有已保存规则中提取分类
+        const ruleCats = [...new Set((cache.rules || []).map(r => r.category).filter(Boolean))];
+        // 加载自定义分类（从 Supabase + localStorage 缓存）
+        let customCats = [];
+        try {
+            const { data: stored } = await supabaseClient
+                .from('site_settings')
+                .select('setting_value')
+                .eq('setting_key', 'custom_categories')
+                .maybeSingle();
+            if (stored && stored.setting_value) {
+                customCats = JSON.parse(stored.setting_value);
+                // 更新本地缓存
+                localStorage.setItem(CATEGORY_KEY, JSON.stringify(customCats));
+            } else {
+                // 尝试从 localStorage 恢复
+                const local = localStorage.getItem(CATEGORY_KEY);
+                if (local) customCats = JSON.parse(local);
+            }
+        } catch (e) {
+            console.error('加载自定义分类失败:', e);
+            const local = localStorage.getItem(CATEGORY_KEY);
+            if (local) customCats = JSON.parse(local);
+        }
+        cache.categories = customCats;
+        
+        // 合并：规则分类 + 自定义分类（自定义但尚无为规则的）
+        const allCats = [...new Set([...ruleCats, ...customCats])];
         
         DOM.ruleCategory.innerHTML = '<option value="">请选择分类</option>';
         DOM.filterCategory.innerHTML = '<option value="all">全部分类</option>';
@@ -4266,16 +4542,44 @@
             }
         };
 
-        DOM.addCategoryBtn.onclick = () => {
+        DOM.addCategoryBtn.onclick = async () => {
             const newCat = DOM.customCategory.value.trim();
             if (!newCat) return alert('请输入自定义分类名称！');
             
-            if (cache.categories.includes(newCat) || defaultCats.includes(newCat)) {
+            if (allCats.includes(newCat)) {
                 return alert('该分类已存在！');
             }
             
-            cache.categories.push(newCat);
-            localStorage.setItem(CATEGORY_KEY, JSON.stringify(cache.categories));
+            // 保存到 Supabase
+            const updatedCats = [...customCats, newCat];
+            try {
+                const { data: existing } = await supabaseClient
+                    .from('site_settings')
+                    .select('id')
+                    .eq('setting_key', 'custom_categories');
+                const value = JSON.stringify(updatedCats);
+                if (existing && existing.length > 0) {
+                    await supabaseClient.from('site_settings')
+                        .update({ setting_value: value, updated_at: new Date().toISOString() })
+                        .eq('id', existing[0].id);
+                } else {
+                    await supabaseClient.from('site_settings').insert({
+                        setting_key: 'custom_categories',
+                        setting_value: value,
+                        description: '自定义断语分类',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    });
+                }
+                cache.categories = updatedCats;
+                localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
+            } catch (e) {
+                console.error('保存自定义分类失败:', e);
+                // 降级到本地存储
+                cache.categories = updatedCats;
+                localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
+            }
+            
             DOM.customCategory.value = '';
             DOM.customCategory.classList.add('hidden');
             DOM.ruleCategory.value = '';
@@ -4295,7 +4599,7 @@
             reloadAll();
         };
 
-        // 断语列表排序
+    // 断语列表排序
         const ruleSort = document.getElementById('rule-sort');
         if (ruleSort) {
             ruleSort.onchange = () => {
@@ -5377,8 +5681,12 @@
             }
             
             if(isMatch) {
-                if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
-                matchedByCategory[rule.category].push(rule.duanyu);
+                // 检查用户是否有该分类的权限
+                const allowedCategories = getCurrentUserAllowedCategories();
+                if (allowedCategories.includes(rule.category)) {
+                    if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
+                    matchedByCategory[rule.category].push(rule.duanyu);
+                }
             }
         });
 
@@ -6115,10 +6423,33 @@
             if (category === '自定义') {
                 category = DOM.customCategory.value.trim();
                 if (!category) return alert('请输入自定义分类名称！');
-                const defaultCats = ['格局','事业','财运','婚姻','健康','性格','灾祸'];
-                if (!cache.categories.includes(category) && !defaultCats.includes(category)) {
-                    cache.categories.push(category);
-                    localStorage.setItem(CATEGORY_KEY, JSON.stringify(cache.categories));
+                if (!cache.categories.includes(category)) {
+                    // 保存到 Supabase
+                    const updatedCats = [...cache.categories, category];
+                    try {
+                        const { data: existing } = await supabaseClient
+                            .from('site_settings')
+                            .select('id')
+                            .eq('setting_key', 'custom_categories');
+                        const value = JSON.stringify(updatedCats);
+                        if (existing && existing.length > 0) {
+                            await supabaseClient.from('site_settings')
+                                .update({ setting_value: value, updated_at: new Date().toISOString() })
+                                .eq('id', existing[0].id);
+                        } else {
+                            await supabaseClient.from('site_settings').insert({
+                                setting_key: 'custom_categories',
+                                setting_value: value,
+                                description: '自定义断语分类',
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            });
+                        }
+                    } catch (e) {
+                        console.error('保存自定义分类失败:', e);
+                    }
+                    cache.categories = updatedCats;
+                    localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
                 }
             }
             if (!category) return alert('请选择断语分类！');
@@ -7407,6 +7738,11 @@
             batchExport.disabled = cache.rules.length === 0;
         }
         
+        const batchReassign = document.getElementById('batch-reassign');
+        if (batchReassign) {
+            batchReassign.disabled = count === 0;
+        }
+        
         // 更新全选当前页状态
         if (selectAll) {
             const checkboxes = document.querySelectorAll('.rule-checkbox');
@@ -7500,6 +7836,12 @@
                     }
                 }
             };
+        }
+        
+        // 批量调整分类
+        const batchReassignBtn = document.getElementById('batch-reassign');
+        if (batchReassignBtn) {
+            batchReassignBtn.onclick = openBatchReassign;
         }
         
         updateSelectionUI();
@@ -16254,6 +16596,116 @@ function getCleanFeatures(features) {
     return features.replace(/<!--PERMS:\{.+?\}-->\n?/, '');
 }
 
+// 获取系统中所有断语分类（从 cache.rules 提取）
+function getAllRuleCategories() {
+    return [...new Set((cache.rules || []).map(r => r.category).filter(Boolean))];
+}
+
+// 填充套餐编辑弹窗中的断语分类复选框
+function populateTierRuleCategories() {
+    const allCats = getAllRuleCategories();
+    if (allCats.length === 0) return;
+    
+    const tiers = document.querySelectorAll('[data-tier-id]');
+    tiers.forEach((tierEl) => {
+        const hiddenInput = tierEl.querySelector('input[type="hidden"]');
+        if (!hiddenInput) return;
+        const id = hiddenInput.value;
+        // 从 features textarea 反推当前保存的 rule_categories
+        const featuresEl = tierEl.querySelector('textarea[id^="tier-features-"]');
+        let currentCats = [];
+        if (featuresEl) {
+            const perms = extractPermissionsFromFeatures(featuresEl.value);
+            if (perms && perms.rule_categories && perms.rule_categories.length > 0) {
+                currentCats = perms.rule_categories;
+            }
+        }
+        const container = tierEl.querySelector('[id^="tier-rule-cats-"]');
+        if (!container) return;
+        // 如 currentCats 为空（旧数据），默认全选
+        const isAll = currentCats.length === 0;
+        container.innerHTML = allCats.map(cat =>
+            `<label class="flex items-center gap-1.5 text-sm">
+                <input type="checkbox" class="tier-rule-cat" value="${cat}" ${isAll || currentCats.includes(cat) ? 'checked' : ''}> ${cat}
+            </label>`
+        ).join('');
+    });
+}
+
+// 从 site_settings 加载免费用户默认分类
+async function loadDefaultRuleCategories() {
+    try {
+        const { data } = await supabaseClient
+            .from('site_settings')
+            .select('setting_value')
+            .eq('setting_key', 'default_rule_categories')
+            .maybeSingle();
+        if (data && data.setting_value) {
+            const parsed = JSON.parse(data.setting_value);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch (e) {
+        console.error('加载默认分类失败:', e);
+    }
+    return getAllRuleCategories();
+}
+
+// 保存免费用户默认分类到 site_settings
+async function saveDefaultRuleCategories(categories) {
+    try {
+        const { data: existing } = await supabaseClient
+            .from('site_settings')
+            .select('id')
+            .eq('setting_key', 'default_rule_categories');
+        const value = JSON.stringify(categories);
+        if (existing && existing.length > 0) {
+            await supabaseClient.from('site_settings')
+                .update({ setting_value: value, updated_at: new Date().toISOString() })
+                .eq('id', existing[0].id);
+        } else {
+            await supabaseClient.from('site_settings').insert({
+                setting_key: 'default_rule_categories',
+                setting_value: value,
+                description: '免费用户默认可访问的断语分类',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            });
+        }
+    } catch (e) {
+        console.error('保存默认分类失败:', e);
+    }
+}
+
+// 填充免费用户默认分类配置区
+async function populateDefaultRuleCategories() {
+    const container = document.getElementById('default-rule-cats');
+    if (!container) return;
+    const allCats = getAllRuleCategories();
+    if (allCats.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-400">暂无分类，请先创建断语</span>';
+        return;
+    }
+    const defaultCats = await loadDefaultRuleCategories();
+    container.innerHTML = allCats.map(cat =>
+        `<label class="flex items-center gap-1.5 text-sm">
+            <input type="checkbox" class="default-rule-cat" value="${cat}" ${defaultCats.includes(cat) ? 'checked' : ''}> ${cat}
+        </label>`
+    ).join('');
+}
+
+// 保存免费用户默认分类
+async function handleSaveDefaultCats() {
+    const container = document.getElementById('default-rule-cats');
+    if (!container) return;
+    const checked = [...container.querySelectorAll('.default-rule-cat:checked')].map(cb => cb.value);
+    await saveDefaultRuleCategories(checked);
+    const status = document.getElementById('default-cats-status');
+    if (status) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => { status.textContent = ''; }, 3000);
+    }
+}
+
 // 渲染支付套餐到页面
 async function renderPaymentTiers() {
     const container = document.getElementById('payment-tiers');
@@ -16548,10 +17000,9 @@ async function openEditPaymentModal() {
                             </div>
                             <div>
                                 <label class="block text-sm font-medium mb-1">套餐标识</label>
-                                <select id="tier-key-${index}" class="w-full p-2 border rounded">
-                                    <option value="pro" ${tier.tier === 'pro' ? 'selected' : ''}>专业版</option>
-                                    <option value="premium" ${tier.tier === 'premium' ? 'selected' : ''}>高级版</option>
-                                </select>
+                                <input type="text" id="tier-key-${index}" value="${tier.tier}"
+                                       placeholder="唯一标识，如 basic/pro/premium/vip"
+                                       class="w-full p-2 border rounded">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-4 mb-4">
@@ -16561,11 +17012,9 @@ async function openEditPaymentModal() {
                             </div>
                             <div>
                                 <label class="block text-sm font-medium mb-1">周期</label>
-                                <select id="tier-period-${index}" class="w-full p-2 border rounded">
-                                    <option value="月" ${tier.period === '月' ? 'selected' : ''}>月</option>
-                                    <option value="年" ${tier.period === '年' ? 'selected' : ''}>年</option>
-                                    <option value="永久" ${tier.period === '永久' ? 'selected' : ''}>永久</option>
-                                </select>
+                                <input type="text" id="tier-period-${index}" value="${tier.period}"
+                                       placeholder="例: 月 / 年 / 永久 / 30天 / 90天 / 180天"
+                                       class="w-full p-2 border rounded">
                             </div>
                         </div>
                         <div class="mb-4">
@@ -16595,6 +17044,13 @@ async function openEditPaymentModal() {
                             </div>
                             <p class="text-xs text-gray-400 mt-1">八字分析对所有用户默认开放，其他功能仅勾选后该套餐会员才能访问</p>
                         </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">可匹配的断语分类</label>
+                            <p class="text-xs text-gray-400 mb-2">勾选的分类下匹配的断语该套餐用户才能看到</p>
+                            <div class="grid grid-cols-3 gap-2" id="tier-rule-cats-${index}">
+                                <!-- 动态生成 -->
+                            </div>
+                        </div>
                         <div class="flex items-center justify-between">
                             <label class="flex items-center gap-2">
                                 <input type="checkbox" id="tier-active-${index}" ${tier.is_active ? 'checked' : ''}>
@@ -16603,6 +17059,19 @@ async function openEditPaymentModal() {
                         </div>
                     </div>
                 `).join('') : '<p class="text-center text-gray-500">暂无支付设置</p>'}
+            </div>
+            
+            <!-- 免费用户默认分类配置 -->
+            <div class="mt-6 border-t pt-4">
+                <h4 class="font-bold text-sm mb-2">免费用户默认权限设置</h4>
+                <p class="text-xs text-gray-400 mb-2">控制未登录用户和已注册但未购买任何套餐的用户可访问的断语分类</p>
+                <div class="grid grid-cols-3 gap-2" id="default-rule-cats">
+                    <!-- 动态填充 -->
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button id="btn-save-default-cats" class="px-3 py-1 bg-blue-600 text-white rounded text-sm" onclick="handleSaveDefaultCats()">保存免费用户设置</button>
+                    <span id="default-cats-status" class="text-xs text-gray-500 self-center"></span>
+                </div>
             </div>
             
             <div class="mt-4 flex gap-3">
@@ -16615,6 +17084,12 @@ async function openEditPaymentModal() {
     `;
     
     document.body.appendChild(modal);
+    
+    // 填充断语分类复选框
+    populateTierRuleCategories();
+    
+    // 填充免费用户默认分类配置
+    populateDefaultRuleCategories();
     
     // 添加套餐按钮
     document.getElementById('btn-add-tier').onclick = function() {
@@ -16632,10 +17107,8 @@ async function openEditPaymentModal() {
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">套餐标识</label>
-                        <select id="tier-key-${newIndex}" class="w-full p-2 border rounded">
-                            <option value="pro">专业版</option>
-                            <option value="premium">高级版</option>
-                        </select>
+                        <input type="text" id="tier-key-${newIndex}"
+                               placeholder="唯一标识，如 basic/pro/premium/vip" class="w-full p-2 border rounded">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4 mb-4">
@@ -16645,11 +17118,8 @@ async function openEditPaymentModal() {
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">周期</label>
-                        <select id="tier-period-${newIndex}" class="w-full p-2 border rounded">
-                            <option value="月">月</option>
-                            <option value="年" selected>年</option>
-                            <option value="永久">永久</option>
-                        </select>
+                        <input type="text" id="tier-period-${newIndex}"
+                               placeholder="例: 月 / 年 / 永久 / 30天 / 90天 / 180天" class="w-full p-2 border rounded">
                     </div>
                 </div>
                 <div class="mb-4">
@@ -16679,6 +17149,13 @@ async function openEditPaymentModal() {
                     </div>
                     <p class="text-xs text-gray-400 mt-1">八字分析对所有用户默认开放</p>
                 </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">可匹配的断语分类</label>
+                    <p class="text-xs text-gray-400 mb-2">勾选的分类下匹配的断语该套餐用户才能看到</p>
+                    <div class="grid grid-cols-3 gap-2" id="tier-rule-cats-${newIndex}">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
                 <div class="flex items-center justify-between">
                     <label class="flex items-center gap-2">
                         <input type="checkbox" id="tier-active-${newIndex}" checked>
@@ -16689,6 +17166,7 @@ async function openEditPaymentModal() {
         `;
         
         list.insertAdjacentHTML('beforeend', newTierHtml);
+        populateTierRuleCategories();
     };
     
     // 保存按钮
@@ -16720,6 +17198,12 @@ async function openEditPaymentModal() {
                 mining: document.getElementById(`tier-perm-mining-${i}`)?.checked ?? false,
                 data: document.getElementById(`tier-perm-data-${i}`)?.checked ?? false
             };
+            // 读取断语分类权限
+            const catsContainer = document.getElementById(`tier-rule-cats-${i}`);
+            if (catsContainer) {
+                permissions.rule_categories = [...catsContainer.querySelectorAll('.tier-rule-cat:checked')]
+                    .map(cb => cb.value);
+            }
             // 将权限JSON编码到features字段中（避免需要新增数据库列）
             const permsStr = JSON.stringify(permissions);
             const encodedFeatures = `<!--PERMS:${permsStr}-->\n${tierFeatures || ''}`;
@@ -16968,12 +17452,17 @@ async function fetchAllUserPermissions(page = 1, pageSize = 10, searchEmail = ''
 // 获取用户权限（优先从 Supabase，失败则用本地缓存）
 async function getUserPermissions() {
     if (!currentUser) {
+        const defaultRuleCats = await loadDefaultRuleCategories();
         return {
             bazi: true,
             rule: false,
             case: false,
             mining: false,
             data: false,
+            permissions: {
+                bazi: true,
+                rule_categories: defaultRuleCats
+            },
             expireDate: 'permanent'
         };
     }
@@ -16982,6 +17471,10 @@ async function getUserPermissions() {
     const remotePerm = await fetchUserPermissionsFromSupabase(currentUser.id);
     
     if (remotePerm) {
+        // 确保 rule_categories 有值
+        if (!remotePerm.permissions.rule_categories || remotePerm.permissions.rule_categories.length === 0) {
+            remotePerm.permissions.rule_categories = await loadDefaultRuleCategories();
+        }
         // 存储到本地缓存
         localStorage.setItem('user_permissions', JSON.stringify(remotePerm.permissions));
         localStorage.setItem('user_expire_date', remotePerm.expireDate);
@@ -16991,17 +17484,21 @@ async function getUserPermissions() {
     // Supabase 获取失败，使用本地缓存
     const localPermissions = localStorage.getItem('user_permissions');
     const localExpireDate = localStorage.getItem('user_expire_date');
+    const localPerms = localPermissions ? JSON.parse(localPermissions) : {
+        bazi: true,
+        rule: false,
+        case: false,
+        research: false,
+        tag: false,
+        mining: false,
+        data: false
+    };
+    if (!localPerms.rule_categories || localPerms.rule_categories.length === 0) {
+        localPerms.rule_categories = await loadDefaultRuleCategories();
+    }
     
     return {
-        permissions: localPermissions ? JSON.parse(localPermissions) : {
-            bazi: true,
-            rule: false,
-            case: false,
-            research: false,
-            tag: false,
-            mining: false,
-            data: false
-        },
+        permissions: localPerms,
         expireDate: localExpireDate || 'permanent'
     };
 }
@@ -18192,9 +18689,19 @@ async function setUserLevel(userId, email, level) {
                 permissions = { ...permissions, ...extractedPerms };
             }
             levelName = tierData.tier_name || level;
-            // 如果套餐周期为"永久"，则永久有效
-            if (tierData.period === '永久') {
+            // 解析周期文本计算有效期
+            const period = tierData.period || '';
+            if (period === '永久') {
                 expireDate = '2099-12-31';
+            } else if (period === '年') {
+                expireDate = calculateExpireDate(365);
+            } else if (period === '月') {
+                expireDate = calculateExpireDate(30);
+            } else if (/^(\d+)天$/.test(period)) {
+                const days = parseInt(period.match(/^(\d+)天$/)[1]);
+                expireDate = calculateExpireDate(days);
+            } else if (/^\d+$/.test(period)) {
+                expireDate = calculateExpireDate(parseInt(period));
             }
         }
     } catch (error) {
@@ -18478,6 +18985,18 @@ async function loadUserPermissionsDisplay() {
                 <span>${p.name}</span>
             </div>`;
         }).join('');
+        
+        // 显示可匹配的断语分类
+        const catInfo = document.getElementById('perm-list-rule-cats');
+        if (catInfo) {
+            const allowedCats = permissions.rule_categories;
+            const allCats = getAllRuleCategories();
+            if (allowedCats && allowedCats.length > 0) {
+                catInfo.textContent = allowedCats.length === allCats.length ? '全部断语分类' : `分类: ${allowedCats.join('、')}`;
+            } else {
+                catInfo.textContent = '全部断语分类';
+            }
+        }
     }
 }
 
