@@ -18997,18 +18997,36 @@ async function loadUserPermissionsDisplay() {
                 .eq('is_active', true)
                 .order('sort_order', { ascending: true });
             if (tiers && tiers.length > 0) {
-                // 找到匹配当前权限的套餐
-                 for (const tier of tiers) {
-                     const tp = extractPermissionsFromFeatures(tier.features) || {};
-                     const match = Object.keys(tp).every(k => permissions[k] === tp[k]);
-                    if (match) {
-                        tierName = tier.tier_name || '基础版';
-                        // 根据权限多少决定颜色
-                        const pc = Object.values(tp).filter(v => v).length;
-                        if (pc >= 5) tierClass = 'px-3 py-1 bg-purple-600 text-white rounded text-sm';
-                        else if (pc >= 3) tierClass = 'px-3 py-1 bg-blue-600 text-white rounded text-sm';
-                        else tierClass = 'px-3 py-1 bg-gray-600 text-white rounded text-sm';
-                        break;
+                // 优先使用 _tier_key 精确匹配
+                if (permissions._tier_key) {
+                    const matched = tiers.find(t => t.tier === permissions._tier_key);
+                    if (matched) {
+                        tierName = matched.tier_name || '基础版';
+                        const tp = extractPermissionsFromFeatures(matched.features);
+                        if (tp) {
+                            const pc = Object.values(tp).filter(v => v).length;
+                            if (pc >= 5) tierClass = 'px-3 py-1 bg-purple-600 text-white rounded text-sm';
+                            else if (pc >= 3) tierClass = 'px-3 py-1 bg-blue-600 text-white rounded text-sm';
+                            else tierClass = 'px-3 py-1 bg-gray-600 text-white rounded text-sm';
+                        } else {
+                            tierClass = 'px-3 py-1 bg-gray-600 text-white rounded text-sm';
+                        }
+                    }
+                }
+                // _tier_key 未匹配到，尝试用权限签名匹配（跳过没有 PERMS 的套餐）
+                if (!tierName || tierName === '基础版') {
+                    for (const tier of tiers) {
+                        const tp = extractPermissionsFromFeatures(tier.features);
+                        if (!tp || Object.keys(tp).length === 0) continue;
+                        const match = Object.keys(tp).every(k => permissions[k] === tp[k]);
+                        if (match) {
+                            tierName = tier.tier_name || '基础版';
+                            const pc = Object.values(tp).filter(v => v).length;
+                            if (pc >= 5) tierClass = 'px-3 py-1 bg-purple-600 text-white rounded text-sm';
+                            else if (pc >= 3) tierClass = 'px-3 py-1 bg-blue-600 text-white rounded text-sm';
+                            else tierClass = 'px-3 py-1 bg-gray-600 text-white rounded text-sm';
+                            break;
+                        }
                     }
                 }
             } else {
