@@ -18576,32 +18576,36 @@ async function loadUserList(page = 1, searchEmail = '', sortBy = 'created_at_des
             const isAdminUser = isAdmin(user.email);
             
             // 判断当前用户匹配哪个套餐（用于高亮按钮）
-            let currentTier = 'basic';
-            for (const tier of availableTiers) {
-                const tp = extractPermissionsFromFeatures(tier.features) || {};
-                const match = Object.keys(tp).every(k => 
-                    permissions[k] === tp[k]
-                );
-                if (match) {
-                    currentTier = tier.tier;
-                    break;
+            let currentTier = '';
+            // 优先使用 _tier_key 精确匹配（新用户都有该字段）
+            if (permissions._tier_key && availableTiers.some(t => t.tier === permissions._tier_key)) {
+                currentTier = permissions._tier_key;
+            } else {
+                // 存量用户：用权限签名匹配（跳过没有 PERMS 标记的套餐）
+                for (const tier of availableTiers) {
+                    const tp = extractPermissionsFromFeatures(tier.features);
+                    if (!tp || Object.keys(tp).length === 0) continue;
+                    const match = Object.keys(tp).every(k => permissions[k] === tp[k]);
+                    if (match) {
+                        currentTier = tier.tier;
+                        break;
+                    }
                 }
-            }
-            // 如果都不匹配，尝试用权限特征判断
-            if (currentTier === 'basic') {
-                if (permissions.rule && permissions.case && permissions.mining && permissions.data) {
-                    // 找有全部权限的套餐
-                    const fullTier = availableTiers.find(t => {
-                        const tp = extractPermissionsFromFeatures(t.features) || {};
-                        return tp.mining === true && tp.data === true;
-                    });
-                    if (fullTier) currentTier = fullTier.tier;
-                } else if (permissions.rule && permissions.case) {
-                    const midTier = availableTiers.find(t => {
-                        const tp = extractPermissionsFromFeatures(t.features) || {};
-                        return tp.rule === true && tp.case === true && tp.mining !== true;
-                    });
-                    if (midTier) currentTier = midTier.tier;
+                // 仍未匹配到时，尝试用权限特征兜底判断
+                if (!currentTier) {
+                    if (permissions.rule && permissions.case && permissions.mining && permissions.data) {
+                        const fullTier = availableTiers.find(t => {
+                            const tp = extractPermissionsFromFeatures(t.features);
+                            return tp && tp.mining === true && tp.data === true;
+                        });
+                        if (fullTier) currentTier = fullTier.tier;
+                    } else if (permissions.rule && permissions.case) {
+                        const midTier = availableTiers.find(t => {
+                            const tp = extractPermissionsFromFeatures(t.features);
+                            return tp && tp.rule === true && tp.case === true && tp.mining !== true;
+                        });
+                        if (midTier) currentTier = midTier.tier;
+                    }
                 }
             }
             
