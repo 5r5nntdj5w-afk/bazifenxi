@@ -1,4 +1,4 @@
-﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -16621,18 +16621,18 @@ function populateTierRuleCategories() {
         const hiddenInput = tierEl.querySelector('input[type="hidden"]');
         if (!hiddenInput) return;
         const id = hiddenInput.value;
-        // 从 features textarea 反推当前保存的 rule_categories
-        const featuresEl = tierEl.querySelector('textarea[id^="tier-features-"]');
+        // 从 data-features 反推当前保存的 rule_categories（textarea 已被 getCleanFeatures 清洗）
+        const rawFeatures = tierEl.dataset.features ? decodeURIComponent(tierEl.dataset.features) : '';
         let currentCats = [];
-        if (featuresEl) {
-            const perms = extractPermissionsFromFeatures(featuresEl.value);
+        if (rawFeatures) {
+            const perms = extractPermissionsFromFeatures(rawFeatures);
             if (perms && perms.rule_categories && perms.rule_categories.length > 0) {
                 currentCats = perms.rule_categories;
             }
         }
         const container = tierEl.querySelector('[id^="tier-rule-cats-"]');
         if (!container) return;
-        // 如 currentCats 为空（旧数据），默认全选
+        // 如 currentCats 为空（旧数据/新套餐），默认全选
         const isAll = currentCats.length === 0;
         container.innerHTML = allCats.map(cat =>
             `<label class="flex items-center gap-1.5 text-sm">
@@ -17001,7 +17001,7 @@ async function openEditPaymentModal() {
             
             <div id="payment-settings-list" class="space-y-4 max-h-96 overflow-y-auto">
                 ${settings && settings.length > 0 ? settings.map((tier, index) => `
-                    <div class="border rounded-lg p-4 bg-gray-50" data-tier-id="${tier.id}">
+                    <div class="border rounded-lg p-4 bg-gray-50" data-tier-id="${tier.id}" data-features="${encodeURIComponent(tier.features || '')}">
                         <input type="hidden" id="tier-id-${index}" value="${tier.id}">
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <div>
