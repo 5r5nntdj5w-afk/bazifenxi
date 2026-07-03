@@ -4507,27 +4507,28 @@
         return getAllRuleCategories();
     }
 
-    // 获取当前用户允许的断语权限等级（需暴露为全局，给 matchRules 使用）
-    window.getCurrentUserAllowedPermLevels = function() {
+    // 获取当前用户的套餐默认操作等级（返回数字 0-3 或 undefined 表示不限制）
+    window.getCurrentUserDefaultPermLevel = function() {
         // 管理员不限制
-        if (currentUser && isAdmin(currentUser.email)) return [];
+        if (currentUser && isAdmin(currentUser.email)) return undefined;
         // 优先使用内存缓存
         if (currentUserPermissionsCache && currentUserPermissionsCache.permissions &&
-            currentUserPermissionsCache.permissions.allowed_permission_levels &&
-            currentUserPermissionsCache.permissions.allowed_permission_levels.length > 0) {
-            return currentUserPermissionsCache.permissions.allowed_permission_levels;
+            currentUserPermissionsCache.permissions.default_perm_level !== undefined &&
+            currentUserPermissionsCache.permissions.default_perm_level !== null &&
+            currentUserPermissionsCache.permissions.default_perm_level !== '') {
+            return Number(currentUserPermissionsCache.permissions.default_perm_level);
         }
         // 回退到 localStorage
         const permStr = localStorage.getItem('user_permissions');
         if (permStr) {
             try {
                 const perms = JSON.parse(permStr);
-                if (perms.allowed_permission_levels && perms.allowed_permission_levels.length > 0) {
-                    return perms.allowed_permission_levels;
+                if (perms.default_perm_level !== undefined && perms.default_perm_level !== null && perms.default_perm_level !== '') {
+                    return Number(perms.default_perm_level);
                 }
             } catch (e) {}
         }
-        return []; // 空数组表示不限制
+        return undefined; // undefined 表示不限制
     }
 
     // 分类管理 - 从 cache.rules 动态提取 + Supabase site_settings 自定义分类
@@ -5720,15 +5721,6 @@
             }
             
             if(isMatch) {
-                // 检查该断语本身的权限等级是否允许当前用户查看
-                const rulePermLevel = rule.permissionLevel !== undefined ? rule.permissionLevel : (rule.isPublic === true || rule.is_public === true ? 3 : 0);
-                const allowedLevels = getCurrentUserAllowedPermLevels();
-                if (allowedLevels.length > 0 && !allowedLevels.includes(rulePermLevel)) {
-                    isMatch = false;
-                }
-            }
-            
-            if(isMatch) {
                 // 检查用户是否有该分类的权限
                 const allowedCategories = getCurrentUserAllowedCategories();
                 if (allowedCategories.includes(rule.category)) {
@@ -6770,8 +6762,13 @@
             const timeLabel = rule.updateTime ? '修改时间' : '创建时间';
             
             // 权限等级判断
-            const permLevel = rule.permissionLevel !== undefined ? rule.permissionLevel : (rule.isPublic === true || rule.is_public === true ? 3 : 0);
+            let permLevel = rule.permissionLevel !== undefined ? rule.permissionLevel : (rule.isPublic === true || rule.is_public === true ? 3 : 0);
             const isAdminUser = currentUser && isAdmin(currentUser.email);
+            // 非管理员用户使用套餐默认操作等级覆盖断语自身权限等级
+            if (!isAdminUser) {
+                const tierLevel = getCurrentUserDefaultPermLevel();
+                if (tierLevel !== undefined) permLevel = tierLevel;
+            }
             const isOwner = currentUser && (rule.ownerId === currentUser.id || rule.userId === currentUser.id || !rule.ownerId);
             
             // 权限等级标签
@@ -16681,24 +16678,20 @@ function populateTierRuleCategories() {
     });
 }
 
-// 填充套餐编辑弹窗中的断语权限等级复选框
+// 填充套餐编辑弹窗中的默认操作等级下拉
 function populateTierPermLevels() {
     const tiers = document.querySelectorAll('[data-tier-id]');
     tiers.forEach((tierEl) => {
         const rawFeatures = tierEl.dataset.features ? decodeURIComponent(tierEl.dataset.features) : '';
-        let currentLevels = [];
+        let savedLevel = '';
         if (rawFeatures) {
             const perms = extractPermissionsFromFeatures(rawFeatures);
-            if (perms && perms.allowed_permission_levels && perms.allowed_permission_levels.length > 0) {
-                currentLevels = perms.allowed_permission_levels;
+            if (perms && perms.default_perm_level !== undefined && perms.default_perm_level !== null && perms.default_perm_level !== '') {
+                savedLevel = String(perms.default_perm_level);
             }
         }
-        const container = tierEl.querySelector('[id^="tier-perm-levels-"]');
-        if (!container) return;
-        // 如果没保存过（旧数据），所有checkbox保持默认未选中（不限制）
-        container.querySelectorAll('.tier-perm-level').forEach(cb => {
-            cb.checked = currentLevels.length > 0 && currentLevels.includes(parseInt(cb.value));
-        });
+        const sel = tierEl.querySelector('[id^="tier-default-perm-level-"]');
+        if (sel) sel.value = savedLevel;
     });
 }
 
@@ -17123,13 +17116,14 @@ async function openEditPaymentModal() {
                         </div>
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-2">可匹配的断语权限等级</label>
-                            <p class="text-xs text-gray-400 mb-2">勾选的权限等级对应的断语该套餐用户才能查看（不勾选则不限制）</p>
-                            <div class="flex gap-4 flex-wrap" id="tier-perm-levels-${index}">
-                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="0"> 私有</label>
-                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="1"> 公开只读</label>
-                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="2"> 公开加密</label>
-                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="3"> 公开可转私有</label>
-                            </div>
+                            <p class="text-xs text-gray-400 mb-2">选择该套餐用户查看断语时的默认操作等级</p>
+                            <select id="tier-default-perm-level-${index}" class="w-full p-2 border rounded text-sm">
+                                <option value="">不限制（按断语自身权限）</option>
+                                <option value="0">🔒 私有</option>
+                                <option value="1">🔓 公开只读</option>
+                                <option value="2">🔐 公开加密</option>
+                                <option value="3">🌍 公开可转私有</option>
+                            </select>
                         </div>
                         <div class="flex items-center justify-between">
                             <label class="flex items-center gap-2">
@@ -17239,13 +17233,14 @@ async function openEditPaymentModal() {
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">可匹配的断语权限等级</label>
-                    <p class="text-xs text-gray-400 mb-2">勾选的权限等级对应的断语该套餐用户才能查看（不勾选则不限制）</p>
-                    <div class="flex gap-4 flex-wrap" id="tier-perm-levels-${newIndex}">
-                        <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="0"> 私有</label>
-                        <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="1"> 公开只读</label>
-                        <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="2"> 公开加密</label>
-                        <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="tier-perm-level" value="3"> 公开可转私有</label>
-                    </div>
+                    <p class="text-xs text-gray-400 mb-2">选择该套餐用户查看断语时的默认操作等级</p>
+                    <select id="tier-default-perm-level-${newIndex}" class="w-full p-2 border rounded text-sm">
+                        <option value="">不限制（按断语自身权限）</option>
+                        <option value="0">🔒 私有</option>
+                        <option value="1">🔓 公开只读</option>
+                        <option value="2">🔐 公开加密</option>
+                        <option value="3">🌍 公开可转私有</option>
+                    </select>
                 </div>
                 <div class="flex items-center justify-between">
                     <label class="flex items-center gap-2">
@@ -17299,21 +17294,16 @@ async function openEditPaymentModal() {
                 permissions.rule_categories = [...catsContainer.querySelectorAll('.tier-rule-cat:checked')]
                     .map(cb => cb.value);
             }
-            // 读取断语权限等级限制
-            const permLevelContainer = document.getElementById(`tier-perm-levels-${i}`);
-            if (permLevelContainer) {
-                const checkedLevels = [...permLevelContainer.querySelectorAll('.tier-perm-level:checked')]
-                    .map(cb => parseInt(cb.value));
-                if (checkedLevels.length > 0) {
-                    permissions.allowed_permission_levels = checkedLevels;
-                }
+            // 读取断语默认操作等级
+            const defaultPermLevel = document.getElementById(`tier-default-perm-level-${i}`)?.value;
+            if (defaultPermLevel !== undefined && defaultPermLevel !== '') {
+                permissions.default_perm_level = parseInt(defaultPermLevel);
             }
-            const permLevels = permissions.allowed_permission_levels || [];
             // 保存该套餐的功能权限签名（不含 rule_categories），供同步时匹配存量用户
             tierSyncData.push({
                 tierKey,
                 ruleCats: permissions.rule_categories || [],
-                permLevels,
+                defaultPermLevel: permissions.default_perm_level,
                 permSignature: { bazi: permissions.bazi, rule: permissions.rule, case: permissions.case, research: permissions.research, tag: permissions.tag, mining: permissions.mining, data: permissions.data }
             });
             // 将权限JSON编码到features字段中（避免需要新增数据库列）
@@ -17377,7 +17367,7 @@ async function openEditPaymentModal() {
                     .from('user_permissions')
                     .select('user_id, permissions');
                 if (allUsers && allUsers.length > 0) {
-                    for (const { tierKey, ruleCats, permLevels, permSignature } of tierSyncData) {
+                    for (const { tierKey, ruleCats, defaultPermLevel, permSignature } of tierSyncData) {
                         if (!tierKey) continue;
                         const matchedUsers = allUsers.filter(user => {
                             const p = user.permissions || {};
@@ -17388,7 +17378,7 @@ async function openEditPaymentModal() {
                         });
                         if (matchedUsers.length > 0) {
                             await Promise.all(matchedUsers.map(user => {
-                                const updatedPerms = { ...user.permissions, ...permSignature, rule_categories: ruleCats, allowed_permission_levels: permLevels };
+                                const updatedPerms = { ...user.permissions, ...permSignature, rule_categories: ruleCats, default_perm_level: defaultPermLevel };
                                 return supabaseClient.from('user_permissions')
                                     .update({ permissions: updatedPerms, updated_at: new Date().toISOString() })
                                     .eq('user_id', user.user_id);
