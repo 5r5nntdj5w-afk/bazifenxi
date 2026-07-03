@@ -4488,7 +4488,13 @@
     window.getCurrentUserAllowedCategories = function() {
         // 管理员全部可见
         if (currentUser && isAdmin(currentUser.email)) return getAllRuleCategories();
-        // 从 localStorage 读取用户权限
+        // 优先使用内存缓存（由 getUserPermissions 定期从 Supabase 刷新）
+        if (currentUserPermissionsCache && currentUserPermissionsCache.permissions && 
+            currentUserPermissionsCache.permissions.rule_categories && 
+            currentUserPermissionsCache.permissions.rule_categories.length > 0) {
+            return currentUserPermissionsCache.permissions.rule_categories;
+        }
+        // 回退到 localStorage
         const permStr = localStorage.getItem('user_permissions');
         if (permStr) {
             try {
@@ -7969,6 +7975,7 @@
     }
     
     let currentUser = null;
+    let currentUserPermissionsCache = null;
 
     async function initSupabase() {
         try {
@@ -17268,6 +17275,33 @@ async function openEditPaymentModal() {
         }
         
         if (errorCount === 0) {
+            // 同步已有用户的断语分类权限
+            for (let i = 0; i < tiers.length; i++) {
+                const tierKey = document.getElementById(`tier-key-${i}`)?.value;
+                if (!tierKey) continue;
+                const catsContainer = document.getElementById(`tier-rule-cats-${i}`);
+                let ruleCats = [];
+                if (catsContainer) {
+                    ruleCats = [...catsContainer.querySelectorAll('.tier-rule-cat:checked')].map(cb => cb.value);
+                }
+                try {
+                    const { data: users } = await supabaseClient
+                        .from('user_permissions')
+                        .select('user_id, permissions')
+                        .filter('permissions->>_tier_key', 'eq', tierKey);
+                    if (users && users.length > 0) {
+                        await Promise.all(users.map(user => {
+                            const updatedPerms = { ...user.permissions, rule_categories: ruleCats };
+                            return supabaseClient.from('user_permissions')
+                                .update({ permissions: updatedPerms, updated_at: new Date().toISOString() })
+                                .eq('user_id', user.user_id);
+                        }));
+                        console.log(`同步套餐 "${tierKey}" 的断语分类到 ${users.length} 个用户`);
+                    }
+                } catch (e) {
+                    console.error(`同步套餐 ${tierKey} 的断语分类失败:`, e);
+                }
+            }
             alert(`支付设置保存成功！\n已保存 ${successCount} 个套餐`);
             document.getElementById('edit-payment-modal').remove();
             await renderPaymentTiers();
@@ -17485,6 +17519,8 @@ async function getUserPermissions() {
         if (!remotePerm.permissions.rule_categories || remotePerm.permissions.rule_categories.length === 0) {
             remotePerm.permissions.rule_categories = await loadDefaultRuleCategories();
         }
+        // 更新内存缓存
+        currentUserPermissionsCache = remotePerm;
         // 存储到本地缓存
         localStorage.setItem('user_permissions', JSON.stringify(remotePerm.permissions));
         localStorage.setItem('user_expire_date', remotePerm.expireDate);
@@ -17507,10 +17543,12 @@ async function getUserPermissions() {
         localPerms.rule_categories = await loadDefaultRuleCategories();
     }
     
-    return {
+    const fallbackResult = {
         permissions: localPerms,
         expireDate: localExpireDate || 'permanent'
     };
+    currentUserPermissionsCache = fallbackResult;
+    return fallbackResult;
 }
 
 // 检查权限
@@ -18698,6 +18736,8 @@ async function setUserLevel(userId, email, level) {
             if (extractedPerms) {
                 permissions = { ...permissions, ...extractedPerms };
             }
+            // 标记该用户所属的套餐标识，便于后续同步
+            permissions._tier_key = level;
             levelName = tierData.tier_name || level;
             // 解析周期文本计算有效期
             const period = tierData.period || '';
@@ -18726,6 +18766,13 @@ async function setUserLevel(userId, email, level) {
         console.log('更新结果:', success);
         
         if (success) {
+            // 如果更新的是当前登录用户，同步更新内存缓存
+            if (currentUser && currentUser.id === userId) {
+                currentUserPermissionsCache = {
+                    permissions: permissions,
+                    expireDate: expireDate
+                };
+            }
             alert(`已设置为${levelName}！`);
             await loadUserList();
         } else {
