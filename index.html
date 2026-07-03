@@ -17302,12 +17302,12 @@ async function openEditPaymentModal() {
                         });
                         if (matchedUsers.length > 0) {
                             await Promise.all(matchedUsers.map(user => {
-                                const updatedPerms = { ...user.permissions, rule_categories: ruleCats };
+                                const updatedPerms = { ...user.permissions, ...permSignature, rule_categories: ruleCats };
                                 return supabaseClient.from('user_permissions')
                                     .update({ permissions: updatedPerms, updated_at: new Date().toISOString() })
                                     .eq('user_id', user.user_id);
                             }));
-                            console.log(`同步套餐 "${tierKey}" 的断语分类到 ${matchedUsers.length} 个用户`);
+                            console.log(`同步套餐 "${tierKey}" 的权限到 ${matchedUsers.length} 个用户`);
                         }
                     }
                 }
