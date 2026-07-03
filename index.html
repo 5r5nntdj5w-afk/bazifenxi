@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4426,36 +4426,46 @@
         const allCats = [...new Set([...(cache.rules || []).map(r => r.category).filter(Boolean), ...(cache.categories || [])])];
         if (allCats.length === 0) return alert('暂无可用分类');
         
-        const target = prompt(`已选择 ${selectedRulesSet.size} 条断语\n\n请输入目标分类名称：\n\n可选分类：${allCats.join('、')}`, allCats[0]);
+        // 创建弹窗
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:360px;max-width:460px;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
+        
+        modal.innerHTML = `
+            <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">批量调整分类</h3>
+            <p style="margin:0 0 16px;font-size:14px;color:#555;">已选择 <strong>${selectedRulesSet.size}</strong> 条断语，请选择目标分类：</p>
+            <select id="batch-cat-select" style="width:100%;padding:8px 10px;font-size:14px;border:1px solid #ccc;border-radius:6px;margin-bottom:20px;box-sizing:border-box;">
+                ${allCats.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button id="batch-cat-cancel" style="padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;">取消</button>
+                <button id="batch-cat-confirm" style="padding:8px 20px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:14px;">确认调整</button>
+            </div>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        const result = await new Promise(resolve => {
+            overlay.querySelector('#batch-cat-cancel').onclick = () => { resolve(null); cleanup(); };
+            overlay.querySelector('#batch-cat-confirm').onclick = () => {
+                const val = overlay.querySelector('#batch-cat-select').value;
+                resolve(val);
+                cleanup();
+            };
+            overlay.onclick = (e) => { if (e.target === overlay) { resolve(null); cleanup(); } };
+            function cleanup() { document.body.removeChild(overlay); }
+        });
+        
+        const target = result;
         if (!target) return;
-        if (!allCats.includes(target)) {
-            const add = confirm(`分类 "${target}" 不存在，是否创建？`);
-            if (add) {
-                const updatedCats = [...(cache.categories || []), target];
-                cache.categories = updatedCats;
-                try {
-                    const { data: existing } = await supabaseClient.from('site_settings')
-                        .select('id').eq('setting_key', 'custom_categories');
-                    const value = JSON.stringify(updatedCats);
-                    if (existing && existing.length > 0) {
-                        await supabaseClient.from('site_settings').update({ setting_value: value }).eq('id', existing[0].id);
-                    } else {
-                        await supabaseClient.from('site_settings').insert({
-                            setting_key: 'custom_categories', setting_value: value, description: '自定义断语分类',
-                            created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-                        });
-                    }
-                } catch (e) { console.error('保存自定义分类失败:', e); }
-                localStorage.setItem(CATEGORY_KEY, JSON.stringify(updatedCats));
-            } else {
-                return;
-            }
-        }
         
         let count = 0;
         for (const rule of cache.rules) {
-            const ruleKey = rule.duanyu?.substring(0, 30) || rule.id;
-            if (selectedRulesSet.has(ruleKey) || selectedRulesSet.has(rule.id)) {
+            const ruleKey = `${rule.category}_${rule.duanyu}`;
+            if (selectedRulesSet.has(ruleKey)) {
                 try {
                     if (rule.id) {
                         await supabaseClient.from('duanyu').update({ category: target }).eq('id', rule.id);
@@ -4471,7 +4481,7 @@
         updateSelectionUI();
         loadCategories();
         reloadAll();
-        alert(`✅ 已将 ${count} 条断语调整到分类 "${target}"`);
+        alert(`已将 ${count} 条断语调整到分类 "${target}"`);
     }
 
     // 获取当前用户允许的断语分类（需暴露为全局，给 matchRules 使用）
