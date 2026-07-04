@@ -11340,7 +11340,7 @@ function getAllTagCategories() {
                 liuNianListHtml += `
                     <div class="liunian-item ${isActive ? 'active' : ''}" data-year="${y}">
                         <div class="liunian-year">${y}</div>
-                        <div class="liunian-age">${startAge + i}岁</div>
+                        <div class="liunian-age">${currentDaYun.getStartAge() + i}岁</div>
                         <div class="liunian-ganzhi">${ygz.gan}${ygz.zhi}</div>
                     </div>
                 `;
@@ -11970,7 +11970,7 @@ function getAllTagCategories() {
                 liuNianListHtml += `
                     <div class="liunian-item ${isActive ? 'active' : ''}" data-year="${y}">
                         <div class="liunian-year">${y}</div>
-                        <div class="liunian-age">${startAge + i}岁</div>
+                        <div class="liunian-age">${currentDaYun.getStartAge() + i}岁</div>
                         <div class="liunian-ganzhi">${ygz.gan}${ygz.zhi}</div>
                     </div>
                 `;
@@ -12850,7 +12850,7 @@ function getAllTagCategories() {
                 liuNianListHtml += `
                     <div class="liunian-item ${isActive ? 'active' : ''}" data-year="${y}">
                         <div class="liunian-year">${y}</div>
-                        <div class="liunian-age">${startAge + i}岁</div>
+                        <div class="liunian-age">${currentDaYun.getStartAge() + i}岁</div>
                         <div class="liunian-ganzhi">${ygz.gan}${ygz.zhi}</div>
                     </div>
                 `;
@@ -13268,7 +13268,7 @@ function getAllTagCategories() {
                         newLiuNianHtml += `
                             <div class="liunian-item ${y === parseInt(year) ? 'active' : ''}" data-year="${y}">
                                 <div class="liunian-year">${y}</div>
-                                <div class="liunian-age">${startAge + i}岁</div>
+                                <div class="liunian-age">${selectedDayun.getStartAge() + i}岁</div>
                                 <div class="liunian-ganzhi">${ygz.gan}${ygz.zhi}</div>
                             </div>
                         `;
