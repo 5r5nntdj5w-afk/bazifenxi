@@ -1359,6 +1359,7 @@
                     <option value="性格">性格</option>
                     <option value="灾祸">灾祸</option>
                 </select>
+                <input type="text" id="rule-search" class="flex-1 p-2 border rounded" placeholder="🔍 搜索断语内容..." autocomplete="off">
                 <button id="clear-filter" class="px-3 py-2 bg-gray-200 rounded">清空筛选</button>
                 <button id="manage-categories-btn" class="px-3 py-2 bg-amber-600 text-white rounded text-sm" onclick="openCategoryManager()">📂 分类管理</button>
             </div>
@@ -2625,6 +2626,7 @@
     };
     let editIndex = -1;
     let currentFilterCategory = 'all';
+    let currentSearchKeyword = '';
 
     // 防抖函数
     function debounce(func, delay = 200) {
@@ -2774,6 +2776,7 @@
             resultFilterCategory: document.getElementById('result-filter-category'),
             copyDuanyu: document.getElementById('copy-duanyu'),
             clearFilterBtn: document.getElementById('clear-filter'),
+            ruleSearch: document.getElementById('rule-search'),
             historyList: document.getElementById('history-list'),
             clearHistory: document.getElementById('clear-history'),
             // 案例库相关
@@ -4648,9 +4651,22 @@
             reloadAll();
         };
 
+        // 实时搜索断语内容
+        if (DOM.ruleSearch) {
+            DOM.ruleSearch.oninput = debounce(function() {
+                currentSearchKeyword = this.value.trim();
+                currentRulePage = 1;
+                reloadAll();
+            }, 200);
+        }
+
         DOM.clearFilterBtn.onclick = () => {
             DOM.filterCategory.value = 'all';
             currentFilterCategory = 'all';
+            if (DOM.ruleSearch) {
+                DOM.ruleSearch.value = '';
+                currentSearchKeyword = '';
+            }
             currentRulePage = 1;
             reloadAll();
         };
@@ -6717,6 +6733,11 @@
         // 先按分类筛选，再按权限过滤
         let filtered = currentFilterCategory === 'all' ? cache.rules : cache.rules.filter(r => r.category === currentFilterCategory);
         filtered = filtered.filter(r => allowedCats.includes(r.category));
+        // 按关键词搜索断语内容
+        if (currentSearchKeyword) {
+            const kw = currentSearchKeyword.toLowerCase();
+            filtered = filtered.filter(r => (r.duanyu || '').toLowerCase().includes(kw));
+        }
         
         if (!filtered.length) { 
             DOM.ruleList.innerHTML = '<p class="text-gray-500">暂无规则</p>'; 
