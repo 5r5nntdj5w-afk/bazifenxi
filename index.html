@@ -10023,7 +10023,7 @@ function getAllTagCategories() {
                         <th class="border-2 border-yellow-400 p-2 bg-yellow-100 font-bold text-gray-800">日柱</th>
                         <th class="border-2 border-gray-300 p-2 bg-gray-100 font-bold text-gray-700">时柱</th>
                         <th class="border-2 border-gray-300 p-2 bg-gray-100 font-bold text-gray-700">大运</th>
-                        <th class="border-2 border-gray-300 p-2 ${isDayun ? 'bg-blue-100 font-bold text-blue-700' : 'bg-gray-100 font-bold text-gray-700'}">${isDayun ? '大运' : '流年'}</th>
+                        ${!isDayun ? '<th class="border-2 border-gray-300 p-2 bg-gray-100 font-bold text-gray-700">流年</th>' : ''}
                     </tr>
                     <tr>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(tianShenNian)}">${tianShenNian}</td>
@@ -10031,7 +10031,7 @@ function getAllTagCategories() {
                         <td class="border-2 border-yellow-300 p-2 bg-yellow-50 font-semibold ${getShenColorClass(tianShenRi)}">${tianShenRi}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(tianShenShi)}">${tianShenShi}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(tianShenDayun)}">${tianShenDayun}</td>
-                        <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(liunianTianShen)}">${liunianTianShen}</td>
+                        ${!isDayun ? '<td class="border-2 border-gray-200 p-2 font-semibold ' + getShenColorClass(liunianTianShen) + '">' + liunianTianShen + '</td>' : ''}
                     </tr>
                     <tr>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getWuXingColor(WU_XING[yearGan]).text}">${yearGan}${WU_XING[yearGan]}</td>
@@ -10039,7 +10039,7 @@ function getAllTagCategories() {
                         <td class="border-2 border-yellow-300 p-2 bg-yellow-50 font-semibold ${getWuXingColor(WU_XING[dayGan]).text}">${dayGan}${WU_XING[dayGan]}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getWuXingColor(WU_XING[hourGan]).text}">${hourGan}${WU_XING[hourGan]}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${currentDaYun && dayunGanZhi !== '-' ? getWuXingColor(WU_XING[dayunGanZhi.charAt(0)]).text : ''}">${currentDaYun && dayunGanZhi !== '-' ? dayunGanZhi.charAt(0) + WU_XING[dayunGanZhi.charAt(0)] : '-'}</td>
-                        <td class="border-2 border-gray-200 p-2 font-semibold ${liunianData ? getWuXingColor(WU_XING[liunianData.gan]).text : ''}">${liunianData ? liunianData.gan + WU_XING[liunianData.gan] : '-'}</td>
+                        ${!isDayun ? '<td class="border-2 border-gray-200 p-2 font-semibold ' + (liunianData ? getWuXingColor(WU_XING[liunianData.gan]).text : '') + '">' + (liunianData ? liunianData.gan + WU_XING[liunianData.gan] : '-') + '</td>' : ''}
                     </tr>
                     <tr>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getWuXingColor(WU_XING[yearZhi]).text}">${yearZhi}${WU_XING[yearZhi]}</td>
@@ -10047,7 +10047,7 @@ function getAllTagCategories() {
                         <td class="border-2 border-yellow-300 p-2 bg-yellow-50 font-semibold ${getWuXingColor(WU_XING[dayZhi]).text}">${dayZhi}${WU_XING[dayZhi]}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getWuXingColor(WU_XING[hourZhi]).text}">${hourZhi}${WU_XING[hourZhi]}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${currentDaYun && dayunGanZhi !== '-' ? getWuXingColor(WU_XING[dayunGanZhi.charAt(1)]).text : ''}">${currentDaYun && dayunGanZhi !== '-' ? dayunGanZhi.charAt(1) + WU_XING[dayunGanZhi.charAt(1)] : '-'}</td>
-                        <td class="border-2 border-gray-200 p-2 font-semibold ${liunianData ? getWuXingColor(WU_XING[liunianData.zhi]).text : ''}">${liunianData ? liunianData.zhi + WU_XING[liunianData.zhi] : '-'}</td>
+                        ${!isDayun ? '<td class="border-2 border-gray-200 p-2 font-semibold ' + (liunianData ? getWuXingColor(WU_XING[liunianData.zhi]).text : '') + '">' + (liunianData ? liunianData.zhi + WU_XING[liunianData.zhi] : '-') + '</td>' : ''}
                     </tr>
                     <tr>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(diShenNian)}">${diShenNian}</td>
@@ -10055,7 +10055,7 @@ function getAllTagCategories() {
                         <td class="border-2 border-yellow-300 p-2 bg-yellow-50 font-semibold ${getShenColorClass(diShenRi)}">${diShenRi}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(diShenShi)}">${diShenShi}</td>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(diShenDayun)}">${diShenDayun}</td>
-                        <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(liunianDiShen)}">${liunianDiShen}</td>
+                        ${!isDayun ? '<td class="border-2 border-gray-200 p-2 font-semibold ' + getShenColorClass(liunianDiShen) + '">' + liunianDiShen + '</td>' : ''}
                     </tr>
                 </table>
             </div>
@@ -11277,14 +11277,14 @@ function getAllTagCategories() {
                 <div class="mb-2">
                     <h3 class="text-base sm:text-lg font-bold text-amber-800 mb-2">🔢 八字排盘结果</h3>
                     <table class="w-full border-2 border-gray-300 text-center text-sm font-semibold">
-                        <tr><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">年柱</th><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">月柱</th><th class="border-2 border-gray-300 p-2 bg-yellow-100">日柱</th><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">时柱</th><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">大运</th><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">流年</th></tr>
+                        <tr><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">年柱</th><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">月柱</th><th class="border-2 border-gray-300 p-2 bg-yellow-100">日柱</th><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">时柱</th><th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">大运</th>${!isDayun ? '<th class="border-2 border-gray-300 p-2 bg-gray-100 text-gray-700">流年</th>' : ''}</tr>
                         <tr>
                             <td class="border-2 border-gray-300 p-2 ${getShenColorClass(tianShenNian)}">${tianShenNian}</td>
                             <td class="border-2 border-gray-300 p-2 ${getShenColorClass(tianShenYue)}">${tianShenYue}</td>
                             <td class="border-2 border-gray-300 p-2 bg-yellow-100 ${getShenColorClass(tianShenRi)}">${tianShenRi}</td>
                             <td class="border-2 border-gray-300 p-2 ${getShenColorClass(tianShenShi)}">${tianShenShi}</td>
                             <td class="border-2 border-gray-300 p-2 ${getShenColorClass(tianShenDayun)}">${tianShenDayun}</td>
-                            <td class="border-2 border-gray-300 p-2 ${getShenColorClass(tianShenLiunian)}">${tianShenLiunian}</td>
+                            ${!isDayun ? '<td class="border-2 border-gray-300 p-2 ' + getShenColorClass(tianShenLiunian) + '">' + tianShenLiunian + '</td>' : ''}
                         </tr>
                         <tr>
                             <td class="border-2 border-gray-300 p-2 ${getWuXingColor(WU_XING[yearGan]).text}">${yearGan} ${WU_XING[yearGan]}</td>
@@ -11292,7 +11292,7 @@ function getAllTagCategories() {
                             <td class="border-2 border-gray-300 p-2 bg-yellow-100 ${getWuXingColor(WU_XING[dayGan]).text}">${dayGan} ${WU_XING[dayGan]}</td>
                             <td class="border-2 border-gray-300 p-2 ${getWuXingColor(WU_XING[hourGan]).text}">${hourGan} ${WU_XING[hourGan]}</td>
                             <td class="border-2 border-gray-300 p-2 ${currentDaYun ? getWuXingColor(WU_XING[dayunGanZhi.charAt(0)]).text : ''}">${currentDaYun ? dayunGanZhi.charAt(0) + ' ' + WU_XING[dayunGanZhi.charAt(0)] : '-'}</td>
-                            <td class="border-2 border-gray-300 p-2 ${liunianData ? getWuXingColor(WU_XING[liunianData.gan]).text : ''}">${liunianData ? liunianData.gan + ' ' + WU_XING[liunianData.gan] : '-'}</td>
+                            ${!isDayun ? '<td class="border-2 border-gray-300 p-2 ' + (liunianData ? getWuXingColor(WU_XING[liunianData.gan]).text : '') + '">' + (liunianData ? liunianData.gan + ' ' + WU_XING[liunianData.gan] : '-') + '</td>' : ''}
                         </tr>
                         <tr>
                             <td class="border-2 border-gray-300 p-2 ${getWuXingColor(WU_XING[yearZhi]).text}">${yearZhi} ${WU_XING[yearZhi]}</td>
@@ -11300,7 +11300,7 @@ function getAllTagCategories() {
                             <td class="border-2 border-gray-300 p-2 bg-yellow-100 ${getWuXingColor(WU_XING[dayZhi]).text}">${dayZhi} ${WU_XING[dayZhi]}</td>
                             <td class="border-2 border-gray-300 p-2 ${getWuXingColor(WU_XING[hourZhi]).text}">${hourZhi} ${WU_XING[hourZhi]}</td>
                             <td class="border-2 border-gray-300 p-2 ${currentDaYun ? getWuXingColor(WU_XING[dayunGanZhi.charAt(1)]).text : ''}">${currentDaYun ? dayunGanZhi.charAt(1) + ' ' + WU_XING[dayunGanZhi.charAt(1)] : '-'}</td>
-                            <td class="border-2 border-gray-300 p-2 ${liunianData ? getWuXingColor(WU_XING[liunianData.zhi]).text : ''}">${liunianData ? liunianData.zhi + ' ' + WU_XING[liunianData.zhi] : '-'}</td>
+                            ${!isDayun ? '<td class="border-2 border-gray-300 p-2 ' + (liunianData ? getWuXingColor(WU_XING[liunianData.zhi]).text : '') + '">' + (liunianData ? liunianData.zhi + ' ' + WU_XING[liunianData.zhi] : '-') + '</td>' : ''}
                         </tr>
                         <tr>
                             <td class="border-2 border-gray-300 p-2 ${getShenColorClass(diShenNian)}">${diShenNian}</td>
@@ -11308,7 +11308,7 @@ function getAllTagCategories() {
                             <td class="border-2 border-gray-300 p-2 bg-yellow-100 ${getShenColorClass(diShenRi)}">${diShenRi}</td>
                             <td class="border-2 border-gray-300 p-2 ${getShenColorClass(diShenShi)}">${diShenShi}</td>
                             <td class="border-2 border-gray-300 p-2 ${getShenColorClass(diShenDayun)}">${diShenDayun}</td>
-                            <td class="border-2 border-gray-300 p-2 ${getShenColorClass(diShenLiunian)}">${diShenLiunian}</td>
+                            ${!isDayun ? '<td class="border-2 border-gray-300 p-2 ' + getShenColorClass(diShenLiunian) + '">' + diShenLiunian + '</td>' : ''}
                         </tr>
                     </table>
                 </div>
@@ -11531,7 +11531,7 @@ function getAllTagCategories() {
                 </div>
                 ` : ''}
                 
-                ${liuNianListHtml ? `
+                ${!isDayun && liuNianListHtml ? `
                 <div class="mb-3">
                     <h4 class="font-bold text-sm mb-2">📅 ${currentDaYun ? getDaYunGanZhi(currentDaYun) : ''}大运流年</h4>
                     <div id="research-liunian-container" class="liunian-list-container">
@@ -11540,7 +11540,7 @@ function getAllTagCategories() {
                 </div>
                 ` : ''}
                 
-                ${timelineItem ? `
+                ${!isDayun && timelineItem ? `
                 <div id="timeline-edit-container" class="p-3 bg-blue-50 rounded">
                     <div class="flex justify-between items-center mb-2">
                         <h4 class="font-bold text-sm mb-0">${String(year)}年事件分析</h4>
@@ -11568,7 +11568,7 @@ function getAllTagCategories() {
                     ` : ''}
                 </div>
                 ` : ''}
-                ${!timelineItem && canEditCase(caseData) ? `
+                ${!isDayun && !timelineItem && canEditCase(caseData) ? `
                 <div id="timeline-edit-container" class="p-3 bg-blue-50 rounded">
                     <div class="flex justify-between items-center mb-2">
                         <h4 class="font-bold text-sm mb-0">${String(year)}年事件</h4>
@@ -11591,7 +11591,7 @@ function getAllTagCategories() {
                     </div>
                 </div>
                 ` : ''}
-                ${!timelineItem && !canEditCase(caseData) ? `
+                ${!isDayun && !timelineItem && !canEditCase(caseData) ? `
                 <div id="timeline-edit-container" class="p-3 bg-blue-50 rounded">
                     <h4 class="font-bold text-sm mb-2">${String(year)}年事件</h4>
                     <p class="text-sm text-gray-500">暂无事件记录</p>
