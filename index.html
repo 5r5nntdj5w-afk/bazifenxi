@@ -9902,7 +9902,7 @@ function getAllTagCategories() {
     
     // 渲染事项研究概览
     // 生成八字信息HTML（用于列表显示）
-    function generateBaziInfoHtml(caseData, year) {
+    function generateBaziInfoHtml(caseData, year, isDayun) {
         if (!caseData.birthDate || typeof Solar === 'undefined') {
             return '<div class="text-xs text-gray-400">缺少排盘数据</div>';
         }
@@ -9944,7 +9944,11 @@ function getAllTagCategories() {
         const daYunList = yun.getDaYun(12);
         
         let currentDaYun = null;
-        let liunianData = getYearGanZhi(year);
+        let liunianData = null;
+        
+        if (!isDayun) {
+            liunianData = getYearGanZhi(year);
+        }
         
         for (let i = 0; i < daYunList.length; i++) {
             const dayun = daYunList[i];
@@ -10019,7 +10023,7 @@ function getAllTagCategories() {
                         <th class="border-2 border-yellow-400 p-2 bg-yellow-100 font-bold text-gray-800">日柱</th>
                         <th class="border-2 border-gray-300 p-2 bg-gray-100 font-bold text-gray-700">时柱</th>
                         <th class="border-2 border-gray-300 p-2 bg-gray-100 font-bold text-gray-700">大运</th>
-                        <th class="border-2 border-gray-300 p-2 bg-gray-100 font-bold text-gray-700">流年</th>
+                        <th class="border-2 border-gray-300 p-2 ${isDayun ? 'bg-blue-100 font-bold text-blue-700' : 'bg-gray-100 font-bold text-gray-700'}">${isDayun ? '大运' : '流年'}</th>
                     </tr>
                     <tr>
                         <td class="border-2 border-gray-200 p-2 font-semibold ${getShenColorClass(tianShenNian)}">${tianShenNian}</td>
@@ -10125,7 +10129,7 @@ function getAllTagCategories() {
         // 渲染当前页案例
         caseList.innerHTML = currentPageCases.map(rc => {
             const isSelected = selectedResearchCases.some(sc => sc.caseId === rc.caseId && sc.year === rc.year);
-            const baziHtml = generateBaziInfoHtml(rc.caseData, rc.year);
+            const baziHtml = generateBaziInfoHtml(rc.caseData, rc.year, rc.isDayun);
             return `
                 <div class="p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50 border-blue-500' : 'border-gray-300'} shadow-sm" 
                      data-case-id="${rc.caseId}" data-year="${rc.year}">
@@ -10135,7 +10139,7 @@ function getAllTagCategories() {
                         </div>
                         <div class="flex items-center gap-2">
                             <button class="paipan-btn px-3 py-1.5 bg-amber-500 text-white rounded text-sm font-bold hover:bg-amber-600 transition-colors" 
-                                    data-case-id="${rc.caseId}" data-year="${rc.year}">排盘详情</button>
+                                    data-case-id="${rc.caseId}" data-year="${rc.year}" data-isdayun="${rc.isDayun || ''}">排盘详情</button>
                             <input type="checkbox" class="research-case-checkbox w-5 h-5" 
                                    data-case-id="${rc.caseId}" data-year="${rc.year}"
                                    ${isSelected ? 'checked' : ''}>
@@ -10154,7 +10158,8 @@ function getAllTagCategories() {
             btn.addEventListener('click', (e) => {
                 const caseId = e.currentTarget.dataset.caseId;
                 const year = parseInt(e.currentTarget.dataset.year);
-                showPaipanResult(caseId, year);
+                const isDayun = e.currentTarget.dataset.isdayun === 'true';
+                showPaipanResult(caseId, year, isDayun);
             });
         });
 
@@ -10268,7 +10273,7 @@ function getAllTagCategories() {
     }
     
     // 在列表下方显示排盘结果
-    function showPaipanResult(caseId, year) {
+    function showPaipanResult(caseId, year, isDayun) {
         const paipanResult = document.getElementById('research-paipan-result');
         const caseData = caseCache.cases.find(c => c.id === caseId);
         
@@ -10284,7 +10289,7 @@ function getAllTagCategories() {
             return;
         }
         
-        const result = generateResearchBaziHtml(caseData, year);
+        const result = generateResearchBaziHtml(caseData, year, isDayun);
         paipanResult.innerHTML = result.html;
         paipanResult.classList.remove('hidden');
         
@@ -10299,9 +10304,9 @@ function getAllTagCategories() {
             }
             
             // 绑定时间线编辑事件
-            setupTimelineEditEvents(paipanResult, caseData, year);
+            setupTimelineEditEvents(paipanResult, caseData, year, isDayun);
             
-            setupDayunAndLiunianHandlers(paipanResult, caseData, year, result);
+            setupDayunAndLiunianHandlers(paipanResult, caseData, year, result, isDayun);
             
             // 研究页面数量调节面板已渲染，绑定重置按钮事件
             initStatsAdjust();
@@ -10310,7 +10315,7 @@ function getAllTagCategories() {
     }
     
     // 时间线编辑功能
-    function setupTimelineEditEvents(container, caseData, year) {
+    function setupTimelineEditEvents(container, caseData, year, isDayun) {
         const editBtn = container.querySelector('#edit-timeline-btn');
         const saveBtn = container.querySelector('#save-timeline-btn');
         const cancelBtn = container.querySelector('#cancel-timeline-btn');
@@ -10444,9 +10449,176 @@ function getAllTagCategories() {
                 }
             });
         }
+        
+        // 大运信息编辑
+        if (isDayun) {
+            const dayunEditBtn = container.querySelector('#edit-dayun-timeline-btn');
+            const dayunSaveBtn = container.querySelector('#save-dayun-timeline-btn');
+            const dayunCancelBtn = container.querySelector('#cancel-dayun-timeline-btn');
+            const dayunViewMode = container.querySelector('#dayun-timeline-view-mode');
+            const dayunEditMode = container.querySelector('#dayun-timeline-edit-mode');
+            
+            if (dayunEditBtn) {
+                dayunEditBtn.addEventListener('click', () => {
+                    if (dayunViewMode) dayunViewMode.classList.add('hidden');
+                    if (dayunEditMode) dayunEditMode.classList.remove('hidden');
+                    dayunEditBtn.classList.add('hidden');
+                    const eventInput = container.querySelector('#dayun-timeline-event-input');
+                    if (eventInput) eventInput.focus();
+                });
+            }
+            
+            if (dayunCancelBtn) {
+                dayunCancelBtn.addEventListener('click', () => {
+                    if (dayunViewMode) dayunViewMode.classList.remove('hidden');
+                    if (dayunEditMode) dayunEditMode.classList.add('hidden');
+                    if (dayunEditBtn) dayunEditBtn.classList.remove('hidden');
+                    // 重置输入框的值
+                    const dayunItem = caseData.timeline ? caseData.timeline.find(t => 
+                        t && t.isDayun === true && t.dayunStartYear !== undefined &&
+                        year >= t.dayunStartYear && year <= (t.dayunEndYear || t.dayunStartYear + 9)
+                    ) : null;
+                    const eventInput = container.querySelector('#dayun-timeline-event-input');
+                    const analysisInput = container.querySelector('#dayun-timeline-analysis-input');
+                    if (eventInput) eventInput.value = escapeHtml(dayunItem?.event) || '';
+                    if (analysisInput) analysisInput.value = escapeHtml(dayunItem?.analysis) || '';
+                });
+            }
+            
+            if (dayunSaveBtn) {
+                dayunSaveBtn.addEventListener('click', async () => {
+                    if (!canEditCase(caseData)) {
+                        alert('您没有权限编辑此案例的事件');
+                        return;
+                    }
+                    
+                    const eventInput = container.querySelector('#dayun-timeline-event-input');
+                    const analysisInput = container.querySelector('#dayun-timeline-analysis-input');
+                    if (!eventInput) return;
+                    
+                    const newEvent = eventInput.value.trim();
+                    const newAnalysis = analysisInput ? analysisInput.value.trim() : '';
+                    
+                    // 更新本地数据
+                    const caseIndex = caseCache.cases.findIndex(c => c.id === caseData.id);
+                    if (caseIndex !== -1) {
+                        let timelineUpdated = false;
+                        if (caseCache.cases[caseIndex].timeline) {
+                            const itemIndex = caseCache.cases[caseIndex].timeline.findIndex(
+                                t => t && t.isDayun === true && t.dayunStartYear !== undefined &&
+                                    year >= t.dayunStartYear && year <= (t.dayunEndYear || t.dayunStartYear + 9)
+                            );
+                            
+                            if (itemIndex !== -1) {
+                                caseCache.cases[caseIndex].timeline[itemIndex].event = newEvent;
+                                caseCache.cases[caseIndex].timeline[itemIndex].analysis = newAnalysis;
+                                timelineUpdated = true;
+                            }
+                        }
+                        
+                        if (!timelineUpdated) {
+                            // 找当前选中大运的详细信息
+                            const dayunContainer = container.querySelector('#research-dayun-container');
+                            const activeDayun = dayunContainer ? dayunContainer.querySelector('.dayun-item.active') : null;
+                            if (activeDayun) {
+                                const dayunIndex = parseInt(activeDayun.dataset.index);
+                                if (!isNaN(dayunIndex)) {
+                                    const gender = caseData.gender === '男' ? 1 : 0;
+                                    const bd = caseData.birthDate;
+                                    let by, bm, bd2, bh, bmin;
+                                    if (bd.includes('-')) {
+                                        const p = bd.split('-');
+                                        by = parseInt(p[0]); bm = parseInt(p[1]);
+                                        bd2 = parseInt(p[2].substring(0, 2));
+                                        bh = p[2].length > 2 ? parseInt(p[2].substring(3, 5)) : 0;
+                                        bmin = p[2].length > 5 ? parseInt(p[2].substring(6, 8)) : 0;
+                                    } else {
+                                        by = parseInt(bd.substring(0, 4)); bm = parseInt(bd.substring(4, 6));
+                                        bd2 = parseInt(bd.substring(6, 8));
+                                        bh = bd.length > 8 ? parseInt(bd.substring(8, 10)) : 0;
+                                        bmin = bd.length > 10 ? parseInt(bd.substring(10, 12)) : 0;
+                                    }
+                                    const solar = Solar.fromYmdHms(by, bm, bd2, bh, bmin, 0);
+                                    const eightChar = solar.getLunar().getEightChar();
+                                    eightChar.setSect(1);
+                                    const yun = eightChar.getYun(gender, 1);
+                                    const daYunList = yun.getDaYun(12);
+                                    if (daYunList[dayunIndex]) {
+                                        const dy = daYunList[dayunIndex];
+                                        if (!caseCache.cases[caseIndex].timeline) {
+                                            caseCache.cases[caseIndex].timeline = [];
+                                        }
+                                        caseCache.cases[caseIndex].timeline.push({
+                                            year: dy.getStartYear() + '-' + dy.getEndYear(),
+                                            event: newEvent,
+                                            analysis: newAnalysis,
+                                            isDayun: true,
+                                            tagIds: [],
+                                            dayunGanzhi: dy.getGanZhi(),
+                                            dayunGan: dy.getGanZhi().charAt(0),
+                                            dayunZhi: dy.getGanZhi().charAt(1),
+                                            dayunStartYear: dy.getStartYear(),
+                                            dayunEndYear: dy.getEndYear(),
+                                            dayunStartAge: dy.getStartAge()
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 保存到本地存储
+                        localStorage.setItem(CASE_KEY, JSON.stringify(caseCache.cases));
+                        
+                        // 同步到云端
+                        if (currentUser && supabaseClient) {
+                            try {
+                                const idMapping = getIdMapping();
+                                const cloudTimeline = convertTimelineTagIds(
+                                    caseCache.cases[caseIndex].timeline || [],
+                                    idMapping,
+                                    'localToCloud'
+                                );
+                                await supabaseClient
+                                    .from('cases')
+                                    .update({
+                                        timeline: cloudTimeline,
+                                        update_time: new Date().toISOString()
+                                    })
+                                    .eq('id', caseCache.cases[caseIndex].cloudId || caseCache.cases[caseIndex].id);
+                            } catch (e) {
+                                console.warn('同步到云端失败:', e);
+                            }
+                        }
+                        
+                        // 更新显示
+                        if (dayunViewMode) {
+                            dayunViewMode.classList.remove('hidden');
+                            dayunViewMode.innerHTML = '<p class="text-sm mb-2"><strong>描述：</strong>' + (newEvent ? escapeHtml(newEvent) : '无') + '</p>' +
+                                (newAnalysis ? '<p class="text-sm"><strong>分析：</strong>' + escapeHtml(newAnalysis) + '</p>' : '<p class="text-sm text-gray-500"><strong>分析：</strong>暂无</p>');
+                        }
+                        if (dayunEditMode) dayunEditMode.classList.add('hidden');
+                        if (dayunEditBtn) dayunEditBtn.classList.remove('hidden');
+                        
+                        // 保存成功提示
+                        const saveBtnEl = container.querySelector('#save-dayun-timeline-btn');
+                        if (saveBtnEl) {
+                            const originalText = saveBtnEl.textContent;
+                            saveBtnEl.textContent = '✓ 已保存';
+                            saveBtnEl.classList.remove('bg-green-500');
+                            saveBtnEl.classList.add('bg-green-600');
+                            setTimeout(() => {
+                                saveBtnEl.textContent = originalText;
+                                saveBtnEl.classList.remove('bg-green-600');
+                                saveBtnEl.classList.add('bg-green-500');
+                            }, 1500);
+                        }
+                    }
+                });
+            }
+        }
     }
     
-    function setupDayunAndLiunianHandlers(container, caseData, year, result) {
+    function setupDayunAndLiunianHandlers(container, caseData, year, result, isDayun) {
         const paipanResult = document.getElementById('research-paipan-result');
         const birthDate = caseData.birthDate;
         const gender = caseData.gender === '男' ? 1 : 0;
@@ -10585,7 +10757,7 @@ function getAllTagCategories() {
                 for (let i = 0; i < duration && i < 10; i++) {
                     const y = dYear + i;
                     const ygz = getYearGanZhi(y);
-                    const isActive = y === parseInt(year);
+                    const isActive = !isDayun && y === parseInt(year);
                     newLiuNianHtml += `
                         <div class="liunian-item ${isActive ? 'active' : ''}" data-year="${y}">
                             <div class="liunian-year">${y}</div>
@@ -10599,6 +10771,34 @@ function getAllTagCategories() {
                 if (liunianContainer) {
                     liunianContainer.innerHTML = newLiuNianHtml;
                     setupLiunianHandlers(container, caseData, year, result, dayunTianShenNew, dayunDiShenNew);
+                }
+                
+                // 大运切换时更新大运信息编辑区
+                if (isDayun) {
+                    const dayunInfoDiv = container.querySelector('#research-dayun-info');
+                    if (dayunInfoDiv) {
+                        // 查找该大运在 caseData.timeline 中的条目
+                        const dayunItem = caseData.timeline ? caseData.timeline.find(t =>
+                            t && t.isDayun === true && t.dayunStartYear === dYear
+                        ) : null;
+                        const dayunEvent = (dayunItem && dayunItem.event) || '';
+                        const dayunAnalysis = (dayunItem && dayunItem.analysis) || '';
+                        const dayunViewMode = dayunInfoDiv.querySelector('#dayun-timeline-view-mode');
+                        const dayunEventInput = dayunInfoDiv.querySelector('#dayun-timeline-event-input');
+                        const dayunAnalysisInput = dayunInfoDiv.querySelector('#dayun-timeline-analysis-input');
+                        if (dayunViewMode) {
+                            dayunViewMode.innerHTML = '<p class="text-sm mb-2"><strong>描述：</strong>' + (dayunEvent ? escapeHtml(dayunEvent) : '无') + '</p>' +
+                                (dayunAnalysis ? '<p class="text-sm"><strong>分析：</strong>' + escapeHtml(dayunAnalysis) + '</p>' : '<p class="text-sm text-gray-500"><strong>分析：</strong>暂无</p>');
+                        }
+                        if (dayunEventInput) dayunEventInput.value = escapeHtml(dayunEvent);
+                        if (dayunAnalysisInput) dayunAnalysisInput.value = escapeHtml(dayunAnalysis);
+                        // 确保编辑模式关闭
+                        const dayunEditMode = dayunInfoDiv.querySelector('#dayun-timeline-edit-mode');
+                        const dayunEditBtn = dayunInfoDiv.querySelector('#edit-dayun-timeline-btn');
+                        if (dayunEditMode) dayunEditMode.classList.add('hidden');
+                        if (dayunViewMode) dayunViewMode.classList.remove('hidden');
+                        if (dayunEditBtn) dayunEditBtn.classList.remove('hidden');
+                    }
                 }
                 
                 const curGroupTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
@@ -10810,7 +11010,7 @@ function getAllTagCategories() {
     }
     
     // 生成研究八字排盘HTML内容（供弹窗和内嵌使用）
-    function generateResearchBaziHtml(caseData, year) {
+    function generateResearchBaziHtml(caseData, year, isDayun) {
         const birthDate = caseData.birthDate;
         const gender = caseData.gender === '男' ? 1 : 0;
         
@@ -11009,6 +11209,19 @@ function getAllTagCategories() {
         
         const timelineItem = getTimelineItemByYear(caseData, year);
         
+        // 查找大运事件数据
+        let dayunTimelineItem = null;
+        let dayunYearLabel = '';
+        if (isDayun) {
+            dayunTimelineItem = caseData.timeline ? caseData.timeline.find(t => 
+                t && t.isDayun === true && t.dayunStartYear !== undefined &&
+                year >= t.dayunStartYear && year <= (t.dayunEndYear || t.dayunStartYear + 9)
+            ) : null;
+            if (dayunTimelineItem) {
+                dayunYearLabel = dayunTimelineItem.year || '';
+            }
+        }
+        
         let daYunListHtml = '';
         daYunList.forEach((dy, idx) => {
             const dgz = getDaYunGanZhi(dy);
@@ -11031,7 +11244,7 @@ function getAllTagCategories() {
             for (let i = 0; i < duration && i < 10; i++) {
                 const y = startYear + i;
                 const ygz = getYearGanZhi(y);
-                const isActive = y === parseInt(year);
+                const isActive = !isDayun && y === parseInt(year);
                 liuNianListHtml += `
                     <div class="liunian-item ${isActive ? 'active' : ''}" data-year="${y}">
                         <div class="liunian-year">${y}</div>
@@ -11048,7 +11261,7 @@ function getAllTagCategories() {
         const html = `
             <div>
                 <div class="flex justify-between items-center mb-2">
-                    <h3 class="font-bold text-base sm:text-lg">${caseData.title} - ${year}年流年分析</h3>
+                    <h3 class="font-bold text-base sm:text-lg">${caseData.title} - ${isDayun ? (dayunYearLabel || year + '年') + '大运分析' : year + '年流年分析'}</h3>
                     <button id="close-paipan-btn" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
                 </div>
                 
@@ -11288,6 +11501,35 @@ function getAllTagCategories() {
                         ${daYunListHtml}
                     </div>
                 </div>
+                
+                ${isDayun ? `
+                <div id="research-dayun-info" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-sm mb-0">📝 大运描述与分析</h4>
+                        ${canEditCase(caseData) ? `<button id="edit-dayun-timeline-btn" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">✏️ 编辑</button>` : ''}
+                    </div>
+                    <div id="dayun-timeline-view-mode">
+                        <p class="text-sm mb-2"><strong>描述：</strong>${dayunTimelineItem && dayunTimelineItem.event ? escapeHtml(dayunTimelineItem.event) : '无'}</p>
+                        ${dayunTimelineItem && dayunTimelineItem.analysis ? `<p class="text-sm"><strong>分析：</strong>${escapeHtml(dayunTimelineItem.analysis)}</p>` : '<p class="text-sm text-gray-500"><strong>分析：</strong>暂无</p>'}
+                    </div>
+                    ${canEditCase(caseData) ? `
+                    <div id="dayun-timeline-edit-mode" class="hidden">
+                        <div class="mb-2">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">大运描述</label>
+                            <input type="text" id="dayun-timeline-event-input" class="w-full p-2 border rounded text-sm" value="${dayunTimelineItem && dayunTimelineItem.event ? escapeHtml(dayunTimelineItem.event) : ''}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">大运分析</label>
+                            <textarea id="dayun-timeline-analysis-input" class="w-full p-2 border rounded text-sm" rows="3">${dayunTimelineItem && dayunTimelineItem.analysis ? escapeHtml(dayunTimelineItem.analysis) : ''}</textarea>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="save-dayun-timeline-btn" class="flex-1 px-3 py-1.5 bg-green-500 text-white rounded text-sm hover:bg-green-600">💾 保存</button>
+                            <button id="cancel-dayun-timeline-btn" class="flex-1 px-3 py-1.5 bg-gray-400 text-white rounded text-sm hover:bg-gray-500">取消</button>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                ` : ''}
                 
                 ${liuNianListHtml ? `
                 <div class="mb-3">
