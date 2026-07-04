@@ -1814,6 +1814,16 @@
                     </select>
                 </div>
                 
+                <!-- 时间类型筛选 -->
+                <div class="mb-4 flex flex-wrap gap-2 items-center">
+                    <label class="text-sm font-medium text-gray-700">时间类型:</label>
+                    <div class="flex gap-1" id="research-time-type-filter">
+                        <button type="button" class="time-type-btn px-3 py-1.5 text-sm rounded border font-medium bg-blue-600 text-white border-blue-600" data-value="all">全部</button>
+                        <button type="button" class="time-type-btn px-3 py-1.5 text-sm rounded border font-medium bg-white text-gray-700 border-gray-300" data-value="liunian">流年</button>
+                        <button type="button" class="time-type-btn px-3 py-1.5 text-sm rounded border font-medium bg-white text-gray-700 border-gray-300" data-value="dayun">大运</button>
+                    </div>
+                </div>
+                
                 <!-- 筛选和操作 -->
                 <div class="flex flex-wrap gap-2 mb-4 items-center">
                     <input type="text" id="research-search" class="p-2 border rounded text-sm flex-1" placeholder="搜索案例名称...">
@@ -9152,6 +9162,7 @@ function getAllTagCategories() {
     let currentTagFilter = 'all';
     let currentResearchTag = null;
     let selectedResearchCases = [];
+    let currentResearchTimeType = 'all';
     
     // 渲染标签列表
     function renderTagList(category = 'all') {
@@ -9866,6 +9877,27 @@ function getAllTagCategories() {
             tagSelect.innerHTML = '<option value="">-- 请先选择分类 --</option>';
             tagSelect.disabled = true;
         }
+        
+        // 时间类型筛选按钮高亮状态
+        const timeTypeBtns = document.querySelectorAll('.time-type-btn');
+        timeTypeBtns.forEach(btn => {
+            btn.onclick = () => {
+                const value = btn.getAttribute('data-value');
+                if (value === currentResearchTimeType) return;
+                
+                currentResearchTimeType = value;
+                timeTypeBtns.forEach(b => {
+                    const isActive = b.getAttribute('data-value') === currentResearchTimeType;
+                    b.className = `time-type-btn px-3 py-1.5 text-sm rounded border font-medium ${
+                        isActive 
+                            ? 'bg-blue-600 text-white border-blue-600' 
+                            : 'bg-white text-gray-700 border-gray-300'
+                    }`;
+                });
+                
+                renderResearchCaseList();
+            };
+        });
     }
     
     // 渲染事项研究概览
@@ -10046,14 +10078,20 @@ function getAllTagCategories() {
         caseCache.cases.forEach(c => {
             if (c.timeline) {
                 c.timeline.forEach(t => {
+                    // 按时间类型筛选
+                    if (currentResearchTimeType === 'liunian' && t.isDayun) return;
+                    if (currentResearchTimeType === 'dayun' && !t.isDayun) return;
+                    
                     if (t.tagIds && t.tagIds.includes(currentResearchTag.id)) {
                         const yearNum = parseInt(t.year);
-                        if (!relatedCases.find(rc => rc.caseId === c.id && rc.year === yearNum)) {
+                        if (!relatedCases.find(rc => rc.caseId === c.id && rc.year === yearNum && rc.isDayun === (t.isDayun === true))) {
                             relatedCases.push({
                                 caseId: c.id,
                                 caseTitle: c.title,
                                 caseData: c,
                                 year: yearNum,
+                                yearLabel: t.year || '',
+                                isDayun: t.isDayun === true,
                                 event: t.event,
                                 analysis: t.analysis,
                                 tagIds: t.tagIds
@@ -10093,7 +10131,7 @@ function getAllTagCategories() {
                      data-case-id="${rc.caseId}" data-year="${rc.year}">
                     <div class="flex items-start justify-between mb-3">
                         <div>
-                            <div class="font-bold text-base">${rc.caseTitle} <span class="text-gray-600 font-semibold">(${rc.year}年)</span> - <span class="font-semibold">${rc.event || '无事件描述'}</span></div>
+                            <div class="font-bold text-base">${rc.caseTitle} <span class="text-gray-600 font-semibold">(${rc.yearLabel || rc.year + '年'})</span>${rc.isDayun ? '<span class="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">大运</span>' : ''} - <span class="font-semibold">${rc.event || '无事件描述'}</span></div>
                         </div>
                         <div class="flex items-center gap-2">
                             <button class="paipan-btn px-3 py-1.5 bg-amber-500 text-white rounded text-sm font-bold hover:bg-amber-600 transition-colors" 
@@ -13676,6 +13714,15 @@ function getAllTagCategories() {
         if (isDayun) {
             // 大运事件：只显示大运信息，不显示年份和流年
             const dayunAge = data.dayunStartAge ? `${data.dayunStartAge}岁起` : '';
+            const tagIds = data.tagIds || [];
+            const tagOptionsHtml = getAllTags().map(tag => {
+                const isSelected = tagIds.includes(tag.id);
+                return `<label class="inline-flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-xs" style="background-color: ${isSelected ? tag.color + '30' : '#f3f4f6'}; border: 1px solid ${tag.color}20;">
+                    <input type="checkbox" class="timeline-tag-checkbox hidden" value="${tag.id}" ${isSelected ? 'checked' : ''}>
+                    <span>${tag.icon}</span>
+                    <span>${tag.name}</span>
+                </label>`;
+            }).join('');
             rowHTML = `
                 <div class="flex gap-2 items-center flex-wrap">
                     <div class="px-3 py-2 bg-blue-50 border border-blue-200 rounded text-sm font-medium text-blue-800">
@@ -13690,6 +13737,9 @@ function getAllTagCategories() {
                     </div>
                     <input type="text" class="timeline-event flex-1 p-2 border rounded text-sm" placeholder="大运期间的整体情况描述" value="${eventValue}">
                     <button type="button" class="del-timeline-btn px-2 py-1 bg-red-500 text-white rounded text-xs">删除</button>
+                </div>
+                <div class="flex flex-wrap gap-1 mt-2 timeline-tags">
+                    ${tagOptionsHtml}
                 </div>
             `;
         } else {
@@ -13751,39 +13801,37 @@ function getAllTagCategories() {
         };
         
         // 标签选择事件
-        if (!isDayun) {
-            const tagCheckboxes = row.querySelectorAll('.timeline-tag-checkbox');
-            tagCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', (e) => {
-                    const tagId = e.target.value;
-                    const label = e.target.parentElement;
-                    
-                    if (e.target.checked) {
-                        if (!currentTimelineData[index].tagIds) {
-                            currentTimelineData[index].tagIds = [];
-                        }
-                        if (!currentTimelineData[index].tagIds.includes(tagId)) {
-                            currentTimelineData[index].tagIds.push(tagId);
-                        }
-                        label.style.backgroundColor = getTagById(tagId).color + '30';
-                    } else {
-                        if (currentTimelineData[index].tagIds) {
-                            currentTimelineData[index].tagIds = currentTimelineData[index].tagIds.filter(id => id !== tagId);
-                        }
-                        label.style.backgroundColor = '#f3f4f6';
-                    }
-                });
+        const tagCheckboxes = row.querySelectorAll('.timeline-tag-checkbox');
+        tagCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const tagId = e.target.value;
+                const label = e.target.parentElement;
                 
-                // 初始化标签选中状态
-                if (checkbox.checked) {
-                    const tagId = checkbox.value;
-                    const tag = getTagById(tagId);
-                    if (tag) {
-                        checkbox.parentElement.style.backgroundColor = tag.color + '30';
+                if (e.target.checked) {
+                    if (!currentTimelineData[index].tagIds) {
+                        currentTimelineData[index].tagIds = [];
                     }
+                    if (!currentTimelineData[index].tagIds.includes(tagId)) {
+                        currentTimelineData[index].tagIds.push(tagId);
+                    }
+                    label.style.backgroundColor = getTagById(tagId).color + '30';
+                } else {
+                    if (currentTimelineData[index].tagIds) {
+                        currentTimelineData[index].tagIds = currentTimelineData[index].tagIds.filter(id => id !== tagId);
+                    }
+                    label.style.backgroundColor = '#f3f4f6';
                 }
             });
-        }
+            
+            // 初始化标签选中状态
+            if (checkbox.checked) {
+                const tagId = checkbox.value;
+                const tag = getTagById(tagId);
+                if (tag) {
+                    checkbox.parentElement.style.backgroundColor = tag.color + '30';
+                }
+            }
+        });
         
         delBtn.onclick = () => {
             currentTimelineData.splice(index, 1);
@@ -14243,6 +14291,7 @@ function getAllTagCategories() {
             event: '',
             analysis: '',
             isDayun: true, // 标记为大运事件
+            tagIds: [], // 初始化为空标签数组
             dayunGanzhi: ganzhi,
             dayunGan: gan,
             dayunZhi: zhi,
