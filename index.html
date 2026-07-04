@@ -10308,6 +10308,49 @@ function getAllTagCategories() {
             
             setupDayunAndLiunianHandlers(paipanResult, caseData, year, result, isDayun);
             
+            // 绑定断语验证按钮（✓正确 / ✗错误）
+            paipanResult.querySelectorAll('.verify-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const card = btn.closest('.rule-card');
+                    if (!card) return;
+                    const category = card.dataset.category;
+                    const duanyuText = card.dataset.duanyu;
+                    const resultValue = btn.dataset.result === 'true';
+                    
+                    const rule = { category, duanyu: duanyuText };
+                    addVerification(rule, caseData.id, resultValue, '');
+                    
+                    // 更新UI反馈：禁用所有验证按钮
+                    const btns = card.querySelectorAll('.verify-btn');
+                    btns.forEach(b => {
+                        b.classList.remove('bg-green-100', 'bg-red-100', 'hover:bg-green-200', 'hover:bg-red-200');
+                        b.classList.add('bg-gray-100', 'text-gray-400');
+                        b.disabled = true;
+                    });
+                    
+                    // 更新统计显示
+                    const stats = getRuleVerificationStats(rule);
+                    const statsEl = card.querySelector('.text-xs.text-gray-500');
+                    if (statsEl) {
+                        statsEl.textContent = `已验证 ${stats.total} 次 | 正确率 ${stats.accuracy}%`;
+                    }
+                    
+                    alert(resultValue ? '✅ 已标记为正确' : '❌ 已标记为错误');
+                });
+            });
+            
+            // 绑定验证历史查看按钮
+            paipanResult.querySelectorAll('.history-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const card = btn.closest('.rule-card');
+                    if (!card) return;
+                    const ruleKey = card.dataset.rulekey;
+                    if (ruleKey && typeof openVerificationHistoryModal === 'function') {
+                        openVerificationHistoryModal(ruleKey);
+                    }
+                });
+            });
+            
             // 研究页面数量调节面板已渲染，绑定重置按钮事件
             initStatsAdjust();
             updateAllShenCardNumbers();
@@ -11156,6 +11199,55 @@ function getAllTagCategories() {
             }
         }
         
+        // === 断语匹配：为当前大运/流年匹配断语 ===
+        const matchData = {
+            nian: { t: yearGan, d: yearZhi },
+            yue: { t: monthGan, d: monthZhi },
+            ri: { t: dayGan, d: dayZhi },
+            shi: { t: hourGan, d: hourZhi },
+            dayun: currentDaYun ? { t: dayunGanZhi.charAt(0), d: dayunGanZhi.charAt(1) } : { t: '', d: '' },
+            liunian: liunianData ? { t: liunianData.gan, d: liunianData.zhi } : { t: '', d: '' },
+            liuyue: { t: '', d: '' },
+            gender: caseData.gender === '男' ? '男' : '女',
+            effectiveAge: currentDaYun ? currentDaYun.getStartAge() + (isDayun ? 0 : (parseInt(year) - currentDaYun.getStartYear())) : null
+        };
+        matchRules(matchData);
+        
+        // 构建匹配断语HTML
+        const matchedByCategory = cache.matchedByCategory || {};
+        const matchedCategories = Object.keys(matchedByCategory).sort();
+        const totalMatched = matchedCategories.reduce((sum, cat) => sum + matchedByCategory[cat].length, 0);
+        
+        let matchedRulesHtml = '';
+        if (totalMatched > 0) {
+            const catColorMap = {'格局':'#3B82F6','事业':'#10B981','财运':'#F59E0B','婚姻':'#EC4899','健康':'#EF4444','性格':'#8B5CF6','灾祸':'#F97316'};
+            let rulesHtml = '';
+            matchedCategories.forEach(cat => {
+                const duanyuList = matchedByCategory[cat];
+                const catColor = catColorMap[cat] || '#6B7280';
+                let catRuleHtml = '';
+                duanyuList.forEach(duanyuText => {
+                    const matchedRule = cache.rules.find(r => r.category === cat && r.duanyu === duanyuText);
+                    if (!matchedRule) return;
+                    const ruleKey = cat + '_' + duanyuText;
+                    const stats = getRuleVerificationStats(matchedRule);
+                    catRuleHtml += `<div class="bg-white rounded-lg border border-gray-200 p-3 mb-2 rule-card" data-category="${escapeHtml(cat)}" data-duanyu="${escapeHtml(duanyuText)}" data-rulekey="${escapeHtml(ruleKey)}">
+                        <p class="text-sm mb-2">${escapeHtml(duanyuText)}</p>
+                        <div class="text-xs text-gray-500 mb-2">已验证 ${stats.total} 次 | 正确率 ${stats.accuracy}%</div>
+                        <div class="flex gap-2 flex-wrap">
+                            <button class="verify-btn px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 border border-green-300" data-result="true">✓ 正确</button>
+                            <button class="verify-btn px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 border border-red-300" data-result="false">✗ 错误</button>
+                            <button class="history-btn px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 border border-blue-300">📊 验证历史</button>
+                        </div>
+                    </div>`;
+                });
+                if (catRuleHtml) {
+                    rulesHtml += `<div class="mb-3"><h4 class="font-bold text-sm mb-2" style="border-left:3px solid ${catColor};padding-left:8px;">【${escapeHtml(cat)}】（${duanyuList.length}条）</h4>${catRuleHtml}</div>`;
+                }
+            });
+            matchedRulesHtml = `<div class="mt-5 pt-3 border-t-2 border-dashed border-gray-300 matched-rules-section"><h3 class="font-bold text-base mb-3">📜 匹配断语（共${totalMatched}条）</h3>${rulesHtml}</div>`;
+        }
+        
         const groupTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
         const groupDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
         const groupCount = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
@@ -11597,6 +11689,7 @@ function getAllTagCategories() {
                     <p class="text-sm text-gray-500">暂无事件记录</p>
                 </div>
                 ` : ''}
+                ${matchedRulesHtml}
             </div>
         `;
         
