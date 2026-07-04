@@ -4654,7 +4654,7 @@
         // 实时搜索断语内容
         if (DOM.ruleSearch) {
             DOM.ruleSearch.oninput = debounce(function() {
-                currentSearchKeyword = this.value.trim();
+                currentSearchKeyword = DOM.ruleSearch.value.trim();
                 currentRulePage = 1;
                 reloadAll();
             }, 200);
