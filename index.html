@@ -1372,6 +1372,13 @@
                 <span id="selection-count" class="text-sm text-gray-500 hidden">已选择 0 条</span>
                 <button id="batch-delete" class="px-3 py-1 bg-red-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量删除</button>
                 <button id="batch-reassign" class="px-3 py-1 bg-teal-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量调整分类</button>
+                <select id="batch-perm-level" class="px-2 py-1 border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <option value="0">🔒 私有</option>
+                    <option value="1">🔓 公开只读</option>
+                    <option value="2">🔐 公开加密</option>
+                    <option value="3">🌍 公开可转私有</option>
+                </select>
+                <button id="batch-set-perm" class="px-3 py-1 bg-purple-700 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量设置权限</button>
                 <button id="batch-export" class="px-3 py-1 bg-purple-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量导出</button>
                 <label id="import-label" class="px-3 py-1 bg-orange-600 text-white rounded text-sm cursor-pointer">
                     导入断语<input type="file" id="import-rule" class="hidden" accept=".json">
@@ -7863,6 +7870,11 @@
             batchReassign.disabled = count === 0;
         }
         
+        const batchPermLevel = document.getElementById('batch-perm-level');
+        const batchSetPerm = document.getElementById('batch-set-perm');
+        if (batchPermLevel) batchPermLevel.disabled = count === 0;
+        if (batchSetPerm) batchSetPerm.disabled = count === 0;
+        
         // 更新全选当前页状态
         if (selectAll) {
             const checkboxes = document.querySelectorAll('.rule-checkbox');
@@ -7962,6 +7974,59 @@
         const batchReassignBtn = document.getElementById('batch-reassign');
         if (batchReassignBtn) {
             batchReassignBtn.onclick = openBatchReassign;
+        }
+        
+        // 批量设置权限
+        const batchSetPermBtn = document.getElementById('batch-set-perm');
+        if (batchSetPermBtn) {
+            batchSetPermBtn.onclick = async function() {
+                const count = selectedRulesSet.size;
+                if (count === 0) return;
+                
+                const permLevelSel = document.getElementById('batch-perm-level');
+                if (!permLevelSel) return;
+                const newLevel = parseInt(permLevelSel.value);
+                
+                if (!confirm(`确定将选中的 ${count} 条断语的权限等级设置为「${permLevelSel.options[permLevelSel.selectedIndex].text}」？`)) return;
+                
+                try {
+                    let updatedCount = 0;
+                    for (const ruleKey of selectedRulesSet) {
+                        const [category, duanyu] = ruleKey.split('_');
+                        const rule = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
+                        if (!rule) continue;
+                        
+                        rule.permissionLevel = newLevel;
+                        rule.isPublic = newLevel > 0;
+                        rule.updateTime = new Date().toISOString();
+                        
+                        // 同步更新云端
+                        if (rule.id && rule.id !== 'undefined' && rule.id !== 'null') {
+                            try {
+                                await supabaseClient
+                                    .from('duanyu')
+                                    .update({ 
+                                        permission_level: newLevel,
+                                        is_public: newLevel > 0,
+                                        update_time: new Date().toISOString()
+                                    })
+                                    .eq('id', rule.id);
+                            } catch (e) {
+                                console.warn(`更新云端断语 ${rule.id} 权限失败:`, e);
+                            }
+                        }
+                        updatedCount++;
+                    }
+                    
+                    localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+                    selectedRulesSet.clear();
+                    reloadAll();
+                    alert(`✅ 已成功将 ${updatedCount} 条断语的权限等级设置为「${permLevelSel.options[permLevelSel.selectedIndex].text}」`);
+                } catch (error) {
+                    console.error('批量设置权限失败:', error);
+                    alert('批量设置权限失败：' + error.message);
+                }
+            };
         }
         
         updateSelectionUI();
