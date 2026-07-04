@@ -8456,7 +8456,11 @@
             cache.rules.forEach(r => { if (r.id) mergedMap.set(r.id, r); });
             remoteRules.forEach(r => { if (r.id) mergedMap.set(r.id, r); });
             
-            const noIdRules = cache.rules.filter(r => !r.id);
+            // 按条件去重：排除本地无ID但云端已有同条件断语（同分类+同条件）
+            const remoteConditionKeys = new Set(
+                Array.from(mergedMap.values()).map(r => `${r.category}|${JSON.stringify(r.conditions)}`)
+            );
+            const noIdRules = cache.rules.filter(r => !r.id && !remoteConditionKeys.has(`${r.category}|${JSON.stringify(r.conditions)}`));
             cache.rules = [...noIdRules, ...Array.from(mergedMap.values())];
             localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
             
