@@ -11176,11 +11176,11 @@ function getAllTagCategories() {
             const group = getShenGroupName(dayunDiShen);
             if(group) groupDi[group]++;
         }
-        if (tianShenLiunian && tianShenLiunian !== '-') {
+        if (!isDayun && tianShenLiunian && tianShenLiunian !== '-') {
             const group = getShenGroupName(tianShenLiunian);
             if(group) groupTian[group]++;
         }
-        if (diShenLiunian && diShenLiunian !== '-') {
+        if (!isDayun && diShenLiunian && diShenLiunian !== '-') {
             const group = getShenGroupName(diShenLiunian);
             if(group) groupDi[group]++;
         }
