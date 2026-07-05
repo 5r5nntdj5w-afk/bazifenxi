@@ -3441,7 +3441,8 @@
                         marker.textContent = markerTxt;
                         // 插入到source symbols后面，确保顺序为 [数字] [年月日时] [增量标记]
                         var refNode = parent.querySelector('.shen-source-symbols');
-                        if (refNode && refNode.nextSibling) {
+                        if (refNode) {
+                            // 当 refNode.nextSibling 为 null 时，insertBefore(marker, null) 等效于追加到末尾
                             parent.insertBefore(marker, refNode.nextSibling);
                         } else {
                             parent.insertBefore(marker, span.nextSibling);
@@ -5506,6 +5507,8 @@
                 if (dSpan && viewSrcDi[cn].length > 0) dSpan.dataset.source = viewSrcDi[cn].join(',');
             });
         })();
+        // 先清除旧标记，再渲染来源角标，最后添加增量标记（确保顺序：[数字] [年月日时] [增量标记]）
+        clearShenMarkers();
         renderShenSources();
         
         // ===== 大运/流年增量标记 =====
@@ -5537,7 +5540,6 @@
             var gld = getShenGroupName(diShenList[idx]);
             if (gld) allDi[gld]++;
         }
-        clearShenMarkers();
         if (hasDayun) {
             updateShenMarkers(baseTian, baseDi, dayunTian, dayunDi, 'dayun');
         }
@@ -13458,11 +13460,16 @@ function getAllTagCategories() {
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
         
+        const closeModal = () => {
+            modal.remove();
+            window.removeEventListener('resize', positionResearchShenCards);
+        };
+        
         modal.innerHTML = `
             <div class="bg-white rounded-lg p-2 max-h-[95vh] overflow-y-auto" style="width: calc(100vw - 16px); max-width: none;">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="font-bold text-lg">事项对比分析 - ${currentResearchTag?.name}</h3>
-                    <button class="close-modal text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    <button class="close-modal text-gray-500 hover:text-gray-700 text-2xl" id="research-compare-close-btn" onclick="window.__researchCompareCloseModal &amp;&amp; window.__researchCompareCloseModal()">&times;</button>
                 </div>
                 
                 <!-- 事项选择列表 -->
@@ -13479,7 +13486,16 @@ function getAllTagCategories() {
             </div>
         `;
         
+        // 把 closeModal 挂到全局，使内联 onclick 可以访问
+        window.__researchCompareCloseModal = closeModal;
+        
         document.body.appendChild(modal);
+        
+        // 重新获取关闭按钮（因为 innerHTML 已重新设置）
+        const closeBtn = modal.querySelector('#research-compare-close-btn');
+        if (closeBtn) {
+            closeBtn.onclick = closeModal;
+        }
         
         const compareCaseList = modal.querySelector('#compare-case-list');
         const compareBaziContainer = modal.querySelector('#compare-bazi-container');
@@ -13513,22 +13529,23 @@ function getAllTagCategories() {
             compareCaseList.appendChild(btn);
         });
         
+        // 先绑定关闭按钮事件（确保即使渲染出错也能关闭窗口）
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+        
         // 默认显示第一个事项的八字信息
         if (selectedResearchCases.length > 0) {
             const firstCase = selectedResearchCases[0];
-            renderBaziInCompareContainer(compareBaziContainer, modal, firstCase.caseData, firstCase.year, firstCase.event, firstCase.caseTitle);
-        }
-        
-        modal.querySelector('.close-modal').addEventListener('click', () => {
-            modal.remove();
-            window.removeEventListener('resize', positionResearchShenCards);
-        });
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-                window.removeEventListener('resize', positionResearchShenCards);
+            try {
+                renderBaziInCompareContainer(compareBaziContainer, modal, firstCase.caseData, firstCase.year, firstCase.event, firstCase.caseTitle);
+            } catch (e) {
+                console.error('渲染对比分析内容异常:', e);
+                compareBaziContainer.innerHTML = '<div class="text-center py-8 text-red-500">加载出错，请尝试选择其他事项</div>';
             }
-        });
+        }
     }
     
     // 在对比分析窗口中渲染八字信息到指定容器（与单独排盘窗口完全一致）
@@ -14113,17 +14130,18 @@ function getAllTagCategories() {
                 });
             });
         })();
+        // 先清除旧标记，再渲染来源角标，最后添加增量标记（确保顺序：[数字] [年月日时] [增量标记]）
+        clearShenMarkers();
         renderShenSources();
         
         // 大运/流年增量标记
-        clearShenMarkers();
-            if (compareHasDayun) {
-                updateShenMarkers(baseGroupTian, baseGroupDi, dayunGroupTian, dayunGroupDi, 'dayun');
-            }
-            if (compareHasLiunian) {
-                updateShenMarkers(dayunGroupTian, dayunGroupDi, allGroupTian, allGroupDi, 'liunian');
-            }
+        if (compareHasDayun) {
+            updateShenMarkers(baseGroupTian, baseGroupDi, dayunGroupTian, dayunGroupDi, 'dayun');
         }
+        if (compareHasLiunian) {
+            updateShenMarkers(dayunGroupTian, dayunGroupDi, allGroupTian, allGroupDi, 'liunian');
+        }
+    }
         
         function setupLiuNianHandlers() {
             container.querySelectorAll('.liunian-item').forEach(lnItem => {
@@ -14253,11 +14271,20 @@ function getAllTagCategories() {
         }
         updateShenCounts();
         
+        // 立即定位十神卡片（避免卡片层叠只显示一个）
+        positionResearchShenCards('research-shen-container-compare');
+        initShenLineClasses(container);
+        
+        // 延时再次定位，确保容器已完全渲染时卡片位置精确
         setTimeout(() => {
-            positionResearchShenCards('research-shen-container-compare');
-            initShenLineClasses(container);
-            initStatsAdjust();
-            updateAllShenCardNumbers();
+            try {
+                positionResearchShenCards('research-shen-container-compare');
+                initShenLineClasses(container);
+                initStatsAdjust();
+                updateAllShenCardNumbers();
+            } catch (e) {
+                console.warn('十神卡片定位/初始化异常:', e);
+            }
         }, 300);
     }
     
