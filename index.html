@@ -422,6 +422,11 @@
                 display: none !important;
             }
             
+            /* 移动端隐藏相生相克说明文字 */
+            .shengke-legend {
+                display: none !important;
+            }
+            
             #research-shen-container {
                 height: 380px !important;
             }
@@ -550,6 +555,28 @@
             #research-compare-content {
                 gap: 0.5rem !important;
             }
+            
+            /* 移动端设置弹窗适配 */
+            #shen-settings-modal {
+                align-items: flex-start !important;
+                padding-top: 20px !important;
+                z-index: 9999 !important;
+            }
+            
+            #shen-settings-modal .shen-settings-modal {
+                max-height: 85vh !important;
+                margin: 0 8px !important;
+                padding: 14px !important;
+            }
+            
+            #shen-settings-modal .shen-settings-group {
+                margin-bottom: 8px !important;
+            }
+            
+            #shen-settings-modal .shen-settings-presets button {
+                font-size: 11px !important;
+                padding: 2px 6px !important;
+            }
         }
         
         @media (min-width: 768px) {
@@ -658,7 +685,7 @@
             line-height: 1;
         }
         /* 设置面板样式 */
-        .shen-settings-modal { max-width: 420px; }
+        .shen-settings-modal { max-width: 420px; max-height: 90vh; overflow-y: auto; }
         .shen-settings-group { margin-bottom: 14px; }
         .shen-settings-group label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: #374151; }
         .shen-settings-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
@@ -970,7 +997,7 @@
                 <!-- 生克关系图 -->
                 <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">
                     <!-- 中心说明 -->
-                    <div class="absolute top-1 sm:top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10">
+                    <div class="absolute top-1 sm:top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10 shengke-legend">
                         <div class="flex items-center gap-1 justify-center bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
                             <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span>相生</span>
                             <span class="flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-full"></span>相克</span>
@@ -2422,7 +2449,7 @@
 
     <!-- 查看案例弹窗 -->
     <!-- 十神标识设置弹窗 -->
-    <div id="shen-settings-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+    <div id="shen-settings-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-[9999]">
         <div class="bg-white rounded-lg p-6 mx-4 shadow-2xl shen-settings-modal">
             <div class="flex justify-between items-center mb-5 pb-3 border-b">
                 <h3 class="text-lg font-bold text-gray-800">⚙ 十神标识符设置</h3>
@@ -2724,7 +2751,7 @@
                             </div>
                             
                             <!-- 中心说明 -->
-                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs text-gray-500 text-center z-10">
+                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs text-gray-500 text-center z-10 shengke-legend">
                                 <div class="bg-white/90 px-3 py-1.5 rounded-full shadow-sm">
                                     <div class="flex items-center gap-1 justify-center">
                                         <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span>相生</span>
@@ -12300,7 +12327,7 @@ function getAllTagCategories() {
                     </div>
                     
                     <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">
-                        <div class="absolute top-1 sm:top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10">
+                        <div class="absolute top-1 sm:top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10 shengke-legend">
                             <div class="flex items-center gap-1 justify-center bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
                                 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span>相生</span>
                                 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-full"></span>相克</span>
@@ -12950,7 +12977,7 @@ function getAllTagCategories() {
                     <!-- 生克关系图 -->
                     <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-8 border-2 border-gray-200">
                         <!-- 中心说明 -->
-                        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10">
+                        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10 shengke-legend">
                             <div class="flex items-center gap-2 justify-center bg-white/80 px-3 py-1 rounded-full shadow-sm">
                                 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span>相生</span>
                                 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-full"></span>相克</span>
@@ -13989,7 +14016,7 @@ function getAllTagCategories() {
                 <div class="mb-3 mt-3">
                     <h4 class="text-base sm:text-lg font-bold text-amber-800 mb-2 text-center">⚖️ 十神关系图</h4>
                     <div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">
-                        <div class="absolute top-1 sm:top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10">
+                        <div class="absolute top-1 sm:top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 text-center z-10 shengke-legend">
                             <div class="flex items-center gap-1 justify-center bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
                                 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span>相生</span>
                                 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-full"></span>相克</span>
