@@ -5473,6 +5473,24 @@
                     if (gd) viewSrcDi[gd].push(pillarKey);
                 }
             }
+            // 大运
+            if (tianShenList.length > 4 && tianShenList[4]) {
+                var g = getShenGroupName(tianShenList[4]);
+                if (g) viewSrcTian[g].push('dayun');
+            }
+            if (diShenList.length > 4 && diShenList[4]) {
+                var gd = getShenGroupName(diShenList[4]);
+                if (gd) viewSrcDi[gd].push('dayun');
+            }
+            // 流年
+            if (tianShenList.length > 5 && tianShenList[5]) {
+                var g = getShenGroupName(tianShenList[5]);
+                if (g) viewSrcTian[g].push('liunian');
+            }
+            if (diShenList.length > 5 && diShenList[5]) {
+                var gd = getShenGroupName(diShenList[5]);
+                if (gd) viewSrcDi[gd].push('liunian');
+            }
             shenGroups.forEach(function(name, idx) {
                 var cn = chineseGroups[idx];
                 var tSpan = document.getElementById('view-shen-tian-' + name);
@@ -6490,6 +6508,7 @@
         (function() {
             var srcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
             var srcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            // 年/月/日/时
             ['nian','yue','ri','shi'].forEach(function(k) {
                 var item = data[k];
                 if (item && item.t) {
@@ -6501,6 +6520,24 @@
                     if (g) srcDi[g].push(k);
                 }
             });
+            // 大运（按顺序在时柱之后）
+            if (data.dayun && data.dayun.t) {
+                var g = getShenGroupName(getExactShen(data.dayun.t, data.ri.t));
+                if (g) srcTian[g].push('dayun');
+            }
+            if (data.dayun && data.dayun.d) {
+                var g = getShenGroupName(getDiShen(data.dayun.d, data.ri.t));
+                if (g) srcDi[g].push('dayun');
+            }
+            // 流年（按顺序在大运之后）
+            if (data.liunian && data.liunian.t) {
+                var g = getShenGroupName(getExactShen(data.liunian.t, data.ri.t));
+                if (g) srcTian[g].push('liunian');
+            }
+            if (data.liunian && data.liunian.d) {
+                var g = getShenGroupName(getDiShen(data.liunian.d, data.ri.t));
+                if (g) srcDi[g].push('liunian');
+            }
             shenGroups.forEach(function(name, idx) {
                 var cn = chineseGroups[idx];
                 var tSpan = document.getElementById('shen-tian-' + name);
@@ -10872,6 +10909,9 @@ function getAllTagCategories() {
             
             setupDayunAndLiunianHandlers(paipanResult, caseData, year, result, isDayun);
             
+            // 初始渲染十神柱位来源角标
+            renderShenSources();
+            
             // 绑定断语验证按钮（✓正确 / ✗错误）
             paipanResult.querySelectorAll('.verify-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -11633,6 +11673,34 @@ function getAllTagCategories() {
                     if (totalSpan) totalSpan.textContent = allGroupTian[chineseName] + allGroupDi[chineseName];
                 });
                 
+                // 追踪各十神组的柱位来源（流年切换时同步更新角标）
+                (function() {
+                    var lnSrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+                    var lnSrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+                    var lnPillars = [
+                        {key:'nian', t:tianShenNian, d:diShenNian},
+                        {key:'yue', t:tianShenYue, d:diShenYue},
+                        {key:'ri', t:tianShenRi, d:diShenRi},
+                        {key:'shi', t:tianShenShi, d:diShenShi},
+                        {key:'dayun', t:currentDayunTianShen, d:currentDayunDiShen},
+                        {key:'liunian', t:liunianTianShenNew, d:liunianDiShenNew}
+                    ];
+                    lnPillars.forEach(function(p) {
+                        var g = getShenGroupName(p.t); if(g) lnSrcTian[g].push(p.key);
+                        var gd = getShenGroupName(p.d); if(gd) lnSrcDi[gd].push(p.key);
+                    });
+                    var lnNames = ['bijie','shishang','caixing','guansha','yinxing'];
+                    var lnCN = {bijie:'比劫',shishang:'食伤',caixing:'财星',guansha:'官杀',yinxing:'印星'};
+                    lnNames.forEach(function(n) {
+                        var cn = lnCN[n];
+                        var tSpan = document.getElementById('research-shen-tian-'+n);
+                        var dSpan = document.getElementById('research-shen-di-'+n);
+                        if (tSpan) tSpan.dataset.source = lnSrcTian[cn].join(',');
+                        if (dSpan) dSpan.dataset.source = lnSrcDi[cn].join(',');
+                    });
+                })();
+                renderShenSources();
+                
                 // 计算基准（八字+大运），保留大运标记
                 const baseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
                 const baseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
@@ -11935,6 +12003,8 @@ function getAllTagCategories() {
             {key:'ri', t:tianShenRi, d:diShenRi},
             {key:'shi', t:tianShenShi, d:diShenShi}
         ];
+        if (currentDaYun && dayunTianShen && dayunTianShen !== '-') rsPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
+        if (!isDayun && tianShenLiunian && tianShenLiunian !== '-') rsPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
         rsPillars.forEach(function(p) {
             var g = getShenGroupName(p.t); if(g) rsSrcTian[g].push(p.key);
             var gd = getShenGroupName(p.d); if(gd) rsSrcDi[gd].push(p.key);
@@ -13141,6 +13211,8 @@ function getAllTagCategories() {
                 {key:'ri', t:tianShenRi, d:diShenRi},
                 {key:'shi', t:tianShenShi, d:diShenShi}
             ];
+            if (currentDaYun && dayunTianShen && dayunTianShen !== '-') dtPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
+            if (liunianData && tianShenLiunian && tianShenLiunian !== '-') dtPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
             dtPillars.forEach(function(p) {
                 var g = getShenGroupName(p.t);
                 if(g) dtSrcTian[g].push(p.key);
@@ -14017,6 +14089,8 @@ function getAllTagCategories() {
                 {key:'ri', t:tianShenRi, d:diShenRi},
                 {key:'shi', t:tianShenShi, d:diShenShi}
             ];
+            if (dayunData) cPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
+            if (compareHasLiunian) cPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
             cPillars.forEach(function(p) {
                 var g = getShenGroupName(p.t); if(g) cSrcTian[g].push(p.key);
                 var gd = getShenGroupName(p.d); if(gd) cSrcDi[gd].push(p.key);
