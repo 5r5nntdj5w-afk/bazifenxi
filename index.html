@@ -3432,13 +3432,13 @@
                         var id = pre + 'shen-' + type + '-' + engNames[name] + suf;
                         var span = document.getElementById(id);
                         if (!span) return;
-                        var next = span.nextElementSibling;
-                        if (!next || !next.classList || !next.classList.contains(markerCls)) {
-                            var marker = document.createElement('span');
-                            marker.className = markerCls + ' ml-0.5 text-xs font-bold';
-                            marker.textContent = markerTxt;
-                            span.parentNode.insertBefore(marker, span.nextSibling);
-                        }
+                        var parent = span.parentNode;
+                        // 先移除当前父元素内已存在的同类型marker（防止交替插入导致的重复）
+                        parent.querySelectorAll('.' + markerCls).forEach(function(el) { el.remove(); });
+                        var marker = document.createElement('span');
+                        marker.className = markerCls + ' ml-0.5 text-xs font-bold';
+                        marker.textContent = markerTxt;
+                        parent.insertBefore(marker, span.nextSibling);
                     });
                 });
             });
