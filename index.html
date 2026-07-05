@@ -589,6 +589,25 @@
             vertical-align: super;
             line-height: 1;
         }
+        /* 十神卡片计数行基础样式 */
+        .shen-count-row {
+            transition: all 0.2s;
+        }
+        /* 十神卡片总数行 */
+        .shen-total-line {
+            transition: all 0.2s;
+        }
+        /* 天干/地支独立模式下的放大数字 */
+        .shen-mode-large {
+            font-size: 1.5rem !important;
+            font-weight: 700;
+            line-height: 1.2;
+            padding: 4px 0;
+        }
+        /* 标签文字（"天干:"/"地支:"）隐藏 */
+        .shen-label {
+            transition: opacity 0.2s;
+        }
     </style>
 </head>
 <body class="bg-gray-50 sm:max-w-6xl mx-auto p-2 sm:p-4">
@@ -900,9 +919,9 @@
                         <div id="shen-bijie" class="absolute text-center z-10">
                             <div class="mobile-card bg-green-50 border-2 border-green-300 rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                 <div class="font-bold text-green-700 text-sm">比劫<span id="wu-bijie" class="text-green-700 ml-1">木</span></div>
-                                <div class="text-sm text-green-700 mt-0.5">天干: <span id="shen-tian-bijie">0</span></div>
-                                <div class="text-sm text-green-700">地支: <span id="shen-di-bijie">0</span></div>
-                                <div class="bg-green-100 rounded px-1.5 py-0.5 mt-0.5">
+                                <div class="shen-tian-line shen-count-row text-sm text-green-700 mt-0.5"><span class="shen-label">天干:</span> <span id="shen-tian-bijie">0</span></div>
+                                <div class="shen-di-line shen-count-row text-sm text-green-700"><span class="shen-label">地支:</span> <span id="shen-di-bijie">0</span></div>
+                                <div class="shen-total-line bg-green-100 rounded px-1.5 py-0.5 mt-0.5">
                                     <span class="font-bold text-green-700 text-sm">总数: <span id="shen-total-bijie">0</span></span>
                                 </div>
                             </div>
@@ -912,9 +931,9 @@
                         <div id="shen-shishang" class="absolute text-center z-10">
                             <div class="mobile-card bg-red-50 border-2 border-red-300 rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                 <div class="font-bold text-red-600 text-sm">食伤<span id="wu-shishang" class="text-red-600 ml-1">火</span></div>
-                                <div class="text-sm text-red-600 mt-0.5">天干: <span id="shen-tian-shishang">0</span></div>
-                                <div class="text-sm text-red-600">地支: <span id="shen-di-shishang">0</span></div>
-                                <div class="bg-red-100 rounded px-1.5 py-0.5 mt-0.5">
+                                <div class="shen-tian-line shen-count-row text-sm text-red-600 mt-0.5"><span class="shen-label">天干:</span> <span id="shen-tian-shishang">0</span></div>
+                                <div class="shen-di-line shen-count-row text-sm text-red-600"><span class="shen-label">地支:</span> <span id="shen-di-shishang">0</span></div>
+                                <div class="shen-total-line bg-red-100 rounded px-1.5 py-0.5 mt-0.5">
                                     <span class="font-bold text-red-600 text-sm">总数: <span id="shen-total-shishang">0</span></span>
                                 </div>
                             </div>
@@ -924,9 +943,9 @@
                         <div id="shen-caixing" class="absolute text-center z-10">
                             <div class="mobile-card bg-amber-50 border-2 border-amber-300 rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                 <div class="font-bold text-amber-700 text-sm">财星<span id="wu-caixing" class="text-amber-700 ml-1">土</span></div>
-                                <div class="text-sm text-amber-700 mt-0.5">天干: <span id="shen-tian-caixing">0</span></div>
-                                <div class="text-sm text-amber-700">地支: <span id="shen-di-caixing">0</span></div>
-                                <div class="bg-amber-100 rounded px-1.5 py-0.5 mt-0.5">
+                                <div class="shen-tian-line shen-count-row text-sm text-amber-700 mt-0.5"><span class="shen-label">天干:</span> <span id="shen-tian-caixing">0</span></div>
+                                <div class="shen-di-line shen-count-row text-sm text-amber-700"><span class="shen-label">地支:</span> <span id="shen-di-caixing">0</span></div>
+                                <div class="shen-total-line bg-amber-100 rounded px-1.5 py-0.5 mt-0.5">
                                     <span class="font-bold text-amber-700 text-sm">总数: <span id="shen-total-caixing">0</span></span>
                                 </div>
                             </div>
@@ -936,9 +955,9 @@
                         <div id="shen-guansha" class="absolute text-center z-10">
                             <div class="mobile-card bg-yellow-50 border-2 border-yellow-300 rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                 <div class="font-bold text-yellow-500 text-sm">官杀<span id="wu-guansha" class="text-yellow-500 ml-1">金</span></div>
-                                <div class="text-sm text-yellow-500 mt-0.5">天干: <span id="shen-tian-guansha">0</span></div>
-                                <div class="text-sm text-yellow-500">地支: <span id="shen-di-guansha">0</span></div>
-                                <div class="bg-yellow-100 rounded px-1.5 py-0.5 mt-0.5">
+                                <div class="shen-tian-line shen-count-row text-sm text-yellow-500 mt-0.5"><span class="shen-label">天干:</span> <span id="shen-tian-guansha">0</span></div>
+                                <div class="shen-di-line shen-count-row text-sm text-yellow-500"><span class="shen-label">地支:</span> <span id="shen-di-guansha">0</span></div>
+                                <div class="shen-total-line bg-yellow-100 rounded px-1.5 py-0.5 mt-0.5">
                                     <span class="font-bold text-yellow-500 text-sm">总数: <span id="shen-total-guansha">0</span></span>
                                 </div>
                             </div>
@@ -948,9 +967,9 @@
                         <div id="shen-yinxing" class="absolute text-center z-10">
                             <div class="mobile-card bg-blue-50 border-2 border-blue-300 rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                 <div class="font-bold text-blue-600 text-sm">印星<span id="wu-yinxing" class="text-blue-600 ml-1">水</span></div>
-                                <div class="text-sm text-blue-600 mt-0.5">天干: <span id="shen-tian-yinxing">0</span></div>
-                                <div class="text-sm text-blue-600">地支: <span id="shen-di-yinxing">0</span></div>
-                                <div class="bg-blue-100 rounded px-1.5 py-0.5 mt-0.5">
+                                <div class="shen-tian-line shen-count-row text-sm text-blue-600 mt-0.5"><span class="shen-label">天干:</span> <span id="shen-tian-yinxing">0</span></div>
+                                <div class="shen-di-line shen-count-row text-sm text-blue-600"><span class="shen-label">地支:</span> <span id="shen-di-yinxing">0</span></div>
+                                <div class="shen-total-line bg-blue-100 rounded px-1.5 py-0.5 mt-0.5">
                                     <span class="font-bold text-blue-600 text-sm">总数: <span id="shen-total-yinxing">0</span></span>
                                 </div>
                             </div>
@@ -2515,9 +2534,9 @@
                             <div id="view-shen-bijie" class="absolute text-center z-10">
                                 <div class="rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold text-sm">比劫<span id="view-wu-bijie" class="ml-1">木</span></div>
-                                    <div class="text-sm mt-0.5">天干: <span id="view-shen-tian-bijie">0</span></div>
-                                    <div class="text-sm">地支: <span id="view-shen-di-bijie">0</span></div>
-                                    <div class="rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="view-shen-tian-bijie">0</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="view-shen-di-bijie">0</span></div>
+                                    <div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold text-sm">总数: <span id="view-shen-total-bijie">0</span></span>
                                     </div>
                                 </div>
@@ -2527,9 +2546,9 @@
                             <div id="view-shen-shishang" class="absolute text-center z-10">
                                 <div class="rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold text-sm">食伤<span id="view-wu-shishang" class="ml-1">火</span></div>
-                                    <div class="text-sm mt-0.5">天干: <span id="view-shen-tian-shishang">0</span></div>
-                                    <div class="text-sm">地支: <span id="view-shen-di-shishang">0</span></div>
-                                    <div class="rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="view-shen-tian-shishang">0</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="view-shen-di-shishang">0</span></div>
+                                    <div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold text-sm">总数: <span id="view-shen-total-shishang">0</span></span>
                                     </div>
                                 </div>
@@ -2539,9 +2558,9 @@
                             <div id="view-shen-caixing" class="absolute text-center z-10">
                                 <div class="rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold text-sm">财星<span id="view-wu-caixing" class="ml-1">土</span></div>
-                                    <div class="text-sm mt-0.5">天干: <span id="view-shen-tian-caixing">0</span></div>
-                                    <div class="text-sm">地支: <span id="view-shen-di-caixing">0</span></div>
-                                    <div class="rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="view-shen-tian-caixing">0</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="view-shen-di-caixing">0</span></div>
+                                    <div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold text-sm">总数: <span id="view-shen-total-caixing">0</span></span>
                                     </div>
                                 </div>
@@ -2551,9 +2570,9 @@
                             <div id="view-shen-guansha" class="absolute text-center z-10">
                                 <div class="rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold text-sm">官杀<span id="view-wu-guansha" class="ml-1">金</span></div>
-                                    <div class="text-sm mt-0.5">天干: <span id="view-shen-tian-guansha">0</span></div>
-                                    <div class="text-sm">地支: <span id="view-shen-di-guansha">0</span></div>
-                                    <div class="rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="view-shen-tian-guansha">0</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="view-shen-di-guansha">0</span></div>
+                                    <div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold text-sm">总数: <span id="view-shen-total-guansha">0</span></span>
                                     </div>
                                 </div>
@@ -2563,9 +2582,9 @@
                             <div id="view-shen-yinxing" class="absolute text-center z-10">
                                 <div class="rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold text-sm">印星<span id="view-wu-yinxing" class="ml-1">水</span></div>
-                                    <div class="text-sm mt-0.5">天干: <span id="view-shen-tian-yinxing">0</span></div>
-                                    <div class="text-sm">地支: <span id="view-shen-di-yinxing">0</span></div>
-                                    <div class="rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="view-shen-tian-yinxing">0</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="view-shen-di-yinxing">0</span></div>
+                                    <div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold text-sm">总数: <span id="view-shen-total-yinxing">0</span></span>
                                     </div>
                                 </div>
@@ -3109,14 +3128,34 @@
         window.currentShenDisplayMode = mode || 'all';
         var showTian = mode === 'all' || mode === 'tian';
         var showDi = mode === 'all' || mode === 'di';
+        var showTotal = mode === 'all';
+        // 隐藏/显示各行
         document.querySelectorAll('.shen-tian-line').forEach(function(el) {
             el.style.display = showTian ? '' : 'none';
         });
         document.querySelectorAll('.shen-di-line').forEach(function(el) {
             el.style.display = showDi ? '' : 'none';
         });
+        document.querySelectorAll('.shen-total-line').forEach(function(el) {
+            el.style.display = showTotal ? '' : 'none';
+        });
+        // 切换按钮激活状态
         document.querySelectorAll('.shen-toggle-btn').forEach(function(btn) {
             btn.classList.toggle('shen-toggle-active', btn.dataset.mode === mode);
+        });
+        // 天干/地支独立模式下放大数字、隐藏标签文字
+        document.querySelectorAll('.shen-count-row').forEach(function(el) {
+            if (mode === 'all') {
+                el.classList.remove('shen-mode-large');
+            } else if (el.classList.contains('shen-tian-line') && mode === 'tian') {
+                el.classList.add('shen-mode-large');
+            } else if (el.classList.contains('shen-di-line') && mode === 'di') {
+                el.classList.add('shen-mode-large');
+            }
+        });
+        // 隐藏"天干:"/"地支:"文字标签（仅保留纯数字）
+        document.querySelectorAll('.shen-label').forEach(function(el) {
+            el.style.display = (mode === 'all') ? '' : 'none';
         });
     };
     
@@ -5208,10 +5247,11 @@
             if (gld) allDi[gld]++;
         }
         clearShenMarkers();
+        if (hasDayun) {
+            updateShenMarkers(baseTian, baseDi, dayunTian, dayunDi, 'dayun');
+        }
         if (hasLiunian) {
             updateShenMarkers(dayunTian, dayunDi, allTian, allDi, 'liunian');
-        } else if (hasDayun) {
-            updateShenMarkers(baseTian, baseDi, dayunTian, dayunDi, 'dayun');
         }
         
         // 定位十神卡片
@@ -6164,10 +6204,11 @@
                 }
             }
             clearShenMarkers();
+            if (hasDayun) {
+                updateShenMarkers(baseTian, baseDi, dayunTian, dayunDi, 'dayun');
+            }
             if (hasLiunian) {
                 updateShenMarkers(dayunTian, dayunDi, allTian, allDi, 'liunian');
-            } else if (hasDayun) {
-                updateShenMarkers(baseTian, baseDi, dayunTian, dayunDi, 'dayun');
             }
         })();
         
@@ -11797,9 +11838,9 @@ function getAllTagCategories() {
                             <div id="research-shen-bijie" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${bijieColors.text} text-sm">比劫<span class="${bijieColors.text} ml-1">${shenWuXing['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
-                                    <div class="${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${bijieColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-bijie" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${bijieColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-bijie" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
+                                    <div class="shen-total-line ${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${bijieColors.textLabel} text-sm">总数: <span id="research-shen-total-bijie">${groupCount['比劫']}</span></span>
                                     </div>
                                 </div>
@@ -11807,9 +11848,9 @@ function getAllTagCategories() {
                             <div id="research-shen-shishang" class="absolute text-center z-10">
                                 <div class="mobile-card ${shishangColors.bg} border-2 ${shishangColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${shishangColors.text} text-sm">食伤<span class="${shishangColors.text} ml-1">${shenWuXing['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
-                                    <div class="${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${shishangColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-shishang" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${shishangColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-shishang" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
+                                    <div class="shen-total-line ${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${shishangColors.textLabel} text-sm">总数: <span id="research-shen-total-shishang">${groupCount['食伤']}</span></span>
                                     </div>
                                 </div>
@@ -11817,9 +11858,9 @@ function getAllTagCategories() {
                             <div id="research-shen-caixing" class="absolute text-center z-10">
                                 <div class="mobile-card ${caixingColors.bg} border-2 ${caixingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${caixingColors.text} text-sm">财星<span class="${caixingColors.text} ml-1">${shenWuXing['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
-                                    <div class="${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${caixingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-caixing" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${caixingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-caixing" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
+                                    <div class="shen-total-line ${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${caixingColors.textLabel} text-sm">总数: <span id="research-shen-total-caixing">${groupCount['财星']}</span></span>
                                     </div>
                                 </div>
@@ -11827,9 +11868,9 @@ function getAllTagCategories() {
                             <div id="research-shen-guansha" class="absolute text-center z-10">
                                 <div class="mobile-card ${guanshaColors.bg} border-2 ${guanshaColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${guanshaColors.text} text-sm">官杀<span class="${guanshaColors.text} ml-1">${shenWuXing['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
-                                    <div class="${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${guanshaColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-guansha" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${guanshaColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-guansha" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
+                                    <div class="shen-total-line ${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${guanshaColors.textLabel} text-sm">总数: <span id="research-shen-total-guansha">${groupCount['官杀']}</span></span>
                                     </div>
                                 </div>
@@ -11837,9 +11878,9 @@ function getAllTagCategories() {
                             <div id="research-shen-yinxing" class="absolute text-center z-10">
                                 <div class="mobile-card ${yinxingColors.bg} border-2 ${yinxingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${yinxingColors.text} text-sm">印星<span class="${yinxingColors.text} ml-1">${shenWuXing['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
-                                    <div class="${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${yinxingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-yinxing" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${yinxingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-yinxing" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
+                                    <div class="shen-total-line ${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${yinxingColors.textLabel} text-sm">总数: <span id="research-shen-total-yinxing">${groupCount['印星']}</span></span>
                                     </div>
                                 </div>
@@ -12452,9 +12493,9 @@ function getAllTagCategories() {
                             <div id="research-shen-bijie-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${bijieColors.text} text-sm">比劫<span id="research-wu-bijie-detail" class="${bijieColors.text} ml-1">${shenWuXing['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie-detail" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie-detail" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
-                                    <div class="${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${bijieColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-bijie-detail" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${bijieColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-bijie-detail" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
+                                    <div class="shen-total-line ${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${bijieColors.textLabel} text-sm">总数: <span id="research-shen-total-bijie-detail">${groupCount['比劫']}</span></span>
                                     </div>
                                 </div>
@@ -12464,9 +12505,9 @@ function getAllTagCategories() {
                             <div id="research-shen-shishang-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${shishangColors.bg} border-2 ${shishangColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${shishangColors.text} text-sm">食伤<span id="research-wu-shishang-detail" class="${shishangColors.text} ml-1">${shenWuXing['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang-detail" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang-detail" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
-                                    <div class="${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${shishangColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-shishang-detail" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${shishangColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-shishang-detail" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
+                                    <div class="shen-total-line ${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${shishangColors.textLabel} text-sm">总数: <span id="research-shen-total-shishang-detail">${groupCount['食伤']}</span></span>
                                     </div>
                                 </div>
@@ -12476,9 +12517,9 @@ function getAllTagCategories() {
                             <div id="research-shen-caixing-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${caixingColors.bg} border-2 ${caixingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${caixingColors.text} text-sm">财星<span id="research-wu-caixing-detail" class="${caixingColors.text} ml-1">${shenWuXing['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing-detail" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing-detail" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
-                                    <div class="${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${caixingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-caixing-detail" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${caixingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-caixing-detail" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
+                                    <div class="shen-total-line ${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${caixingColors.textLabel} text-sm">总数: <span id="research-shen-total-caixing-detail">${groupCount['财星']}</span></span>
                                     </div>
                                 </div>
@@ -12488,9 +12529,9 @@ function getAllTagCategories() {
                             <div id="research-shen-guansha-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${guanshaColors.bg} border-2 ${guanshaColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${guanshaColors.text} text-sm">官杀<span id="research-wu-guansha-detail" class="${guanshaColors.text} ml-1">${shenWuXing['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha-detail" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha-detail" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
-                                    <div class="${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${guanshaColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-guansha-detail" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${guanshaColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-guansha-detail" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
+                                    <div class="shen-total-line ${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${guanshaColors.textLabel} text-sm">总数: <span id="research-shen-total-guansha-detail">${groupCount['官杀']}</span></span>
                                     </div>
                                 </div>
@@ -12500,9 +12541,9 @@ function getAllTagCategories() {
                             <div id="research-shen-yinxing-detail" class="absolute text-center z-10">
                                 <div class="mobile-card ${yinxingColors.bg} border-2 ${yinxingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${yinxingColors.text} text-sm">印星<span id="research-wu-yinxing-detail" class="${yinxingColors.text} ml-1">${shenWuXing['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing-detail" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing-detail" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
-                                    <div class="${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${yinxingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-yinxing-detail" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${yinxingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-yinxing-detail" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
+                                    <div class="shen-total-line ${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${yinxingColors.textLabel} text-sm">总数: <span id="research-shen-total-yinxing-detail">${groupCount['印星']}</span></span>
                                     </div>
                                 </div>
@@ -12719,10 +12760,11 @@ function getAllTagCategories() {
                 var g2 = getShenGroupName(dayunDiShen); if(g2) dtDayunDi[g2]++;
             }
             clearShenMarkers();
+            if (dtHasDayun) {
+                updateShenMarkers(dtBaseTian, dtBaseDi, dtDayunTian, dtDayunDi, 'dayun');
+            }
             if (dtHasLiunian) {
                 updateShenMarkers(dtDayunTian, dtDayunDi, initGroupTian, initGroupDi, 'liunian');
-            } else if (dtHasDayun) {
-                updateShenMarkers(dtBaseTian, dtBaseDi, dtDayunTian, dtDayunDi, 'dayun');
             }
         })();
         
@@ -13373,9 +13415,9 @@ function getAllTagCategories() {
                             <div id="research-shen-bijie-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${bijieColors.text} text-sm">比劫<span id="research-wu-bijie-compare" class="${bijieColors.text} ml-1">${shenWuXing['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text} mt-0.5">天干: <span id="research-shen-tian-bijie-compare" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
-                                    <div class="text-sm ${bijieColors.text}">地支: <span id="research-shen-di-bijie-compare" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
-                                    <div class="${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${bijieColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-bijie-compare" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${bijieColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-bijie-compare" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
+                                    <div class="shen-total-line ${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${bijieColors.textLabel} text-sm">总数: <span id="research-shen-total-bijie-compare">${groupTian['比劫'] + groupDi['比劫']}</span></span>
                                     </div>
                                 </div>
@@ -13383,9 +13425,9 @@ function getAllTagCategories() {
                             <div id="research-shen-shishang-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${shishangColors.bg} border-2 ${shishangColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${shishangColors.text} text-sm">食伤<span id="research-wu-shishang-compare" class="${shishangColors.text} ml-1">${shenWuXing['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text} mt-0.5">天干: <span id="research-shen-tian-shishang-compare" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
-                                    <div class="text-sm ${shishangColors.text}">地支: <span id="research-shen-di-shishang-compare" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
-                                    <div class="${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${shishangColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-shishang-compare" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${shishangColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-shishang-compare" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
+                                    <div class="shen-total-line ${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${shishangColors.textLabel} text-sm">总数: <span id="research-shen-total-shishang-compare">${groupTian['食伤'] + groupDi['食伤']}</span></span>
                                     </div>
                                 </div>
@@ -13393,9 +13435,9 @@ function getAllTagCategories() {
                             <div id="research-shen-caixing-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${caixingColors.bg} border-2 ${caixingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${caixingColors.text} text-sm">财星<span id="research-wu-caixing-compare" class="${caixingColors.text} ml-1">${shenWuXing['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text} mt-0.5">天干: <span id="research-shen-tian-caixing-compare" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
-                                    <div class="text-sm ${caixingColors.text}">地支: <span id="research-shen-di-caixing-compare" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
-                                    <div class="${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${caixingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-caixing-compare" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${caixingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-caixing-compare" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
+                                    <div class="shen-total-line ${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${caixingColors.textLabel} text-sm">总数: <span id="research-shen-total-caixing-compare">${groupTian['财星'] + groupDi['财星']}</span></span>
                                     </div>
                                 </div>
@@ -13403,9 +13445,9 @@ function getAllTagCategories() {
                             <div id="research-shen-guansha-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${guanshaColors.bg} border-2 ${guanshaColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${guanshaColors.text} text-sm">官杀<span id="research-wu-guansha-compare" class="${guanshaColors.text} ml-1">${shenWuXing['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text} mt-0.5">天干: <span id="research-shen-tian-guansha-compare" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
-                                    <div class="text-sm ${guanshaColors.text}">地支: <span id="research-shen-di-guansha-compare" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
-                                    <div class="${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${guanshaColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-guansha-compare" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${guanshaColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-guansha-compare" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
+                                    <div class="shen-total-line ${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${guanshaColors.textLabel} text-sm">总数: <span id="research-shen-total-guansha-compare">${groupTian['官杀'] + groupDi['官杀']}</span></span>
                                     </div>
                                 </div>
@@ -13413,9 +13455,9 @@ function getAllTagCategories() {
                             <div id="research-shen-yinxing-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${yinxingColors.bg} border-2 ${yinxingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${yinxingColors.text} text-sm">印星<span id="research-wu-yinxing-compare" class="${yinxingColors.text} ml-1">${shenWuXing['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text} mt-0.5">天干: <span id="research-shen-tian-yinxing-compare" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
-                                    <div class="text-sm ${yinxingColors.text}">地支: <span id="research-shen-di-yinxing-compare" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
-                                    <div class="${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
+                                    <div class="shen-tian-line shen-count-row text-sm ${yinxingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-yinxing-compare" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${yinxingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-yinxing-compare" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
+                                    <div class="shen-total-line ${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${yinxingColors.textLabel} text-sm">总数: <span id="research-shen-total-yinxing-compare">${groupTian['印星'] + groupDi['印星']}</span></span>
                                     </div>
                                 </div>
@@ -13520,10 +13562,11 @@ function getAllTagCategories() {
             
             // 大运/流年增量标记
             clearShenMarkers();
+            if (compareHasDayun) {
+                updateShenMarkers(baseGroupTian, baseGroupDi, dayunGroupTian, dayunGroupDi, 'dayun');
+            }
             if (compareHasLiunian) {
                 updateShenMarkers(dayunGroupTian, dayunGroupDi, allGroupTian, allGroupDi, 'liunian');
-            } else if (compareHasDayun) {
-                updateShenMarkers(baseGroupTian, baseGroupDi, dayunGroupTian, dayunGroupDi, 'dayun');
             }
         }
         
