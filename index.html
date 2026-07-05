@@ -11171,6 +11171,48 @@ function getAllTagCategories() {
         });
         
         setupLiunianHandlers(container, caseData, year, result, result.currentDayunTianShen, result.currentDayunDiShen);
+        
+        // 初始标记大运/流年增量
+        (function() {
+            var rsBaseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var rsBaseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var rsDayunTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var rsDayunDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var rsAllTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var rsAllDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            // 八字四柱
+            [tianShenNian, tianShenYue, tianShenRi, tianShenShi].forEach(function(s) {
+                var g = getShenGroupName(s);
+                if(g) { rsBaseTian[g]++; rsDayunTian[g]++; rsAllTian[g]++; }
+            });
+            [diShenNian, diShenYue, diShenRi, diShenShi].forEach(function(s) {
+                var g = getShenGroupName(s);
+                if(g) { rsBaseDi[g]++; rsDayunDi[g]++; rsAllDi[g]++; }
+            });
+            var rsHasDayun = currentDaYun && result.currentDayunTianShen && result.currentDayunDiShen;
+            var rsHasLiunian = liunianData && !isDayun;
+            if (rsHasDayun) {
+                var g = getShenGroupName(result.currentDayunTianShen);
+                if(g) { rsDayunTian[g]++; rsAllTian[g]++; }
+                var gd = getShenGroupName(result.currentDayunDiShen);
+                if(gd) { rsDayunDi[gd]++; rsAllDi[gd]++; }
+            }
+            if (rsHasLiunian) {
+                var liunianTianShen = getExactShen(liunianData.gan, dayGan);
+                var liunianDiShen = getDiShen(liunianData.zhi, dayGan);
+                var g = getShenGroupName(liunianTianShen);
+                if(g) rsAllTian[g]++;
+                var gd = getShenGroupName(liunianDiShen);
+                if(gd) rsAllDi[gd]++;
+            }
+            clearShenMarkers();
+            if (rsHasDayun) {
+                updateShenMarkers(rsBaseTian, rsBaseDi, rsDayunTian, rsDayunDi, 'dayun');
+            }
+            if (rsHasLiunian) {
+                updateShenMarkers(rsDayunTian, rsDayunDi, rsAllTian, rsAllDi, 'liunian');
+            }
+        })();
     }
     
     function setupLiunianHandlers(container, caseData, year, result, currentDayunTianShen, currentDayunDiShen) {
