@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -481,9 +481,28 @@
                 margin-top: 3px !important;
             }
             
-            /* 移动端隐藏天干/地支标签文字，释放空间加大数字 */
+            /* 移动端隐藏天干/地支标签文字和数量数字，仅显示角标和增量标记 */
             .mobile-card .shen-count-row .shen-label {
                 display: none !important;
+            }
+            .mobile-card .shen-count-row > span:not([class]) {
+                display: none !important;
+            }
+            /* 天干和地支行之间添加分隔线，使用伪元素确保始终显示 */
+            .mobile-card .shen-di-line::before {
+                content: '';
+                display: block;
+                border-top: 1px dashed #aaa;
+                margin-bottom: 3px;
+                padding-top: 2px;
+            }
+            /* 加大角标和增量标记字号 */
+            .mobile-card .shen-source-symbols {
+                font-size: 16px !important;
+            }
+            .mobile-card .shen-marker-dayun,
+            .mobile-card .shen-marker-liunian {
+                font-size: 18px !important;
             }
             .mobile-card .shen-count-row {
                 font-size: 14px !important;
