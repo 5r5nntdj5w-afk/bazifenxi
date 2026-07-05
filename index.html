@@ -13523,7 +13523,15 @@ function getAllTagCategories() {
                 btn.className = 'px-4 py-2 rounded-lg text-sm font-medium transition-all bg-amber-500 text-white hover:bg-amber-600';
                 
                 // 渲染八字信息（使用与单独排盘窗口完全相同的逻辑）
-                renderBaziInCompareContainer(compareBaziContainer, modal, sc.caseData, sc.year, sc.event, sc.caseTitle);
+                try {
+                    if (!sc.caseData || !sc.caseData.birthDate) {
+                        throw new Error('案例数据不完整（缺少出生日期）');
+                    }
+                    renderBaziInCompareContainer(compareBaziContainer, modal, sc.caseData, sc.year, sc.event, sc.caseTitle);
+                } catch (e) {
+                    console.error('渲染对比分析内容异常:', e);
+                    compareBaziContainer.innerHTML = '<div class="text-center py-8 text-red-500">加载出错：' + (e.message || e) + '<br><span class="text-sm">请尝试选择其他事项</span></div>';
+                }
             });
             
             compareCaseList.appendChild(btn);
@@ -13540,10 +13548,13 @@ function getAllTagCategories() {
         if (selectedResearchCases.length > 0) {
             const firstCase = selectedResearchCases[0];
             try {
+                if (!firstCase.caseData || !firstCase.caseData.birthDate) {
+                    throw new Error('案例数据不完整（缺少出生日期）');
+                }
                 renderBaziInCompareContainer(compareBaziContainer, modal, firstCase.caseData, firstCase.year, firstCase.event, firstCase.caseTitle);
             } catch (e) {
                 console.error('渲染对比分析内容异常:', e);
-                compareBaziContainer.innerHTML = '<div class="text-center py-8 text-red-500">加载出错，请尝试选择其他事项</div>';
+                compareBaziContainer.innerHTML = '<div class="text-center py-8 text-red-500">加载出错：' + (e.message || e) + '<br><span class="text-sm">请尝试选择其他事项</span></div>';
             }
         }
     }
