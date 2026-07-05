@@ -5178,15 +5178,21 @@
                 const textDivs = card.querySelectorAll('.text-sm');
                 textDivs.forEach(div => {
                     if(!div.classList.contains('font-bold')) {
-                        div.className = `text-sm ${colors.text} mt-0.5`;
+                        var cls = 'text-sm ' + colors.text + ' mt-0.5';
+                        if (div.classList.contains('shen-tian-line')) cls += ' shen-tian-line';
+                        if (div.classList.contains('shen-di-line')) cls += ' shen-di-line';
+                        if (div.classList.contains('shen-count-row')) cls += ' shen-count-row';
+                        div.className = cls;
                     }
                 });
                 
                 const totalDiv = card.querySelector('.rounded');
                 if(totalDiv) {
-                    totalDiv.className = `${colors.bg} rounded px-1.5 py-0.5 mt-0.5`;
+                    var cls = colors.bg + ' rounded px-1.5 py-0.5 mt-0.5';
+                    if (totalDiv.classList.contains('shen-total-line')) cls += ' shen-total-line';
+                    totalDiv.className = cls;
                     const totalSpan = totalDiv.querySelector('span');
-                    if(totalSpan) totalSpan.className = `font-bold ${colors.text} text-sm`;
+                    if(totalSpan) totalSpan.className = 'font-bold ' + colors.text + ' text-sm';
                 }
             }
         };
@@ -6097,22 +6103,30 @@
                 
                 const tianDiv = card.children[1];
                 if(tianDiv) {
-                    tianDiv.className = `text-sm ${colors.text} mt-0.5`;
+                    var cls = 'text-sm ' + colors.text + ' mt-0.5';
+                    if (tianDiv.classList.contains('shen-tian-line')) cls += ' shen-tian-line';
+                    if (tianDiv.classList.contains('shen-count-row')) cls += ' shen-count-row';
+                    tianDiv.className = cls;
                 }
                 
                 const diDiv = card.children[2];
                 if(diDiv) {
-                    diDiv.className = `text-sm ${colors.text}`;
+                    var cls = 'text-sm ' + colors.text;
+                    if (diDiv.classList.contains('shen-di-line')) cls += ' shen-di-line';
+                    if (diDiv.classList.contains('shen-count-row')) cls += ' shen-count-row';
+                    diDiv.className = cls;
                 }
                 
                 const totalDiv = card.querySelector('.rounded');
                 if(totalDiv) {
-                    totalDiv.className = `${colors.bgLabel} rounded px-1.5 py-0.5 mt-0.5`;
+                    var cls = colors.bgLabel + ' rounded px-1.5 py-0.5 mt-0.5';
+                    if (totalDiv.classList.contains('shen-total-line')) cls += ' shen-total-line';
+                    totalDiv.className = cls;
                 }
                 
                 const totalSpan = totalDiv.querySelector('.font-bold');
                 if(totalSpan) {
-                    totalSpan.className = `font-bold ${colors.textLabel} text-sm`;
+                    totalSpan.className = 'font-bold ' + colors.textLabel + ' text-sm';
                 }
             }
         }
