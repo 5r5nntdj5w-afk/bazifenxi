@@ -608,6 +608,44 @@
         .shen-label {
             transition: opacity 0.2s;
         }
+        /* 柱位来源符号 */
+        .shen-source-symbols {
+            font-size: 9px;
+            color: inherit;
+            margin-left: 2px;
+            letter-spacing: 0.5px;
+            opacity: 0.8;
+            vertical-align: super;
+            line-height: 1;
+        }
+        /* 设置面板样式 */
+        .shen-settings-modal { max-width: 420px; }
+        .shen-settings-group { margin-bottom: 14px; }
+        .shen-settings-group label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: #374151; }
+        .shen-settings-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+        .shen-settings-presets button {
+            width: 36px; height: 36px; font-size: 16px; border: 2px solid #e5e7eb; border-radius: 6px;
+            cursor: pointer; transition: all 0.15s; background: #fff; display: flex; align-items: center; justify-content: center;
+        }
+        .shen-settings-presets button:hover { border-color: #6366f1; background: #eef2ff; }
+        .shen-settings-presets button.active { border-color: #6366f1; background: #e0e7ff; box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+        .shen-settings-input { width: 60px; font-size: 14px; padding: 4px 8px; border: 2px solid #e5e7eb; border-radius: 6px; text-align: center; }
+        .shen-settings-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
+        .shen-settings-preview { background: #f9fafb; border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 13px; line-height: 1.8; }
+        .shen-settings-preview .shen-label { font-weight: 600; margin-right: 4px; }
+        .shen-settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+        .shen-settings-actions button { padding: 6px 20px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+        .shen-settings-actions .btn-primary { background: #6366f1; color: #fff; }
+        .shen-settings-actions .btn-primary:hover { background: #4f46e5; }
+        .shen-settings-actions .btn-cancel { background: #e5e7eb; color: #374151; }
+        .shen-settings-actions .btn-cancel:hover { background: #d1d5db; }
+        .shen-settings-gear {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border: 1px solid #d1d5db; border-radius: 6px;
+            background: #fff; cursor: pointer; transition: all 0.15s; font-size: 14px; line-height: 1;
+            margin-left: 6px; color: #6b7280;
+        }
+        .shen-settings-gear:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
     </style>
 </head>
 <body class="bg-gray-50 sm:max-w-6xl mx-auto p-2 sm:p-4">
@@ -911,6 +949,7 @@
                             <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
                             <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
                             <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                            <button class="shen-settings-gear" onclick="openShenSettingsModal()" title="标识符设置">⚙</button>
                         </div>
                     </div>
                     <!-- 环形布局（五等分圆） -->
@@ -2343,6 +2382,60 @@
     </div>
 
     <!-- 查看案例弹窗 -->
+    <!-- 十神标识设置弹窗 -->
+    <div id="shen-settings-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg p-6 mx-4 shadow-2xl shen-settings-modal">
+            <div class="flex justify-between items-center mb-5 pb-3 border-b">
+                <h3 class="text-lg font-bold text-gray-800">⚙ 十神标识符设置</h3>
+                <span onclick="closeShenSettingsModal()" class="text-gray-400 hover:text-gray-600 text-xl cursor-pointer">&times;</span>
+            </div>
+            <div class="text-xs text-gray-500 mb-3">可选择预设标识符或手动输入自定义符号</div>
+            
+            <div class="shen-settings-group">
+                <label>年柱标识</label>
+                <div class="shen-settings-presets" data-target="nian"></div>
+                <input class="shen-settings-input" type="text" id="shen-settings-nian" maxlength="2" oninput="onShenSettingInput('nian')">
+            </div>
+            <div class="shen-settings-group">
+                <label>月柱标识</label>
+                <div class="shen-settings-presets" data-target="yue"></div>
+                <input class="shen-settings-input" type="text" id="shen-settings-yue" maxlength="2" oninput="onShenSettingInput('yue')">
+            </div>
+            <div class="shen-settings-group">
+                <label>日柱标识</label>
+                <div class="shen-settings-presets" data-target="ri"></div>
+                <input class="shen-settings-input" type="text" id="shen-settings-ri" maxlength="2" oninput="onShenSettingInput('ri')">
+            </div>
+            <div class="shen-settings-group">
+                <label>时柱标识</label>
+                <div class="shen-settings-presets" data-target="shi"></div>
+                <input class="shen-settings-input" type="text" id="shen-settings-shi" maxlength="2" oninput="onShenSettingInput('shi')">
+            </div>
+            <div class="border-t pt-3 mt-1 mb-3"></div>
+            <div class="shen-settings-group">
+                <label>大运标记</label>
+                <div class="shen-settings-presets" data-target="dayun"></div>
+                <input class="shen-settings-input" type="text" id="shen-settings-dayun" maxlength="2" oninput="onShenSettingInput('dayun')">
+            </div>
+            <div class="shen-settings-group">
+                <label>流年标记</label>
+                <div class="shen-settings-presets" data-target="liunian"></div>
+                <input class="shen-settings-input" type="text" id="shen-settings-liunian" maxlength="2" oninput="onShenSettingInput('liunian')">
+            </div>
+            
+            <div class="shen-settings-preview">
+                <div><span class="shen-label">预览：</span>天干: 3 <span id="shen-preview-tian" style="font-size:9px;opacity:0.8;vertical-align:super;">年月日</span></div>
+                <div><span class="shen-label">预览：</span>地支: 2 <span id="shen-preview-di" style="font-size:9px;opacity:0.8;vertical-align:super;">年时</span></div>
+                <div><span class="shen-label" style="font-size:11px;">大运</span><span id="shen-preview-dayun" style="color:#3B82F6;">●</span> <span class="shen-label" style="font-size:11px;">流年</span><span id="shen-preview-liunian" style="color:#F97316;">■</span></div>
+            </div>
+            
+            <div class="shen-settings-actions">
+                <button class="btn-cancel" onclick="closeShenSettingsModal()">取消</button>
+                <button class="btn-primary" onclick="saveShenSettingsFromModal()">保存设置</button>
+            </div>
+        </div>
+    </div>
+    
     <div id="view-case-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div class="flex justify-between items-center mb-6 pb-4 border-b-2 border-amber-200">
@@ -2526,6 +2619,7 @@
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
                                 <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
                                 <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                                <button class="shen-settings-gear" onclick="openShenSettingsModal()" title="标识符设置">⚙</button>
                             </div>
                         </div>
                         <!-- 环形布局（五等分圆） -->
@@ -3038,6 +3132,138 @@
         });
         
         updateAdjustDisplay();
+    }
+    
+    // ===== 十神柱位来源标识设置系统 =====
+    window.SHEN_SOURCE_DEFAULTS = { nian: '年', yue: '月', ri: '日', shi: '时', dayun: '●', liunian: '■' };
+    window.SHEN_SOURCE_PRESETS = {
+        pillar: { nian: ['年', '⓵', '❶', '①', 'Y', '甲'], yue: ['月', '⓶', '❷', '②', 'M', '乙'], ri: ['日', '⓷', '❸', '③', 'D', '丙'], shi: ['时', '⓸', '❹', '④', 'H', '丁'] },
+        marker: { dayun: ['●', '▲', '★', '◆', '♦'], liunian: ['■', '▼', '☆', '◇', '⬢'] }
+    };
+    window.shenSourceSettings = getShenSourceSettings();
+    
+    function getShenSourceSettings() {
+        try { var saved = JSON.parse(localStorage.getItem('shenSourceSettings')); return saved || {nian:'年',yue:'月',ri:'日',shi:'时',dayun:'●',liunian:'■'}; }
+        catch(e) { return {nian:'年',yue:'月',ri:'日',shi:'时',dayun:'●',liunian:'■'}; }
+    }
+    function saveShenSourceSettings(settings) {
+        localStorage.setItem('shenSourceSettings', JSON.stringify(settings));
+        Object.assign(window.shenSourceSettings, settings);
+        renderShenSources();
+    }
+    function renderShenSources() {
+        var settings = window.shenSourceSettings || getShenSourceSettings();
+        var groups = ['bijie','shishang','caixing','guansha','yinxing'];
+        var prefixes = ['','research-','view-'];
+        var suffixes = ['','-detail','-compare'];
+        var pillarMap = {nian:'nian',yue:'yue',ri:'ri',shi:'shi',dayun:'dayun',liunian:'liunian'};
+        prefixes.forEach(function(pre) {
+            suffixes.forEach(function(suf) {
+                groups.forEach(function(name) {
+                    ['tian','di'].forEach(function(type) {
+                        var span = document.getElementById(pre+'shen-'+type+'-'+name+suf);
+                        if (!span) return;
+                        var nextEl = span.nextElementSibling;
+                        if (nextEl && nextEl.classList.contains('shen-source-symbols')) nextEl.remove();
+                        var sourceAttr = span.dataset.source;
+                        if (!sourceAttr) return;
+                        var pillars = sourceAttr.split(',');
+                        var symbols = '';
+                        pillars.forEach(function(p) { symbols += settings[p] || p; });
+                        if (symbols) {
+                            var sourceEl = document.createElement('span');
+                            sourceEl.className = 'shen-source-symbols';
+                            sourceEl.textContent = symbols;
+                            span.parentNode.insertBefore(sourceEl, span.nextSibling);
+                        }
+                    });
+                });
+            });
+        });
+    }
+    
+    // ===== 设置面板UI函数 =====
+    function openShenSettingsModal() {
+        var settings = window.shenSourceSettings || getShenSourceSettings();
+        var modal = document.getElementById('shen-settings-modal');
+        if (!modal) return;
+        
+        // 填充预设按钮
+        var presetsConfig = window.SHEN_SOURCE_PRESETS;
+        ['nian','yue','ri','shi','dayun','liunian'].forEach(function(key) {
+            var container = modal.querySelector('.shen-settings-presets[data-target="'+key+'"]');
+            if (!container) return;
+            container.innerHTML = '';
+            var presets = presetsConfig.pillar ? (presetsConfig.pillar[key] || []) : [];
+            if (key === 'dayun' || key === 'liunian') presets = presetsConfig.marker ? (presetsConfig.marker[key] || []) : [];
+            presets.forEach(function(sym) {
+                var btn = document.createElement('button');
+                btn.textContent = sym;
+                btn.onclick = function() { selectShenPreset(key, sym); };
+                if (settings[key] === sym) btn.className = 'active';
+                container.appendChild(btn);
+            });
+        });
+        
+        // 填充输入框
+        ['nian','yue','ri','shi','dayun','liunian'].forEach(function(key) {
+            var input = document.getElementById('shen-settings-'+key);
+            if (input) input.value = settings[key] || '';
+        });
+        
+        updateShenSettingsPreview(settings);
+        modal.classList.remove('hidden');
+    }
+    
+    function closeShenSettingsModal() {
+        var modal = document.getElementById('shen-settings-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+    
+    function selectShenPreset(key, sym) {
+        var container = document.querySelector('.shen-settings-presets[data-target="'+key+'"]');
+        if (container) {
+            container.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+            var btn = container.querySelector('button');
+            if (btn) {
+                container.querySelectorAll('button').forEach(function(b) {
+                    if (b.textContent === sym) b.className = 'active';
+                });
+            }
+        }
+        var input = document.getElementById('shen-settings-'+key);
+        if (input) input.value = sym;
+        var settings = getCurrentSettingsFromModal();
+        updateShenSettingsPreview(settings);
+    }
+    
+    function onShenSettingInput(key) {
+        var container = document.querySelector('.shen-settings-presets[data-target="'+key+'"]');
+        if (container) container.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+        var settings = getCurrentSettingsFromModal();
+        updateShenSettingsPreview(settings);
+    }
+    
+    function getCurrentSettingsFromModal() {
+        var settings = {};
+        ['nian','yue','ri','shi','dayun','liunian'].forEach(function(key) {
+            var input = document.getElementById('shen-settings-'+key);
+            settings[key] = input ? input.value : '';
+        });
+        return settings;
+    }
+    
+    function updateShenSettingsPreview(settings) {
+        document.getElementById('shen-preview-tian').textContent = (settings.nian||'')+(settings.yue||'')+(settings.ri||'')+(settings.shi||'');
+        document.getElementById('shen-preview-di').textContent = (settings.nian||'')+(settings.shi||'');
+        document.getElementById('shen-preview-dayun').textContent = settings.dayun || '●';
+        document.getElementById('shen-preview-liunian').textContent = settings.liunian || '■';
+    }
+    
+    function saveShenSettingsFromModal() {
+        var settings = getCurrentSettingsFromModal();
+        saveShenSourceSettings(settings);
+        closeShenSettingsModal();
     }
     
     function updateAllShenCardNumbers() {
@@ -5223,6 +5449,31 @@
             if (totalSpan) totalSpan.textContent = groupTian[cn] + groupDi[cn];
         });
         
+        // 追踪各十神组的柱位来源
+        (function() {
+            var viewSrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            var viewSrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            for (var vi = 0; vi < tianShenList.length; vi++) {
+                var pillarKey = vi < 4 ? ['nian','yue','ri','shi'][vi] : (vi === 4 ? 'dayun' : 'liunian');
+                if (tianShenList[vi]) {
+                    var g = getShenGroupName(tianShenList[vi]);
+                    if (g) viewSrcTian[g].push(pillarKey);
+                }
+                if (diShenList[vi]) {
+                    var gd = getShenGroupName(diShenList[vi]);
+                    if (gd) viewSrcDi[gd].push(pillarKey);
+                }
+            }
+            shenGroups.forEach(function(name, idx) {
+                var cn = chineseGroups[idx];
+                var tSpan = document.getElementById('view-shen-tian-' + name);
+                var dSpan = document.getElementById('view-shen-di-' + name);
+                if (tSpan && viewSrcTian[cn].length > 0) tSpan.dataset.source = viewSrcTian[cn].join(',');
+                if (dSpan && viewSrcDi[cn].length > 0) dSpan.dataset.source = viewSrcDi[cn].join(',');
+            });
+        })();
+        renderShenSources();
+        
         // ===== 大运/流年增量标记 =====
         var baseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
         var baseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
@@ -6225,6 +6476,48 @@
                 updateShenMarkers(dayunTian, dayunDi, allTian, allDi, 'liunian');
             }
         })();
+        
+        // 追踪各十神组的柱位来源（年/月/日/时/大运/流年）
+        (function() {
+            var srcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            var srcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            ['nian','yue','ri','shi'].forEach(function(k) {
+                var item = data[k];
+                if (item && item.t) {
+                    var g = getShenGroupName(getExactShen(item.t, data.ri.t));
+                    if (g) srcTian[g].push(k);
+                }
+                if (item && item.d) {
+                    var g = getShenGroupName(getDiShen(item.d, data.ri.t));
+                    if (g) srcDi[g].push(k);
+                }
+            });
+            if (data.dayun && data.dayun.t) {
+                var g = getShenGroupName(getExactShen(data.dayun.t, data.ri.t));
+                if (g) srcTian[g].push('dayun');
+            }
+            if (data.dayun && data.dayun.d) {
+                var g = getShenGroupName(getDiShen(data.dayun.d, data.ri.t));
+                if (g) srcDi[g].push('dayun');
+            }
+            if (data.liunian && data.liunian.t) {
+                var g = getShenGroupName(getExactShen(data.liunian.t, data.ri.t));
+                if (g) srcTian[g].push('liunian');
+            }
+            if (data.liunian && data.liunian.d) {
+                var g = getShenGroupName(getDiShen(data.liunian.d, data.ri.t));
+                if (g) srcDi[g].push('liunian');
+            }
+            shenGroups.forEach(function(idx) {
+                var name = shenGroups[idx];
+                var cn = chineseGroups[idx];
+                var tSpan = document.getElementById('shen-tian-' + name);
+                var dSpan = document.getElementById('shen-di-' + name);
+                if (tSpan && srcTian[cn].length > 0) tSpan.dataset.source = srcTian[cn].join(',');
+                if (dSpan && srcDi[cn].length > 0) dSpan.dataset.source = srcDi[cn].join(',');
+            });
+        })();
+        renderShenSources();
         
         // 获取十神所属的组名
         function getShenGroupName(shen) {
@@ -11641,6 +11934,29 @@ function getAllTagCategories() {
             if (groupCount[groupName] < 0) groupCount[groupName] = 0;
         });
         
+        // 追踪各十神组的柱位来源
+        var rsSrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+        var rsSrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+        var rsPillars = [
+            {key:'nian', t:tianShenNian, d:diShenNian},
+            {key:'yue', t:tianShenYue, d:diShenYue},
+            {key:'ri', t:tianShenRi, d:diShenRi},
+            {key:'shi', t:tianShenShi, d:diShenShi}
+        ];
+        if (currentDaYun && dayunTianShen && dayunTianShen !== '-') rsPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
+        if (!isDayun && tianShenLiunian && tianShenLiunian !== '-') rsPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
+        rsPillars.forEach(function(p) {
+            var g = getShenGroupName(p.t); if(g) rsSrcTian[g].push(p.key);
+            var gd = getShenGroupName(p.d); if(gd) rsSrcDi[gd].push(p.key);
+        });
+        var rsGroupNames = ['bijie','shishang','caixing','guansha','yinxing'];
+        var rsCN = {bijie:'比劫',shishang:'食伤',caixing:'财星',guansha:'官杀',yinxing:'印星'};
+        var rsSourceAttr = {};
+        rsGroupNames.forEach(function(n) {
+            rsSourceAttr['research-shen-tian-'+n] = rsSrcTian[rsCN[n]].join(',');
+            rsSourceAttr['research-shen-di-'+n] = rsSrcDi[rsCN[n]].join(',');
+        });
+        
         const getShenColorClass = (shen) => {
             const group = getShenGroupName(shen);
             if(!group) return 'text-gray-600';
@@ -11888,14 +12204,15 @@ function getAllTagCategories() {
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
                                 <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
                                 <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                                <button class="shen-settings-gear" onclick="openShenSettingsModal()" title="标识符设置">⚙</button>
                             </div>
                         </div>
                         <div id="research-shen-container" class="relative w-full max-w-3xl mx-auto" style="height: 320px;">
                             <div id="research-shen-bijie" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${bijieColors.text} text-sm">比劫<span class="${bijieColors.text} ml-1">${shenWuXing['比劫']}</span></div>
-                                    <div class="shen-tian-line shen-count-row text-sm ${bijieColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-bijie" data-base="${groupTian['比劫']}">${groupTian['比劫']}</span></div>
-                                    <div class="shen-di-line shen-count-row text-sm ${bijieColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-bijie" data-base="${groupDi['比劫']}">${groupDi['比劫']}</span></div>
+                                    <div class="shen-tian-line shen-count-row text-sm ${bijieColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-bijie" data-base="${groupTian['比劫']}" data-source="${rsSourceAttr['research-shen-tian-bijie']}">${groupTian['比劫']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${bijieColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-bijie" data-base="${groupDi['比劫']}" data-source="${rsSourceAttr['research-shen-di-bijie']}">${groupDi['比劫']}</span></div>
                                     <div class="shen-total-line ${bijieColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${bijieColors.textLabel} text-sm">总数: <span id="research-shen-total-bijie">${groupCount['比劫']}</span></span>
                                     </div>
@@ -11904,8 +12221,8 @@ function getAllTagCategories() {
                             <div id="research-shen-shishang" class="absolute text-center z-10">
                                 <div class="mobile-card ${shishangColors.bg} border-2 ${shishangColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${shishangColors.text} text-sm">食伤<span class="${shishangColors.text} ml-1">${shenWuXing['食伤']}</span></div>
-                                    <div class="shen-tian-line shen-count-row text-sm ${shishangColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-shishang" data-base="${groupTian['食伤']}">${groupTian['食伤']}</span></div>
-                                    <div class="shen-di-line shen-count-row text-sm ${shishangColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-shishang" data-base="${groupDi['食伤']}">${groupDi['食伤']}</span></div>
+                                    <div class="shen-tian-line shen-count-row text-sm ${shishangColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-shishang" data-base="${groupTian['食伤']}" data-source="${rsSourceAttr['research-shen-tian-shishang']}">${groupTian['食伤']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${shishangColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-shishang" data-base="${groupDi['食伤']}" data-source="${rsSourceAttr['research-shen-di-shishang']}">${groupDi['食伤']}</span></div>
                                     <div class="shen-total-line ${shishangColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${shishangColors.textLabel} text-sm">总数: <span id="research-shen-total-shishang">${groupCount['食伤']}</span></span>
                                     </div>
@@ -11914,8 +12231,8 @@ function getAllTagCategories() {
                             <div id="research-shen-caixing" class="absolute text-center z-10">
                                 <div class="mobile-card ${caixingColors.bg} border-2 ${caixingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${caixingColors.text} text-sm">财星<span class="${caixingColors.text} ml-1">${shenWuXing['财星']}</span></div>
-                                    <div class="shen-tian-line shen-count-row text-sm ${caixingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-caixing" data-base="${groupTian['财星']}">${groupTian['财星']}</span></div>
-                                    <div class="shen-di-line shen-count-row text-sm ${caixingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-caixing" data-base="${groupDi['财星']}">${groupDi['财星']}</span></div>
+                                    <div class="shen-tian-line shen-count-row text-sm ${caixingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-caixing" data-base="${groupTian['财星']}" data-source="${rsSourceAttr['research-shen-tian-caixing']}">${groupTian['财星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${caixingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-caixing" data-base="${groupDi['财星']}" data-source="${rsSourceAttr['research-shen-di-caixing']}">${groupDi['财星']}</span></div>
                                     <div class="shen-total-line ${caixingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${caixingColors.textLabel} text-sm">总数: <span id="research-shen-total-caixing">${groupCount['财星']}</span></span>
                                     </div>
@@ -11924,8 +12241,8 @@ function getAllTagCategories() {
                             <div id="research-shen-guansha" class="absolute text-center z-10">
                                 <div class="mobile-card ${guanshaColors.bg} border-2 ${guanshaColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${guanshaColors.text} text-sm">官杀<span class="${guanshaColors.text} ml-1">${shenWuXing['官杀']}</span></div>
-                                    <div class="shen-tian-line shen-count-row text-sm ${guanshaColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-guansha" data-base="${groupTian['官杀']}">${groupTian['官杀']}</span></div>
-                                    <div class="shen-di-line shen-count-row text-sm ${guanshaColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-guansha" data-base="${groupDi['官杀']}">${groupDi['官杀']}</span></div>
+                                    <div class="shen-tian-line shen-count-row text-sm ${guanshaColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-guansha" data-base="${groupTian['官杀']}" data-source="${rsSourceAttr['research-shen-tian-guansha']}">${groupTian['官杀']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${guanshaColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-guansha" data-base="${groupDi['官杀']}" data-source="${rsSourceAttr['research-shen-di-guansha']}">${groupDi['官杀']}</span></div>
                                     <div class="shen-total-line ${guanshaColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${guanshaColors.textLabel} text-sm">总数: <span id="research-shen-total-guansha">${groupCount['官杀']}</span></span>
                                     </div>
@@ -11934,8 +12251,8 @@ function getAllTagCategories() {
                             <div id="research-shen-yinxing" class="absolute text-center z-10">
                                 <div class="mobile-card ${yinxingColors.bg} border-2 ${yinxingColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
                                     <div class="font-bold ${yinxingColors.text} text-sm">印星<span class="${yinxingColors.text} ml-1">${shenWuXing['印星']}</span></div>
-                                    <div class="shen-tian-line shen-count-row text-sm ${yinxingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-yinxing" data-base="${groupTian['印星']}">${groupTian['印星']}</span></div>
-                                    <div class="shen-di-line shen-count-row text-sm ${yinxingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-yinxing" data-base="${groupDi['印星']}">${groupDi['印星']}</span></div>
+                                    <div class="shen-tian-line shen-count-row text-sm ${yinxingColors.text} mt-0.5"><span class="shen-label">天干:</span> <span id="research-shen-tian-yinxing" data-base="${groupTian['印星']}" data-source="${rsSourceAttr['research-shen-tian-yinxing']}">${groupTian['印星']}</span></div>
+                                    <div class="shen-di-line shen-count-row text-sm ${yinxingColors.text}"><span class="shen-label">地支:</span> <span id="research-shen-di-yinxing" data-base="${groupDi['印星']}" data-source="${rsSourceAttr['research-shen-di-yinxing']}">${groupDi['印星']}</span></div>
                                     <div class="shen-total-line ${yinxingColors.bgLabel} rounded px-1.5 py-0.5 mt-0.5">
                                         <span class="font-bold ${yinxingColors.textLabel} text-sm">总数: <span id="research-shen-total-yinxing">${groupCount['印星']}</span></span>
                                     </div>
@@ -12541,6 +12858,7 @@ function getAllTagCategories() {
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
                                 <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
                                 <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                                <button class="shen-settings-gear" onclick="openShenSettingsModal()" title="标识符设置">⚙</button>
                             </div>
                         </div>
                         <!-- 环形布局（五等分圆）- 使用与八字分析页面相同的ID -->
@@ -12713,6 +13031,34 @@ function getAllTagCategories() {
                         if (totalSpan) totalSpan.textContent = allGroupTian[chineseName] + allGroupDi[chineseName];
                     });
                     
+                    // 追踪各十神组的柱位来源
+                    (function() {
+                        var lnSrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+                        var lnSrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+                        var lnPillars = [
+                            {key:'nian', t:tianShenNian, d:diShenNian},
+                            {key:'yue', t:tianShenYue, d:diShenYue},
+                            {key:'ri', t:tianShenRi, d:diShenRi},
+                            {key:'shi', t:tianShenShi, d:diShenShi},
+                            {key:'dayun', t:currentDayunTianShen, d:currentDayunDiShen},
+                            {key:'liunian', t:liunianTianShenNew, d:liunianDiShenNew}
+                        ];
+                        lnPillars.forEach(function(p) {
+                            var g = getShenGroupName(p.t); if(g) lnSrcTian[g].push(p.key);
+                            var gd = getShenGroupName(p.d); if(gd) lnSrcDi[gd].push(p.key);
+                        });
+                        var lnNames = ['bijie','shishang','caixing','guansha','yinxing'];
+                        var lnCN = {bijie:'比劫',shishang:'食伤',caixing:'财星',guansha:'官杀',yinxing:'印星'};
+                        lnNames.forEach(function(n) {
+                            var cn = lnCN[n];
+                            var tSpan = document.getElementById('research-shen-tian-'+n+'-detail');
+                            var dSpan = document.getElementById('research-shen-di-'+n+'-detail');
+                            if (tSpan && lnSrcTian[cn].length > 0) tSpan.dataset.source = lnSrcTian[cn].join(',');
+                            if (dSpan && lnSrcDi[cn].length > 0) dSpan.dataset.source = lnSrcDi[cn].join(',');
+                        });
+                    })();
+                    renderShenSources();
+                    
                     // 大运/流年增量标记（以八字+大运为基准，标记流年增量）
                     var detailBaseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
                     var detailBaseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
@@ -12795,6 +13141,34 @@ function getAllTagCategories() {
             if (totalSpan) totalSpan.textContent = initGroupTian[chineseName] + initGroupDi[chineseName] + offset.tian + offset.di;
         });
         
+        // 追踪各十神组的柱位来源
+        (function() {
+            var dtSrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            var dtSrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            var dtPillars = [
+                {key:'nian', t:tianShenNian, d:diShenNian},
+                {key:'yue', t:tianShenYue, d:diShenYue},
+                {key:'ri', t:tianShenRi, d:diShenRi},
+                {key:'shi', t:tianShenShi, d:diShenShi}
+            ];
+            if (currentDaYun && dayunTianShen && dayunTianShen !== '-') dtPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
+            if (liunianData && tianShenLiunian && tianShenLiunian !== '-') dtPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
+            dtPillars.forEach(function(p) {
+                var g = getShenGroupName(p.t);
+                if(g) dtSrcTian[g].push(p.key);
+                var gd = getShenGroupName(p.d);
+                if(gd) dtSrcDi[gd].push(p.key);
+            });
+            var dtNames = ['bijie','shishang','caixing','guansha','yinxing'];
+            dtNames.forEach(function(name) {
+                var cn = ({bijie:'比劫',shishang:'食伤',caixing:'财星',guansha:'官杀',yinxing:'印星'})[name];
+                var tSpan = document.getElementById('research-shen-tian-' + name + '-detail');
+                var dSpan = document.getElementById('research-shen-di-' + name + '-detail');
+                if (tSpan && dtSrcTian[cn].length > 0) tSpan.dataset.source = dtSrcTian[cn].join(',');
+                if (dSpan && dtSrcDi[cn].length > 0) dSpan.dataset.source = dtSrcDi[cn].join(',');
+            });
+        })();
+        
         // 初始状态的大运/流年增量标记
         (function() {
             var dtBaseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
@@ -12832,6 +13206,7 @@ function getAllTagCategories() {
         setTimeout(() => positionResearchShenCards('research-shen-container-detail'), 300);
         // 初始化十神卡片显示模式类
         setTimeout(() => initShenLineClasses(modal), 350);
+        setTimeout(() => renderShenSources(), 400);
         window.removeEventListener('resize', positionResearchShenCards);
         window.addEventListener('resize', () => positionResearchShenCards('research-shen-container-detail'));
         modal.querySelector('.close-modal').addEventListener('click', () => {
@@ -12956,6 +13331,33 @@ function getAllTagCategories() {
                         }
                         if (totalSpan) totalSpan.textContent = curGroupTian[chineseName] + curGroupDi[chineseName] + offset.tian + offset.di;
                     });
+                    
+                    // 追踪各十神组的柱位来源
+                    (function() {
+                        var dySrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+                        var dySrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+                        var dyPillars = [
+                            {key:'nian', t:tianShenNian, d:diShenNian},
+                            {key:'yue', t:tianShenYue, d:diShenYue},
+                            {key:'ri', t:tianShenRi, d:diShenRi},
+                            {key:'shi', t:tianShenShi, d:diShenShi},
+                            {key:'dayun', t:dayunTianShenNew, d:dayunDiShenNew}
+                        ];
+                        dyPillars.forEach(function(p) {
+                            var g = getShenGroupName(p.t); if(g) dySrcTian[g].push(p.key);
+                            var gd = getShenGroupName(p.d); if(gd) dySrcDi[gd].push(p.key);
+                        });
+                        var dyNames = ['bijie','shishang','caixing','guansha','yinxing'];
+                        var dyCN = {bijie:'比劫',shishang:'食伤',caixing:'财星',guansha:'官杀',yinxing:'印星'};
+                        dyNames.forEach(function(n) {
+                            var cn = dyCN[n];
+                            var tSpan = document.getElementById('research-shen-tian-'+n);
+                            var dSpan = document.getElementById('research-shen-di-'+n);
+                            if (tSpan && dySrcTian[cn].length > 0) tSpan.dataset.source = dySrcTian[cn].join(',');
+                            if (dSpan && dySrcDi[cn].length > 0) dSpan.dataset.source = dySrcDi[cn].join(',');
+                        });
+                    })();
+                    renderShenSources();
                     
                     // 大运增量标记（以八字为基准，标记大运增量）
                     var detailDayunBaseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
@@ -13465,6 +13867,7 @@ function getAllTagCategories() {
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
                                 <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
                                 <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                                <button class="shen-settings-gear" onclick="openShenSettingsModal()" title="标识符设置">⚙</button>
                             </div>
                         </div>
                         <div id="research-shen-container-compare" class="relative w-full max-w-3xl mx-auto" style="height: 320px;">
@@ -13614,10 +14017,39 @@ function getAllTagCategories() {
                     dSpanCompare.textContent = allGroupDi[cn] + offset.di;
                 }
                 if (tTotalCompare) tTotalCompare.textContent = allGroupTian[cn] + allGroupDi[cn] + offset.tian + offset.di;
+        });
+        
+        // 追踪各十神组的柱位来源
+        (function() {
+            var cSrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            var cSrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
+            var cPillars = [
+                {key:'nian', t:tianShenNian, d:diShenNian},
+                {key:'yue', t:tianShenYue, d:diShenYue},
+                {key:'ri', t:tianShenRi, d:diShenRi},
+                {key:'shi', t:tianShenShi, d:diShenShi}
+            ];
+            if (dayunData) cPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
+            if (compareHasLiunian) cPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
+            cPillars.forEach(function(p) {
+                var g = getShenGroupName(p.t); if(g) cSrcTian[g].push(p.key);
+                var gd = getShenGroupName(p.d); if(gd) cSrcDi[gd].push(p.key);
             });
-            
-            // 大运/流年增量标记
-            clearShenMarkers();
+            var cNames = ['bijie','shishang','caixing','guansha','yinxing'];
+            cNames.forEach(function(name) {
+                var cn = ({bijie:'比劫',shishang:'食伤',caixing:'财星',guansha:'官杀',yinxing:'印星'})[name];
+                ['','-compare'].forEach(function(suf) {
+                    var tSpan = document.getElementById('research-shen-tian-' + name + suf);
+                    var dSpan = document.getElementById('research-shen-di-' + name + suf);
+                    if (tSpan && cSrcTian[cn].length > 0) tSpan.dataset.source = cSrcTian[cn].join(',');
+                    if (dSpan && cSrcDi[cn].length > 0) dSpan.dataset.source = cSrcDi[cn].join(',');
+                });
+            });
+        })();
+        renderShenSources();
+        
+        // 大运/流年增量标记
+        clearShenMarkers();
             if (compareHasDayun) {
                 updateShenMarkers(baseGroupTian, baseGroupDi, dayunGroupTian, dayunGroupDi, 'dayun');
             }
