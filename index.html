@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -363,8 +363,6 @@
         /* 手机端十神卡片适配 */
         @media (max-width: 767px) {
             .mobile-card {
-                width: 64px !important;
-                height: 64px !important;
                 padding: 2px !important;
                 font-size: 9px !important;
                 line-height: 1.1 !important;
@@ -415,27 +413,67 @@
         
         /* 研究弹窗响应式 */
         @media (max-width: 767px) {
+            /* 移动端隐藏所有十神关系图的连线（SVG箭头） */
+            #shen-arrows,
+            #view-shen-arrows,
+            #research-shen-arrows,
+            #research-shen-arrows-detail,
+            #research-shen-arrows-compare {
+                display: none !important;
+            }
+            
             #research-shen-container {
-                height: 320px !important;
+                height: 380px !important;
+            }
+            
+            #research-shen-container-compare {
+                height: 380px !important;
             }
             
             /* 八字分析页面十神关系图移动端适配 */
             #shen-container {
-                height: 350px !important;
+                height: 380px !important;
+            }
+            
+            /* 案例详情页十神关系图 */
+            #view-shen-container {
+                height: 420px !important;
             }
             
             /* 移动端十神卡片样式 */
             .mobile-card {
-                font-size: 10px !important;
-                padding: 4px !important;
+                font-size: 11px !important;
+                padding: 10px 6px !important;
             }
             
-            .mobile-card .text-lg {
-                font-size: 14px !important;
+            .mobile-card .font-bold.text-sm {
+                font-size: 12px !important;
             }
             
-            .mobile-card .text-xs {
-                font-size: 8px !important;
+            /* 天干地支行强制一行显示不换行 */
+            .mobile-card .shen-tian-line,
+            .mobile-card .shen-di-line {
+                white-space: nowrap !important;
+                font-size: 11px !important;
+            }
+            
+            /* 源角标和增量标记不换行 */
+            .mobile-card .shen-source-symbols,
+            .mobile-card .shen-marker-dayun,
+            .mobile-card .shen-marker-liunian {
+                white-space: nowrap !important;
+            }
+            
+            /* 天干和地支行之间增加间距 */
+            .mobile-card .shen-di-line {
+                margin-top: 2px !important;
+            }
+            
+            /* 总数行 */
+            .mobile-card .shen-total-line {
+                font-size: 11px !important;
+                padding: 2px 8px !important;
+                margin-top: 3px !important;
             }
             
             /* 移动端大运和流年列表样式 */
@@ -1060,7 +1098,7 @@
                         // 响应式适配
                         var isMobile = window.innerWidth < 768;
                         var radius = Math.min(containerWidth, containerHeight) * (isMobile ? 0.30 : 0.35);
-                        var cardWidth = isMobile ? 64 : 96; // w-24 = 96px, 移动端使用64px
+                        var cardWidth = isMobile ? 100 : 96; // w-24 = 96px, 移动端使用100px
                         var cardHalf = cardWidth / 2;
                         
                         var shenIds = ['shen-bijie', 'shen-shishang', 'shen-caixing', 'shen-guansha', 'shen-yinxing'];
@@ -5248,7 +5286,7 @@
         // 响应式适配（与其他页面保持一致）
         var isMobile = window.innerWidth < 768;
         var radius = Math.min(containerWidth, containerHeight) * (isMobile ? 0.30 : 0.35);
-        var cardWidth = isMobile ? 64 : 96; // w-24 = 96px, 移动端使用64px
+        var cardWidth = isMobile ? 100 : 96; // w-24 = 96px, 移动端使用100px
         var cardHalf = cardWidth / 2;
         
         var shenIds = ['view-shen-bijie', 'view-shen-shishang', 'view-shen-caixing', 'view-shen-guansha', 'view-shen-yinxing'];
@@ -5590,7 +5628,7 @@
         
         var isMobile = window.innerWidth < 768;
         var radius = Math.min(containerWidth, containerHeight) * (isMobile ? 0.30 : 0.35);
-        var cardSize = isMobile ? 64 : 96;
+        var cardSize = isMobile ? 100 : 96;
         var cardHalf = cardSize / 2;
         
         var shenIds = [containerId.replace('-container', '-bijie'), 
