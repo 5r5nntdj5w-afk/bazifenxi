@@ -3173,8 +3173,8 @@
                         var sourceAttr = span.dataset.source;
                         if (!sourceAttr) return;
                         var pillars = sourceAttr.split(',');
-                        // 过滤掉空字符串
-                        pillars = pillars.filter(function(p) { return p.length > 0; });
+                        // 过滤掉空字符串，且只显示年/月/日/时的来源角标（大运/流年由增量标记系统负责显示，避免符号重复）
+                        pillars = pillars.filter(function(p) { return p === 'nian' || p === 'yue' || p === 'ri' || p === 'shi'; });
                         if (pillars.length === 0) return;
                         var symbols = '';
                         pillars.forEach(function(p) { symbols += settings[p] || p; });
@@ -3182,7 +3182,8 @@
                             var sourceEl = document.createElement('span');
                             sourceEl.className = 'shen-source-symbols';
                             sourceEl.textContent = symbols;
-                            parent.appendChild(sourceEl);
+                            // 插入到span后面（紧挨数字），确保在增量标记之前显示
+                            parent.insertBefore(sourceEl, span.nextSibling);
                         }
                     });
                 });
@@ -3438,7 +3439,13 @@
                         var marker = document.createElement('span');
                         marker.className = markerCls + ' ml-0.5 text-xs font-bold';
                         marker.textContent = markerTxt;
-                        parent.insertBefore(marker, span.nextSibling);
+                        // 插入到source symbols后面，确保顺序为 [数字] [年月日时] [增量标记]
+                        var refNode = parent.querySelector('.shen-source-symbols');
+                        if (refNode && refNode.nextSibling) {
+                            parent.insertBefore(marker, refNode.nextSibling);
+                        } else {
+                            parent.insertBefore(marker, span.nextSibling);
+                        }
                     });
                 });
             });
