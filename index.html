@@ -3158,25 +3158,31 @@
         var groups = ['bijie','shishang','caixing','guansha','yinxing'];
         var prefixes = ['','research-','view-'];
         var suffixes = ['','-detail','-compare'];
-        var pillarMap = {nian:'nian',yue:'yue',ri:'ri',shi:'shi',dayun:'dayun',liunian:'liunian'};
         prefixes.forEach(function(pre) {
             suffixes.forEach(function(suf) {
                 groups.forEach(function(name) {
                     ['tian','di'].forEach(function(type) {
                         var span = document.getElementById(pre+'shen-'+type+'-'+name+suf);
                         if (!span) return;
-                        var nextEl = span.nextElementSibling;
-                        if (nextEl && nextEl.classList.contains('shen-source-symbols')) nextEl.remove();
+                        // 清除父元素内所有旧的来源符号（解决重复堆积问题）
+                        var parent = span.parentNode;
+                        parent.querySelectorAll('.shen-source-symbols').forEach(function(el) { el.remove(); });
+                        // 数量为零时跳过（解决遗留空数据问题）
+                        var count = parseInt(span.textContent) || 0;
+                        if (count <= 0) return;
                         var sourceAttr = span.dataset.source;
                         if (!sourceAttr) return;
                         var pillars = sourceAttr.split(',');
+                        // 过滤掉空字符串
+                        pillars = pillars.filter(function(p) { return p.length > 0; });
+                        if (pillars.length === 0) return;
                         var symbols = '';
                         pillars.forEach(function(p) { symbols += settings[p] || p; });
                         if (symbols) {
                             var sourceEl = document.createElement('span');
                             sourceEl.className = 'shen-source-symbols';
                             sourceEl.textContent = symbols;
-                            span.parentNode.insertBefore(sourceEl, span.nextSibling);
+                            parent.appendChild(sourceEl);
                         }
                     });
                 });
