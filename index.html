@@ -14124,7 +14124,7 @@ function getAllTagCategories() {
                 {key:'ri', t:tianShenRi, d:diShenRi},
                 {key:'shi', t:tianShenShi, d:diShenShi}
             ];
-            if (dayunData) cPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
+            if (currentDaYun) cPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
             if (compareHasLiunian) cPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
             cPillars.forEach(function(p) {
                 var g = getShenGroupName(p.t); if(g) cSrcTian[g].push(p.key);
