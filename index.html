@@ -3150,6 +3150,8 @@
         localStorage.setItem('shenSourceSettings', JSON.stringify(settings));
         Object.assign(window.shenSourceSettings, settings);
         renderShenSources();
+        // 重新渲染增量标记（刷新页面函数的标记会同步使用新设置）
+        try { if (typeof calcAll === 'function') calcAll(); } catch(e) {}
     }
     function renderShenSources() {
         var settings = window.shenSourceSettings || getShenSourceSettings();
@@ -3411,7 +3413,8 @@
     
     window.updateShenMarkers = function(baseGt, baseGd, curGt, curGd, markerType) {
         var markerCls = markerType === 'dayun' ? 'shen-marker-dayun' : 'shen-marker-liunian';
-        var markerTxt = markerType === 'dayun' ? '●' : '■';
+        var settings = window.shenSourceSettings || getShenSourceSettings();
+        var markerTxt = markerType === 'dayun' ? (settings.dayun || '●') : (settings.liunian || '■');
         var engNames = {比劫:'bijie', 食伤:'shishang', 财星:'caixing', 官杀:'guansha', 印星:'yinxing'};
         var prefixes = ['', 'research-', 'view-'];
         var suffixes = ['', '-detail', '-compare'];
@@ -5453,8 +5456,8 @@
         (function() {
             var viewSrcTian = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
             var viewSrcDi = {比劫:[], 食伤:[], 财星:[], 官杀:[], 印星:[]};
-            for (var vi = 0; vi < tianShenList.length; vi++) {
-                var pillarKey = vi < 4 ? ['nian','yue','ri','shi'][vi] : (vi === 4 ? 'dayun' : 'liunian');
+            for (var vi = 0; vi < 4; vi++) {
+                var pillarKey = ['nian','yue','ri','shi'][vi];
                 if (tianShenList[vi]) {
                     var g = getShenGroupName(tianShenList[vi]);
                     if (g) viewSrcTian[g].push(pillarKey);
@@ -6492,24 +6495,7 @@
                     if (g) srcDi[g].push(k);
                 }
             });
-            if (data.dayun && data.dayun.t) {
-                var g = getShenGroupName(getExactShen(data.dayun.t, data.ri.t));
-                if (g) srcTian[g].push('dayun');
-            }
-            if (data.dayun && data.dayun.d) {
-                var g = getShenGroupName(getDiShen(data.dayun.d, data.ri.t));
-                if (g) srcDi[g].push('dayun');
-            }
-            if (data.liunian && data.liunian.t) {
-                var g = getShenGroupName(getExactShen(data.liunian.t, data.ri.t));
-                if (g) srcTian[g].push('liunian');
-            }
-            if (data.liunian && data.liunian.d) {
-                var g = getShenGroupName(getDiShen(data.liunian.d, data.ri.t));
-                if (g) srcDi[g].push('liunian');
-            }
-            shenGroups.forEach(function(idx) {
-                var name = shenGroups[idx];
+            shenGroups.forEach(function(name, idx) {
                 var cn = chineseGroups[idx];
                 var tSpan = document.getElementById('shen-tian-' + name);
                 var dSpan = document.getElementById('shen-di-' + name);
@@ -11943,8 +11929,6 @@ function getAllTagCategories() {
             {key:'ri', t:tianShenRi, d:diShenRi},
             {key:'shi', t:tianShenShi, d:diShenShi}
         ];
-        if (currentDaYun && dayunTianShen && dayunTianShen !== '-') rsPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
-        if (!isDayun && tianShenLiunian && tianShenLiunian !== '-') rsPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
         rsPillars.forEach(function(p) {
             var g = getShenGroupName(p.t); if(g) rsSrcTian[g].push(p.key);
             var gd = getShenGroupName(p.d); if(gd) rsSrcDi[gd].push(p.key);
@@ -13151,8 +13135,6 @@ function getAllTagCategories() {
                 {key:'ri', t:tianShenRi, d:diShenRi},
                 {key:'shi', t:tianShenShi, d:diShenShi}
             ];
-            if (currentDaYun && dayunTianShen && dayunTianShen !== '-') dtPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
-            if (liunianData && tianShenLiunian && tianShenLiunian !== '-') dtPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
             dtPillars.forEach(function(p) {
                 var g = getShenGroupName(p.t);
                 if(g) dtSrcTian[g].push(p.key);
@@ -14029,8 +14011,6 @@ function getAllTagCategories() {
                 {key:'ri', t:tianShenRi, d:diShenRi},
                 {key:'shi', t:tianShenShi, d:diShenShi}
             ];
-            if (dayunData) cPillars.push({key:'dayun', t:dayunTianShen, d:dayunDiShen});
-            if (compareHasLiunian) cPillars.push({key:'liunian', t:tianShenLiunian, d:diShenLiunian});
             cPillars.forEach(function(p) {
                 var g = getShenGroupName(p.t); if(g) cSrcTian[g].push(p.key);
                 var gd = getShenGroupName(p.d); if(gd) cSrcDi[gd].push(p.key);
