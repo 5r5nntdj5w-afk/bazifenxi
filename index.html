@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lunar-javascript/1.2.35/lunar.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.local.js"></script>
     <style>
         .nav-btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.2s ease; margin: 0 6px; }
         .nav-btn-default { background: #f3f3f3; color: #333333; }
@@ -8677,10 +8678,12 @@
 
     // ==================== Supabase 云存储 ====================
     // 使用环境变量或默认值（用于 GitHub Pages 部署）
+    // 本地开发时优先使用 config.local.js 中的配置（不会提交到仓库）
+    const LOCAL_CFG = window.__LOCAL_CONFIG || {};
     const FALLBACK_CONFIG = {
-        supabase_url: '%SUPABASE_URL%',
-        supabase_key: '%SUPABASE_KEY%',
-        admin_email: '%ADMIN_EMAIL%'
+        supabase_url: LOCAL_CFG.supabase_url || '%SUPABASE_URL%',
+        supabase_key: LOCAL_CFG.supabase_key || '%SUPABASE_KEY%',
+        admin_email: LOCAL_CFG.admin_email || '%ADMIN_EMAIL%'
     };
     
     // 动态配置变量（从数据库获取）
