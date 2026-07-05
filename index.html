@@ -886,6 +886,7 @@
                     </svg>
                     
                     <!-- 显示切换按钮 -->
+                    <div class="h-8"></div>
                     <div class="flex justify-center mb-2">
                         <div class="shen-toggle-group">
                             <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
@@ -2500,6 +2501,7 @@
                         </svg>
                         
                         <!-- 显示切换按钮 -->
+                        <div class="h-8"></div>
                         <div class="flex justify-center mb-2">
                             <div class="shen-toggle-group">
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
@@ -3120,13 +3122,16 @@
     
     window.initShenLineClasses = function(container) {
         var scope = container || document;
-        scope.querySelectorAll('[id*="shen-tian-"]').forEach(function(span) {
-            var div = span.closest('div') || span.parentElement;
-            if (div && !div.classList.contains('shen-tian-line')) div.classList.add('shen-tian-line');
-        });
-        scope.querySelectorAll('[id*="shen-di-"]').forEach(function(span) {
-            var div = span.closest('div') || span.parentElement;
-            if (div && !div.classList.contains('shen-di-line')) div.classList.add('shen-di-line');
+        var shenNames = ['bijie', 'shishang', 'caixing', 'guansha', 'yinxing'];
+        ['tian', 'di'].forEach(function(type) {
+            shenNames.forEach(function(name) {
+                scope.querySelectorAll('[id*="shen-' + type + '-' + name + '"]').forEach(function(span) {
+                    var div = span.closest('div') || span.parentElement;
+                    if (div && !div.classList.contains('shen-' + type + '-line')) {
+                        div.classList.add('shen-' + type + '-line');
+                    }
+                });
+            });
         });
     };
     
@@ -5173,6 +5178,42 @@
             if (totalSpan) totalSpan.textContent = groupTian[cn] + groupDi[cn];
         });
         
+        // ===== 大运/流年增量标记 =====
+        var baseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+        var baseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+        var dayunTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+        var dayunDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+        var allTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+        var allDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+        // 统计八字（前4项）
+        for (var vi = 0; vi < 4; vi++) {
+            var g = getShenGroupName(tianShenList[vi]);
+            if (g) { baseTian[g]++; dayunTian[g]++; allTian[g]++; }
+            var gd = getShenGroupName(diShenList[vi]);
+            if (gd) { baseDi[gd]++; dayunDi[gd]++; allDi[gd]++; }
+        }
+        var hasDayun = dayunData && dayunData.dayunGanShen;
+        var hasLiunian = liunianData && liunianData.liunianGanShen;
+        if (hasDayun) {
+            var gd = getShenGroupName(tianShenList[4]);
+            if (gd) { dayunTian[gd]++; allTian[gd]++; }
+            var gdd = getShenGroupName(diShenList[4]);
+            if (gdd) { dayunDi[gdd]++; allDi[gdd]++; }
+        }
+        if (hasLiunian) {
+            var idx = hasDayun ? 5 : 4;
+            var gl = getShenGroupName(tianShenList[idx]);
+            if (gl) allTian[gl]++;
+            var gld = getShenGroupName(diShenList[idx]);
+            if (gld) allDi[gld]++;
+        }
+        clearShenMarkers();
+        if (hasLiunian) {
+            updateShenMarkers(dayunTian, dayunDi, allTian, allDi, 'liunian');
+        } else if (hasDayun) {
+            updateShenMarkers(baseTian, baseDi, dayunTian, dayunDi, 'dayun');
+        }
+        
         // 定位十神卡片
         setTimeout(positionViewShenCards, 50);
     }
@@ -6069,6 +6110,66 @@
             }
             if (totalSpan) totalSpan.textContent = groupCount[cn];
         });
+        
+        // 更新十神增量标记（八字分析主页面）
+        (function() {
+            var baseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var baseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var dayunTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var dayunDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var allTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var allDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var baziKeys = ['nian', 'yue', 'ri', 'shi'];
+            var hasDayun = data.dayun && data.dayun.t;
+            var hasLiunian = data.liunian && data.liunian.t;
+            // 统计八字
+            baziKeys.forEach(function(k) {
+                var item = data[k];
+                if (item && item.t) {
+                    var g = getShenGroupName(getExactShen(item.t, data.ri.t));
+                    if (g) { baseTian[g]++; dayunTian[g]++; allTian[g]++; }
+                }
+                if (item && item.d) {
+                    var g = getShenGroupName(getDiShen(item.d, data.ri.t));
+                    if (g) { baseDi[g]++; dayunDi[g]++; allDi[g]++; }
+                }
+            });
+            // 统计大运
+            if (hasDayun) {
+                baziKeys.forEach(function(k) {
+                    var item = data[k];
+                    if (item && item.t) {
+                        var g = getShenGroupName(getExactShen(item.t, data.ri.t));
+                        if (g) { baseTian[g] = baseTian[g]; }
+                    }
+                });
+                if (data.dayun.t) {
+                    var g = getShenGroupName(getExactShen(data.dayun.t, data.ri.t));
+                    if (g) { dayunTian[g]++; allTian[g]++; }
+                }
+                if (data.dayun.d) {
+                    var g = getShenGroupName(getDiShen(data.dayun.d, data.ri.t));
+                    if (g) { dayunDi[g]++; allDi[g]++; }
+                }
+            }
+            // 统计流年
+            if (hasLiunian) {
+                if (data.liunian.t) {
+                    var g = getShenGroupName(getExactShen(data.liunian.t, data.ri.t));
+                    if (g) allTian[g]++;
+                }
+                if (data.liunian.d) {
+                    var g = getShenGroupName(getDiShen(data.liunian.d, data.ri.t));
+                    if (g) allDi[g]++;
+                }
+            }
+            clearShenMarkers();
+            if (hasLiunian) {
+                updateShenMarkers(dayunTian, dayunDi, allTian, allDi, 'liunian');
+            } else if (hasDayun) {
+                updateShenMarkers(baseTian, baseDi, dayunTian, dayunDi, 'dayun');
+            }
+        })();
         
         // 获取十神所属的组名
         function getShenGroupName(shen) {
@@ -11684,6 +11785,7 @@ function getAllTagCategories() {
                         </div>
                         <svg id="research-shen-arrows" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
                         <!-- 显示切换按钮 -->
+                        <div class="h-8"></div>
                         <div class="flex justify-center mb-2">
                             <div class="shen-toggle-group">
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
@@ -12336,6 +12438,7 @@ function getAllTagCategories() {
                         </svg>
                         
                         <!-- 显示切换按钮 -->
+                        <div class="h-8"></div>
                         <div class="flex justify-center mb-2">
                             <div class="shen-toggle-group">
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
@@ -12513,6 +12616,18 @@ function getAllTagCategories() {
                         if (totalSpan) totalSpan.textContent = allGroupTian[chineseName] + allGroupDi[chineseName];
                     });
                     
+                    // 大运/流年增量标记（以八字+大运为基准，标记流年增量）
+                    var detailBaseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    var detailBaseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    [tianShenNian, tianShenYue, tianShenRi, tianShenShi, currentDayunTianShen].forEach(function(s) {
+                        var g = getShenGroupName(s); if(g) detailBaseTian[g]++;
+                    });
+                    [diShenNian, diShenYue, diShenRi, diShenShi, currentDayunDiShen].forEach(function(s) {
+                        var g = getShenGroupName(s); if(g) detailBaseDi[g]++;
+                    });
+                    clearShenMarkers('liunian');
+                    updateShenMarkers(detailBaseTian, detailBaseDi, allGroupTian, allGroupDi, 'liunian');
+                    
                     // 重新定位十神卡片
                     setTimeout(() => positionResearchShenCards('research-shen-container-detail'), 50);
                 });
@@ -12583,12 +12698,42 @@ function getAllTagCategories() {
             if (totalSpan) totalSpan.textContent = initGroupTian[chineseName] + initGroupDi[chineseName] + offset.tian + offset.di;
         });
         
+        // 初始状态的大运/流年增量标记
+        (function() {
+            var dtBaseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var dtBaseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var dtDayunTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            var dtDayunDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            [tianShenNian, tianShenYue, tianShenRi, tianShenShi].forEach(function(s) {
+                var g = getShenGroupName(s);
+                if(g) { dtBaseTian[g]++; dtDayunTian[g]++; }
+            });
+            [diShenNian, diShenYue, diShenRi, diShenShi].forEach(function(s) {
+                var g = getShenGroupName(s);
+                if(g) { dtBaseDi[g]++; dtDayunDi[g]++; }
+            });
+            var dtHasDayun = currentDaYun && dayunTianShen && dayunDiShen && dayunTianShen !== '-' && dayunDiShen !== '-';
+            var dtHasLiunian = liunianData && tianShenLiunian && diShenLiunian && tianShenLiunian !== '-' && diShenLiunian !== '-';
+            if (dtHasDayun) {
+                var g1 = getShenGroupName(dayunTianShen); if(g1) dtDayunTian[g1]++;
+                var g2 = getShenGroupName(dayunDiShen); if(g2) dtDayunDi[g2]++;
+            }
+            clearShenMarkers();
+            if (dtHasLiunian) {
+                updateShenMarkers(dtDayunTian, dtDayunDi, initGroupTian, initGroupDi, 'liunian');
+            } else if (dtHasDayun) {
+                updateShenMarkers(dtBaseTian, dtBaseDi, dtDayunTian, dtDayunDi, 'dayun');
+            }
+        })();
+        
         // 详情弹窗数量调节面板已渲染，绑定重置按钮事件
         initStatsAdjust();
         updateAllShenCardNumbers();
         
         // 定位十神卡片
         setTimeout(() => positionResearchShenCards('research-shen-container-detail'), 300);
+        // 初始化十神卡片显示模式类
+        setTimeout(() => initShenLineClasses(modal), 350);
         window.removeEventListener('resize', positionResearchShenCards);
         window.addEventListener('resize', () => positionResearchShenCards('research-shen-container-detail'));
         modal.querySelector('.close-modal').addEventListener('click', () => {
@@ -12713,6 +12858,18 @@ function getAllTagCategories() {
                         }
                         if (totalSpan) totalSpan.textContent = curGroupTian[chineseName] + curGroupDi[chineseName] + offset.tian + offset.di;
                     });
+                    
+                    // 大运增量标记（以八字为基准，标记大运增量）
+                    var detailDayunBaseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    var detailDayunBaseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    [tianShenNian, tianShenYue, tianShenRi, tianShenShi].forEach(function(s) {
+                        var g = getShenGroupName(s); if(g) detailDayunBaseTian[g]++;
+                    });
+                    [diShenNian, diShenYue, diShenRi, diShenShi].forEach(function(s) {
+                        var g = getShenGroupName(s); if(g) detailDayunBaseDi[g]++;
+                    });
+                    clearShenMarkers('dayun');
+                    updateShenMarkers(detailDayunBaseTian, detailDayunBaseDi, curGroupTian, curGroupDi, 'dayun');
                     
                     // 重新定位十神卡片
                     setTimeout(positionResearchShenCards, 50);
@@ -13204,6 +13361,7 @@ function getAllTagCategories() {
                         </div>
                         <svg id="research-shen-arrows-compare" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
                         <!-- 显示切换按钮 -->
+                        <div class="h-8"></div>
                         <div class="flex justify-center mb-2">
                             <div class="shen-toggle-group">
                                 <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
@@ -13299,22 +13457,30 @@ function getAllTagCategories() {
         function updateShenCounts() {
             const allGroupTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
             const allGroupDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            // 用于增量标记的基准统计
+            const baseGroupTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            const baseGroupDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            const dayunGroupTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+            const dayunGroupDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
             
+            // 八字四柱（base + dayun + all）
             [tianShenNian, tianShenYue, tianShenRi, tianShenShi].forEach(shen => {
                 const group = getShenGroupName(shen);
-                if(group) allGroupTian[group]++;
+                if(group) { baseGroupTian[group]++; dayunGroupTian[group]++; allGroupTian[group]++; }
             });
             [diShenNian, diShenYue, diShenRi, diShenShi].forEach(shen => {
                 const group = getShenGroupName(shen);
-                if(group) allGroupDi[group]++;
+                if(group) { baseGroupDi[group]++; dayunGroupDi[group]++; allGroupDi[group]++; }
             });
-            if (currentDaYun && dayunTianShen && dayunDiShen && dayunTianShen !== '-') {
+            var compareHasDayun = currentDaYun && dayunTianShen && dayunDiShen && dayunTianShen !== '-';
+            var compareHasLiunian = liunianData && tianShenLiunian && diShenLiunian && tianShenLiunian !== '-';
+            if (compareHasDayun) {
                 const g1 = getShenGroupName(dayunTianShen);
                 const g2 = getShenGroupName(dayunDiShen);
-                if(g1) allGroupTian[g1]++;
-                if(g2) allGroupDi[g2]++;
+                if(g1) { dayunGroupTian[g1]++; allGroupTian[g1]++; }
+                if(g2) { dayunGroupDi[g2]++; allGroupDi[g2]++; }
             }
-            if (liunianData && tianShenLiunian && diShenLiunian && tianShenLiunian !== '-') {
+            if (compareHasLiunian) {
                 const g1 = getShenGroupName(tianShenLiunian);
                 const g2 = getShenGroupName(diShenLiunian);
                 if(g1) allGroupTian[g1]++;
@@ -13351,6 +13517,14 @@ function getAllTagCategories() {
                 }
                 if (tTotalCompare) tTotalCompare.textContent = allGroupTian[cn] + allGroupDi[cn] + offset.tian + offset.di;
             });
+            
+            // 大运/流年增量标记
+            clearShenMarkers();
+            if (compareHasLiunian) {
+                updateShenMarkers(dayunGroupTian, dayunGroupDi, allGroupTian, allGroupDi, 'liunian');
+            } else if (compareHasDayun) {
+                updateShenMarkers(baseGroupTian, baseGroupDi, dayunGroupTian, dayunGroupDi, 'dayun');
+            }
         }
         
         function setupLiuNianHandlers() {
