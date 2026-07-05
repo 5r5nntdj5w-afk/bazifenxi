@@ -551,6 +551,44 @@
             scrollbar-width: thin;
             scrollbar-color: #d1d5db #f1f1f1;
         }
+        /* 十神显示模式切换按钮组 */
+        .shen-toggle-group {
+            display: inline-flex;
+            gap: 2px;
+        }
+        .shen-toggle-btn {
+            padding: 2px 10px;
+            font-size: 11px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: #fff;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            line-height: 1.5;
+        }
+        .shen-toggle-btn:hover {
+            background: #f3f4f6;
+        }
+        .shen-toggle-btn.shen-toggle-active {
+            background: #6366f1;
+            color: #fff;
+            border-color: #6366f1;
+        }
+        /* 大运增量标记 - 蓝色圆点 */
+        .shen-marker-dayun {
+            color: #3B82F6;
+            font-size: 11px;
+            vertical-align: super;
+            line-height: 1;
+        }
+        /* 流年增量标记 - 橙色方形 */
+        .shen-marker-liunian {
+            color: #F97316;
+            font-size: 11px;
+            vertical-align: super;
+            line-height: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-50 sm:max-w-6xl mx-auto p-2 sm:p-4">
@@ -847,6 +885,14 @@
                     <svg id="shen-arrows" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
                     </svg>
                     
+                    <!-- 显示切换按钮 -->
+                    <div class="flex justify-center mb-2">
+                        <div class="shen-toggle-group">
+                            <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
+                            <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
+                            <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                        </div>
+                    </div>
                     <!-- 环形布局（五等分圆） -->
                     <div id="shen-container" class="relative w-full max-w-3xl mx-auto" style="height: 320px;">
                         <!-- 比劫（顶部，0度）- 木属性 -->
@@ -934,6 +980,7 @@
                     // 页面加载后初始化观察器
                     window.addEventListener('load', function() {
                         setTimeout(initShenObserver, 200);
+                        setTimeout(initShenLineClasses, 200);
                     });
                     
                     function positionShenCards() {
@@ -2452,6 +2499,14 @@
                         <svg id="view-shen-arrows" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
                         </svg>
                         
+                        <!-- 显示切换按钮 -->
+                        <div class="flex justify-center mb-2">
+                            <div class="shen-toggle-group">
+                                <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
+                                <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
+                                <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                            </div>
+                        </div>
                         <!-- 环形布局（五等分圆） -->
                         <div id="view-shen-container" class="relative w-full mx-auto" style="height: 480px;">
                             <!-- 比劫（顶部，0度）- 木属性 -->
@@ -3045,6 +3100,71 @@
         // 更新数量调节卡片颜色
         updateAdjustCardColors();
     }
+    
+    // ============ 十神卡片显示切换 ============
+    window.currentShenDisplayMode = 'all';
+    window.applyShenDisplayMode = function(mode) {
+        window.currentShenDisplayMode = mode || 'all';
+        var showTian = mode === 'all' || mode === 'tian';
+        var showDi = mode === 'all' || mode === 'di';
+        document.querySelectorAll('.shen-tian-line').forEach(function(el) {
+            el.style.display = showTian ? '' : 'none';
+        });
+        document.querySelectorAll('.shen-di-line').forEach(function(el) {
+            el.style.display = showDi ? '' : 'none';
+        });
+        document.querySelectorAll('.shen-toggle-btn').forEach(function(btn) {
+            btn.classList.toggle('shen-toggle-active', btn.dataset.mode === mode);
+        });
+    };
+    
+    window.initShenLineClasses = function(container) {
+        var scope = container || document;
+        scope.querySelectorAll('[id*="shen-tian-"]').forEach(function(span) {
+            var div = span.closest('div') || span.parentElement;
+            if (div && !div.classList.contains('shen-tian-line')) div.classList.add('shen-tian-line');
+        });
+        scope.querySelectorAll('[id*="shen-di-"]').forEach(function(span) {
+            var div = span.closest('div') || span.parentElement;
+            if (div && !div.classList.contains('shen-di-line')) div.classList.add('shen-di-line');
+        });
+    };
+    
+    window.clearShenMarkers = function(type) {
+        var selector = type === 'dayun' ? '.shen-marker-dayun' : 
+                       type === 'liunian' ? '.shen-marker-liunian' : 
+                       '.shen-marker-dayun, .shen-marker-liunian';
+        document.querySelectorAll(selector).forEach(function(el) {
+            el.remove();
+        });
+    };
+    
+    window.updateShenMarkers = function(baseGt, baseGd, curGt, curGd, markerType) {
+        var markerCls = markerType === 'dayun' ? 'shen-marker-dayun' : 'shen-marker-liunian';
+        var markerTxt = markerType === 'dayun' ? '●' : '■';
+        var engNames = {比劫:'bijie', 食伤:'shishang', 财星:'caixing', 官杀:'guansha', 印星:'yinxing'};
+        var prefixes = ['', 'research-', 'view-'];
+        var suffixes = ['', '-detail', '-compare'];
+        ['比劫', '食伤', '财星', '官杀', '印星'].forEach(function(name) {
+            ['tian', 'di'].forEach(function(type) {
+                if ((type === 'tian' && curGt[name] <= baseGt[name]) || (type === 'di' && curGd[name] <= baseGd[name])) return;
+                prefixes.forEach(function(pre) {
+                    suffixes.forEach(function(suf) {
+                        var id = pre + 'shen-' + type + '-' + engNames[name] + suf;
+                        var span = document.getElementById(id);
+                        if (!span) return;
+                        var next = span.nextElementSibling;
+                        if (!next || !next.classList || !next.classList.contains(markerCls)) {
+                            var marker = document.createElement('span');
+                            marker.className = markerCls + ' ml-0.5 text-xs font-bold';
+                            marker.textContent = markerTxt;
+                            span.parentNode.insertBefore(marker, span.nextSibling);
+                        }
+                    });
+                });
+            });
+        });
+    };
     
     document.addEventListener('click', (e) => {
         // 处理折叠/展开按钮
@@ -10226,6 +10346,9 @@ function getAllTagCategories() {
                 }
             };
         }
+        
+        // 初始化十神卡片显示模式标记
+        setTimeout(function() { initShenLineClasses(caseList); }, 50);
     }
     
     // 处理页面大小变化
@@ -10873,6 +10996,20 @@ function getAllTagCategories() {
                     if (totalSpan) totalSpan.textContent = curGroupTian[chineseName] + curGroupDi[chineseName];
                 });
                 
+                // 计算基准（仅八字：年月日时）
+                const baseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                const baseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                [tianShenNian, tianShenYue, tianShenRi, tianShenShi].forEach(shen => {
+                    const g = getShenGroupName(shen);
+                    if(g) baseTian[g]++;
+                });
+                [diShenNian, diShenYue, diShenRi, diShenShi].forEach(shen => {
+                    const g = getShenGroupName(shen);
+                    if(g) baseDi[g]++;
+                });
+                clearShenMarkers();
+                updateShenMarkers(baseTian, baseDi, curGroupTian, curGroupDi, 'dayun');
+                
                 setTimeout(positionResearchShenCards, 50);
             });
         });
@@ -11012,6 +11149,20 @@ function getAllTagCategories() {
                     if (diSpan) diSpan.textContent = allGroupDi[chineseName];
                     if (totalSpan) totalSpan.textContent = allGroupTian[chineseName] + allGroupDi[chineseName];
                 });
+                
+                // 计算基准（八字+大运），保留大运标记
+                const baseTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                const baseDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                [tianShenNian, tianShenYue, tianShenRi, tianShenShi, currentDayunTianShen].forEach(shen => {
+                    const g = getShenGroupName(shen);
+                    if(g) baseTian[g]++;
+                });
+                [diShenNian, diShenYue, diShenRi, diShenShi, currentDayunDiShen].forEach(shen => {
+                    const g = getShenGroupName(shen);
+                    if(g) baseDi[g]++;
+                });
+                clearShenMarkers('liunian');
+                updateShenMarkers(baseTian, baseDi, allGroupTian, allGroupDi, 'liunian');
                 
                 setTimeout(positionResearchShenCards, 50);
             });
@@ -11532,6 +11683,14 @@ function getAllTagCategories() {
                             </div>
                         </div>
                         <svg id="research-shen-arrows" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+                        <!-- 显示切换按钮 -->
+                        <div class="flex justify-center mb-2">
+                            <div class="shen-toggle-group">
+                                <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
+                                <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
+                                <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                            </div>
+                        </div>
                         <div id="research-shen-container" class="relative w-full max-w-3xl mx-auto" style="height: 320px;">
                             <div id="research-shen-bijie" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
@@ -12176,6 +12335,14 @@ function getAllTagCategories() {
                         <svg id="research-shen-arrows-detail" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
                         </svg>
                         
+                        <!-- 显示切换按钮 -->
+                        <div class="flex justify-center mb-2">
+                            <div class="shen-toggle-group">
+                                <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
+                                <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
+                                <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                            </div>
+                        </div>
                         <!-- 环形布局（五等分圆）- 使用与八字分析页面相同的ID -->
                         <div id="research-shen-container-detail" class="relative w-full max-w-3xl mx-auto" style="height: 550px;">
                             <!-- 比劫（顶部，0度） -->
@@ -13036,6 +13203,14 @@ function getAllTagCategories() {
                             </div>
                         </div>
                         <svg id="research-shen-arrows-compare" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+                        <!-- 显示切换按钮 -->
+                        <div class="flex justify-center mb-2">
+                            <div class="shen-toggle-group">
+                                <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
+                                <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
+                                <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
+                            </div>
+                        </div>
                         <div id="research-shen-container-compare" class="relative w-full max-w-3xl mx-auto" style="height: 320px;">
                             <div id="research-shen-bijie-compare" class="absolute text-center z-10">
                                 <div class="mobile-card ${bijieColors.bg} border-2 ${bijieColors.border} rounded-lg p-1.5 shadow-md w-24 h-24 flex flex-col justify-center items-center leading-tight">
@@ -13308,6 +13483,7 @@ function getAllTagCategories() {
         
         setTimeout(() => {
             positionResearchShenCards('research-shen-container-compare');
+            initShenLineClasses(container);
             initStatsAdjust();
             updateAllShenCardNumbers();
         }, 300);
