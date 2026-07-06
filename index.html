@@ -469,10 +469,6 @@
                 white-space: nowrap !important;
             }
             
-            /* 天干和地支行之间增加间距 */
-            .mobile-card .shen-di-line {
-                margin-top: 2px !important;
-            }
             
             /* 总数行 */
             .mobile-card .shen-total-line {
@@ -488,13 +484,15 @@
             .mobile-card .shen-count-row > span:not([class]) {
                 display: none !important;
             }
-            /* 天干和地支行之间添加分隔线，使用伪元素确保始终显示 */
-            .mobile-card .shen-di-line::before {
-                content: '';
-                display: block;
+            /* 天干和地支行间分隔线独立元素 */
+            .mobile-card .shen-tian-line,
+            .mobile-card .shen-di-line {
+                min-height: 18px !important;
+            }
+            .mobile-card .shen-line-sep {
                 border-top: 1px dashed #aaa;
-                margin-bottom: 3px;
-                padding-top: 2px;
+                margin: 2px 0;
+                width: 100%;
             }
             /* 加大角标和增量标记字号 */
             .mobile-card .shen-source-symbols {
@@ -1180,6 +1178,7 @@
                                 cardInner.style.height = cardWidth + 'px';
                                 if (isMobile) {
                                     cardInner.classList.add('mobile-card');
+                                    ensureShenCardSeparator(cardInner);
                                 } else {
                                     cardInner.classList.remove('mobile-card');
                                 }
@@ -1212,6 +1211,18 @@
                         drawKeArrow(svg, positions[3].x, positions[3].y, positions[0].x, positions[0].y, containerWidth, containerHeight); // 官杀→比劫
                         drawKeArrow(svg, positions[4].x, positions[4].y, positions[1].x, positions[1].y, containerWidth, containerHeight); // 印星→食伤
                     }
+                    
+                    // 在十神卡片的年日柱和地支行之间插入分隔线（移动端）
+                    window.ensureShenCardSeparator = function(cardDiv) {
+                        if (!cardDiv) return;
+                        var tianLine = cardDiv.querySelector('.shen-tian-line');
+                        if (!tianLine) return;
+                        var next = tianLine.nextElementSibling;
+                        if (next && next.classList.contains('shen-line-sep')) return;
+                        var sep = document.createElement('div');
+                        sep.className = 'shen-line-sep';
+                        tianLine.parentNode.insertBefore(sep, tianLine.nextSibling);
+                    };
                     
                     window.removeEventListener('resize', positionShenCards);
                     window.addEventListener('resize', positionShenCards);
@@ -5368,6 +5379,7 @@
                 cardInner.style.height = cardWidth + 'px';
                 if (isMobile) {
                     cardInner.classList.add('mobile-card');
+                    ensureShenCardSeparator(cardInner);
                 } else {
                     cardInner.classList.remove('mobile-card');
                 }
@@ -5711,6 +5723,7 @@
                 cardInner.style.height = cardSize + 'px';
                 if (isMobile) {
                     cardInner.classList.add('mobile-card');
+                    ensureShenCardSeparator(cardInner);
                 } else {
                     cardInner.classList.remove('mobile-card');
                 }
