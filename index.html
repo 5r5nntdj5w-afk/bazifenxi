@@ -777,6 +777,255 @@
             .rule-sort-row > div { justify-content: space-between; }
             .rule-btn-sm { font-size: 12px; padding: 6px 10px; }
         }
+/* ========== 自定义字段下拉框（搜索+折叠） ========== */
+.condition-field-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+.custom-field-trigger {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    min-height: 38px;
+    box-sizing: border-box;
+}
+.custom-field-trigger:hover {
+    border-color: #9ca3af;
+}
+.custom-field-trigger.active {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+.custom-field-text {
+    font-size: 1rem;
+    color: #9ca3af;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.custom-field-text.selected {
+    color: #374151;
+}
+.custom-field-arrow {
+    font-size: 0.875rem;
+    color: #9ca3af;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+.custom-field-arrow.open {
+    transform: rotate(180deg);
+}
+.custom-field-dropdown {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    max-height: 420px;
+    overflow: hidden;
+    flex-direction: column;
+}
+.custom-field-dropdown.show {
+    display: flex;
+}
+.custom-field-search-box {
+    padding: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+.custom-field-search-input {
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    font-size: 0.9375rem;
+    outline: none;
+    box-sizing: border-box;
+}
+.custom-field-search-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+.custom-field-options {
+    overflow-y: auto;
+    flex: 1;
+    padding: 0.25rem 0;
+}
+.custom-field-group-header {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #6b7280;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    border-bottom: 1px solid #f3f4f6;
+    background: #f9fafb;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.custom-field-group-header:hover {
+    background: #f3f4f6;
+}
+.custom-field-group-header .collapse-arrow {
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+}
+.custom-field-group-header .collapse-arrow.collapsed {
+    transform: rotate(-90deg);
+}
+.pin-star {
+    cursor: pointer;
+    font-size: 1.1rem;
+    margin-right: 0.25rem;
+    user-select: none;
+    flex-shrink: 0;
+    color: #d1d5db;
+    transition: color 0.2s, transform 0.15s;
+}
+.pin-star:hover {
+    color: #f59e0b;
+    transform: scale(1.2);
+}
+.pin-star.pinned {
+    color: #f59e0b;
+}
+.custom-field-group-options {
+    padding: 0;
+}
+.custom-field-group-options.collapsed {
+    display: none;
+}
+.custom-field-option {
+    padding: 0.5rem 0.75rem 0.5rem 1.25rem;
+    font-size: 0.9375rem;
+    color: #000;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background 0.15s;
+}
+.custom-field-option:hover {
+    background: #eff6ff;
+}
+.custom-field-option.highlighted {
+    background: #dbeafe;
+}
+.custom-field-option.selected {
+    background: #3b82f6;
+    color: #fff;
+}
+.custom-field-option.hidden-option {
+    display: none;
+}
+.custom-field-no-results {
+    padding: 1rem;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.8125rem;
+}
+/* ========== 案例库简洁视图 ========== */
+.case-simple-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.625rem 0.75rem;
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #92400e;
+    text-align: center;
+    transition: all 0.15s;
+    min-height: 44px;
+    word-break: break-all;
+}
+.case-simple-item:hover {
+    background: #fde68a;
+    border-color: #d97706;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.case-simple-item.active {
+    background: #f59e0b;
+    color: #fff;
+    border-color: #d97706;
+}
+/* ========== 案例库内联详情区 ========== */
+#case-detail-body {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: #000;
+    font-weight: 600;
+}
+#case-detail-body .bazi-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+#case-detail-body .bazi-table-wrap table {
+    min-width: 600px;
+    font-size: 1.125rem;
+}
+#case-detail-body .bazi-table-wrap table td,
+#case-detail-body .bazi-table-wrap table th {
+    padding: 0.5rem 0.75rem;
+}
+#case-detail-body .section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #92400e;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 2px solid #fde68a;
+}
+#case-detail-body .event-card {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+#case-detail-body .event-card .event-year {
+    font-weight: 700;
+    color: #92400e;
+    font-size: 1.125rem;
+}
+#case-detail-body .event-card .event-desc {
+    color: #000;
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-top: 0.25rem;
+    line-height: 1.6;
+}
+#case-detail-body .event-card .event-analysis {
+    color: #000;
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-top: 0.25rem;
+    padding-left: 0.75rem;
+    border-left: 3px solid #f59e0b;
+}
     </style>
 </head>
 <body class="bg-gray-50 sm:max-w-6xl mx-auto p-2 sm:p-4">
@@ -951,7 +1200,7 @@
                     </button>
                     <div id="adjust-panel" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
                         <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
-                            <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                            <div class="flex-1 flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll justify-center">
                                 <!-- 比劫 -->
                                 <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
                                     <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
@@ -1372,8 +1621,320 @@
                         <option value="and">并且</option>
                         <option value="or">或者</option>
                     </select>
-                    <select class="condition-field flex-1 p-2 border rounded">
+                    <div class="condition-field-wrapper">
+                        <select class="condition-field" style="display:none">
                         <option value="">选择字段</option>
+
+                        <optgroup label="【原局精确匹配】原局五行数量判断">
+                        <option value="原局五行数量-木">原局木五行数量</option>
+                        <option value="原局五行数量-火">原局火五行数量</option>
+                        <option value="原局五行数量-土">原局土五行数量</option>
+                        <option value="原局五行数量-金">原局金五行数量</option>
+                        <option value="原局五行数量-水">原局水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局天干五行数量判断">
+                        <option value="原局天干五行数量-木">原局天干木五行数量</option>
+                        <option value="原局天干五行数量-火">原局天干火五行数量</option>
+                        <option value="原局天干五行数量-土">原局天干土五行数量</option>
+                        <option value="原局天干五行数量-金">原局天干金五行数量</option>
+                        <option value="原局天干五行数量-水">原局天干水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局地支五行数量判断">
+                        <option value="原局地支五行数量-木">原局地支木五行数量</option>
+                        <option value="原局地支五行数量-火">原局地支火五行数量</option>
+                        <option value="原局地支五行数量-土">原局地支土五行数量</option>
+                        <option value="原局地支五行数量-金">原局地支金五行数量</option>
+                        <option value="原局地支五行数量-水">原局地支水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局十神数量判断(不区分阴阳)">
+                        <option value="原局十神数量-比劫">原局比劫数量</option>
+                        <option value="原局十神数量-食伤">原局食伤数量</option>
+                        <option value="原局十神数量-财星">原局财星数量</option>
+                        <option value="原局十神数量-官杀">原局官杀数量</option>
+                        <option value="原局十神数量-印星">原局印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局天干十神数量判断(不区分阴阳)">
+                        <option value="原局天干十神数量-比劫">原局天干比劫数量</option>
+                        <option value="原局天干十神数量-食伤">原局天干食伤数量</option>
+                        <option value="原局天干十神数量-财星">原局天干财星数量</option>
+                        <option value="原局天干十神数量-官杀">原局天干官杀数量</option>
+                        <option value="原局天干十神数量-印星">原局天干印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局地支十神数量判断(不区分阴阳)">
+                        <option value="原局地支十神数量-比劫">原局地支比劫数量</option>
+                        <option value="原局地支十神数量-食伤">原局地支食伤数量</option>
+                        <option value="原局地支十神数量-财星">原局地支财星数量</option>
+                        <option value="原局地支十神数量-官杀">原局地支官杀数量</option>
+                        <option value="原局地支十神数量-印星">原局地支印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局十神数量判断(区分阴阳)">
+                        <option value="原局十神数量-比肩">原局比肩数量</option>
+                        <option value="原局十神数量-劫财">原局劫财数量</option>
+                        <option value="原局十神数量-食神">原局食神数量</option>
+                        <option value="原局十神数量-伤官">原局伤官数量</option>
+                        <option value="原局十神数量-偏财">原局偏财数量</option>
+                        <option value="原局十神数量-正财">原局正财数量</option>
+                        <option value="原局十神数量-七杀">原局七杀数量</option>
+                        <option value="原局十神数量-正官">原局正官数量</option>
+                        <option value="原局十神数量-偏印">原局偏印数量</option>
+                        <option value="原局十神数量-正印">原局正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局天干十神数量判断(区分阴阳)">
+                        <option value="原局天干十神数量-比肩">原局天干比肩数量</option>
+                        <option value="原局天干十神数量-劫财">原局天干劫财数量</option>
+                        <option value="原局天干十神数量-食神">原局天干食神数量</option>
+                        <option value="原局天干十神数量-伤官">原局天干伤官数量</option>
+                        <option value="原局天干十神数量-偏财">原局天干偏财数量</option>
+                        <option value="原局天干十神数量-正财">原局天干正财数量</option>
+                        <option value="原局天干十神数量-七杀">原局天干七杀数量</option>
+                        <option value="原局天干十神数量-正官">原局天干正官数量</option>
+                        <option value="原局天干十神数量-偏印">原局天干偏印数量</option>
+                        <option value="原局天干十神数量-正印">原局天干正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局精确匹配】原局地支十神数量判断(区分阴阳)">
+                        <option value="原局地支十神数量-比肩">原局地支比肩数量</option>
+                        <option value="原局地支十神数量-劫财">原局地支劫财数量</option>
+                        <option value="原局地支十神数量-食神">原局地支食神数量</option>
+                        <option value="原局地支十神数量-伤官">原局地支伤官数量</option>
+                        <option value="原局地支十神数量-偏财">原局地支偏财数量</option>
+                        <option value="原局地支十神数量-正财">原局地支正财数量</option>
+                        <option value="原局地支十神数量-七杀">原局地支七杀数量</option>
+                        <option value="原局地支十神数量-正官">原局地支正官数量</option>
+                        <option value="原局地支十神数量-偏印">原局地支偏印数量</option>
+                        <option value="原局地支十神数量-正印">原局地支正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局和大运五行数量判断">
+                        <option value="原局大运五行数量-木">原局+大运木五行数量</option>
+                        <option value="原局大运五行数量-火">原局+大运火五行数量</option>
+                        <option value="原局大运五行数量-土">原局+大运土五行数量</option>
+                        <option value="原局大运五行数量-金">原局+大运金五行数量</option>
+                        <option value="原局大运五行数量-水">原局+大运水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局天干和大运天干五行数量判断">
+                        <option value="原局大运天干五行数量-木">原局天干+大运天干木五行数量</option>
+                        <option value="原局大运天干五行数量-火">原局天干+大运天干火五行数量</option>
+                        <option value="原局大运天干五行数量-土">原局天干+大运天干土五行数量</option>
+                        <option value="原局大运天干五行数量-金">原局天干+大运天干金五行数量</option>
+                        <option value="原局大运天干五行数量-水">原局天干+大运天干水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局地支和大运地支五行数量判断">
+                        <option value="原局大运地支五行数量-木">原局地支+大运地支木五行数量</option>
+                        <option value="原局大运地支五行数量-火">原局地支+大运地支火五行数量</option>
+                        <option value="原局大运地支五行数量-土">原局地支+大运地支土五行数量</option>
+                        <option value="原局大运地支五行数量-金">原局地支+大运地支金五行数量</option>
+                        <option value="原局大运地支五行数量-水">原局地支+大运地支水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局和大运十神数量判断(不区分阴阳)">
+                        <option value="原局大运十神数量-比劫">原局+大运比劫数量</option>
+                        <option value="原局大运十神数量-食伤">原局+大运食伤数量</option>
+                        <option value="原局大运十神数量-财星">原局+大运财星数量</option>
+                        <option value="原局大运十神数量-官杀">原局+大运官杀数量</option>
+                        <option value="原局大运十神数量-印星">原局+大运印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局天干和大运天干十神数量判断(不区分阴阳)">
+                        <option value="原局大运天干十神数量-比劫">原局天干+大运天干比劫数量</option>
+                        <option value="原局大运天干十神数量-食伤">原局天干+大运天干食伤数量</option>
+                        <option value="原局大运天干十神数量-财星">原局天干+大运天干财星数量</option>
+                        <option value="原局大运天干十神数量-官杀">原局天干+大运天干官杀数量</option>
+                        <option value="原局大运天干十神数量-印星">原局天干+大运天干印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局地支和大运地支十神数量判断(不区分阴阳)">
+                        <option value="原局大运地支十神数量-比劫">原局地支+大运地支比劫数量</option>
+                        <option value="原局大运地支十神数量-食伤">原局地支+大运地支食伤数量</option>
+                        <option value="原局大运地支十神数量-财星">原局地支+大运地支财星数量</option>
+                        <option value="原局大运地支十神数量-官杀">原局地支+大运地支官杀数量</option>
+                        <option value="原局大运地支十神数量-印星">原局地支+大运地支印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局和大运十神数量判断(区分阴阳)">
+                        <option value="原局大运十神数量-比肩">原局+大运比肩数量</option>
+                        <option value="原局大运十神数量-劫财">原局+大运劫财数量</option>
+                        <option value="原局大运十神数量-食神">原局+大运食神数量</option>
+                        <option value="原局大运十神数量-伤官">原局+大运伤官数量</option>
+                        <option value="原局大运十神数量-偏财">原局+大运偏财数量</option>
+                        <option value="原局大运十神数量-正财">原局+大运正财数量</option>
+                        <option value="原局大运十神数量-七杀">原局+大运七杀数量</option>
+                        <option value="原局大运十神数量-正官">原局+大运正官数量</option>
+                        <option value="原局大运十神数量-偏印">原局+大运偏印数量</option>
+                        <option value="原局大运十神数量-正印">原局+大运正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局天干和大运天干十神数量判断(区分阴阳)">
+                        <option value="原局大运天干十神数量-比肩">原局天干+大运天干比肩数量</option>
+                        <option value="原局大运天干十神数量-劫财">原局天干+大运天干劫财数量</option>
+                        <option value="原局大运天干十神数量-食神">原局天干+大运天干食神数量</option>
+                        <option value="原局大运天干十神数量-伤官">原局天干+大运天干伤官数量</option>
+                        <option value="原局大运天干十神数量-偏财">原局天干+大运天干偏财数量</option>
+                        <option value="原局大运天干十神数量-正财">原局天干+大运天干正财数量</option>
+                        <option value="原局大运天干十神数量-七杀">原局天干+大运天干七杀数量</option>
+                        <option value="原局大运天干十神数量-正官">原局天干+大运天干正官数量</option>
+                        <option value="原局大运天干十神数量-偏印">原局天干+大运天干偏印数量</option>
+                        <option value="原局大运天干十神数量-正印">原局天干+大运天干正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运精确匹配】原局地支和大运地支十神数量判断(区分阴阳)">
+                        <option value="原局大运地支十神数量-比肩">原局地支+大运地支比肩数量</option>
+                        <option value="原局大运地支十神数量-劫财">原局地支+大运地支劫财数量</option>
+                        <option value="原局大运地支十神数量-食神">原局地支+大运地支食神数量</option>
+                        <option value="原局大运地支十神数量-伤官">原局地支+大运地支伤官数量</option>
+                        <option value="原局大运地支十神数量-偏财">原局地支+大运地支偏财数量</option>
+                        <option value="原局大运地支十神数量-正财">原局地支+大运地支正财数量</option>
+                        <option value="原局大运地支十神数量-七杀">原局地支+大运地支七杀数量</option>
+                        <option value="原局大运地支十神数量-正官">原局地支+大运地支正官数量</option>
+                        <option value="原局大运地支十神数量-偏印">原局地支+大运地支偏印数量</option>
+                        <option value="原局大运地支十神数量-正印">原局地支+大运地支正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局、大运和流年五行数量判断">
+                        <option value="原局大运流年五行数量-木">原局+大运+流年木五行数量</option>
+                        <option value="原局大运流年五行数量-火">原局+大运+流年火五行数量</option>
+                        <option value="原局大运流年五行数量-土">原局+大运+流年土五行数量</option>
+                        <option value="原局大运流年五行数量-金">原局+大运+流年金五行数量</option>
+                        <option value="原局大运流年五行数量-水">原局+大运+流年水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局天干、大运天干和流年天干五行数量判断">
+                        <option value="原局大运流年天干五行数量-木">原局天干+大运天干+流年天干木五行数量</option>
+                        <option value="原局大运流年天干五行数量-火">原局天干+大运天干+流年天干火五行数量</option>
+                        <option value="原局大运流年天干五行数量-土">原局天干+大运天干+流年天干土五行数量</option>
+                        <option value="原局大运流年天干五行数量-金">原局天干+大运天干+流年天干金五行数量</option>
+                        <option value="原局大运流年天干五行数量-水">原局天干+大运天干+流年天干水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局地支、大运地支和流年地支五行数量判断">
+                        <option value="原局大运流年地支五行数量-木">原局地支+大运地支+流年地支木五行数量</option>
+                        <option value="原局大运流年地支五行数量-火">原局地支+大运地支+流年地支火五行数量</option>
+                        <option value="原局大运流年地支五行数量-土">原局地支+大运地支+流年地支土五行数量</option>
+                        <option value="原局大运流年地支五行数量-金">原局地支+大运地支+流年地支金五行数量</option>
+                        <option value="原局大运流年地支五行数量-水">原局地支+大运地支+流年地支水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局、大运和流年十神数量判断(不区分阴阳)">
+                        <option value="原局大运流年十神数量-比劫">原局+大运+流年比劫数量</option>
+                        <option value="原局大运流年十神数量-食伤">原局+大运+流年食伤数量</option>
+                        <option value="原局大运流年十神数量-财星">原局+大运+流年财星数量</option>
+                        <option value="原局大运流年十神数量-官杀">原局+大运+流年官杀数量</option>
+                        <option value="原局大运流年十神数量-印星">原局+大运+流年印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局天干、大运天干和流年天干十神数量判断(不区分阴阳)">
+                        <option value="原局大运流年天干十神数量-比劫">原局天干+大运天干+流年天干比劫数量</option>
+                        <option value="原局大运流年天干十神数量-食伤">原局天干+大运天干+流年天干食伤数量</option>
+                        <option value="原局大运流年天干十神数量-财星">原局天干+大运天干+流年天干财星数量</option>
+                        <option value="原局大运流年天干十神数量-官杀">原局天干+大运天干+流年天干官杀数量</option>
+                        <option value="原局大运流年天干十神数量-印星">原局天干+大运天干+流年天干印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局地支、大运地支和流年地支十神数量判断(不区分阴阳)">
+                        <option value="原局大运流年地支十神数量-比劫">原局地支+大运地支+流年地支比劫数量</option>
+                        <option value="原局大运流年地支十神数量-食伤">原局地支+大运地支+流年地支食伤数量</option>
+                        <option value="原局大运流年地支十神数量-财星">原局地支+大运地支+流年地支财星数量</option>
+                        <option value="原局大运流年地支十神数量-官杀">原局地支+大运地支+流年地支官杀数量</option>
+                        <option value="原局大运流年地支十神数量-印星">原局地支+大运地支+流年地支印星数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局、大运和流年十神数量判断(区分阴阳)">
+                        <option value="原局大运流年十神数量-比肩">原局+大运+流年比肩数量</option>
+                        <option value="原局大运流年十神数量-劫财">原局+大运+流年劫财数量</option>
+                        <option value="原局大运流年十神数量-食神">原局+大运+流年食神数量</option>
+                        <option value="原局大运流年十神数量-伤官">原局+大运+流年伤官数量</option>
+                        <option value="原局大运流年十神数量-偏财">原局+大运+流年偏财数量</option>
+                        <option value="原局大运流年十神数量-正财">原局+大运+流年正财数量</option>
+                        <option value="原局大运流年十神数量-七杀">原局+大运+流年七杀数量</option>
+                        <option value="原局大运流年十神数量-正官">原局+大运+流年正官数量</option>
+                        <option value="原局大运流年十神数量-偏印">原局+大运+流年偏印数量</option>
+                        <option value="原局大运流年十神数量-正印">原局+大运+流年正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局天干、大运天干和流年天干十神数量判断(区分阴阳)">
+                        <option value="原局大运流年天干十神数量-比肩">原局天干+大运天干+流年天干比肩数量</option>
+                        <option value="原局大运流年天干十神数量-劫财">原局天干+大运天干+流年天干劫财数量</option>
+                        <option value="原局大运流年天干十神数量-食神">原局天干+大运天干+流年天干食神数量</option>
+                        <option value="原局大运流年天干十神数量-伤官">原局天干+大运天干+流年天干伤官数量</option>
+                        <option value="原局大运流年天干十神数量-偏财">原局天干+大运天干+流年天干偏财数量</option>
+                        <option value="原局大运流年天干十神数量-正财">原局天干+大运天干+流年天干正财数量</option>
+                        <option value="原局大运流年天干十神数量-七杀">原局天干+大运天干+流年天干七杀数量</option>
+                        <option value="原局大运流年天干十神数量-正官">原局天干+大运天干+流年天干正官数量</option>
+                        <option value="原局大运流年天干十神数量-偏印">原局天干+大运天干+流年天干偏印数量</option>
+                        <option value="原局大运流年天干十神数量-正印">原局天干+大运天干+流年天干正印数量</option>
+                        </optgroup>
+                        <optgroup label="【原局+大运+流年精确匹配】原局地支、大运地支和流年地支十神数量判断(区分阴阳)">
+                        <option value="原局大运流年地支十神数量-比肩">原局地支+大运地支+流年地支比肩数量</option>
+                        <option value="原局大运流年地支十神数量-劫财">原局地支+大运地支+流年地支劫财数量</option>
+                        <option value="原局大运流年地支十神数量-食神">原局地支+大运地支+流年地支食神数量</option>
+                        <option value="原局大运流年地支十神数量-伤官">原局地支+大运地支+流年地支伤官数量</option>
+                        <option value="原局大运流年地支十神数量-偏财">原局地支+大运地支+流年地支偏财数量</option>
+                        <option value="原局大运流年地支十神数量-正财">原局地支+大运地支+流年地支正财数量</option>
+                        <option value="原局大运流年地支十神数量-七杀">原局地支+大运地支+流年地支七杀数量</option>
+                        <option value="原局大运流年地支十神数量-正官">原局地支+大运地支+流年地支正官数量</option>
+                        <option value="原局大运流年地支十神数量-偏印">原局地支+大运地支+流年地支偏印数量</option>
+                        <option value="原局大运流年地支十神数量-正印">原局地支+大运地支+流年地支正印数量</option>
+                        </optgroup>
+                        <optgroup label="【精确匹配】性别判断">
+                        <option value="性别">性别</option>
+                        </optgroup>
+                        <optgroup label="【比较判断】年龄判断">
+                        <option value="年龄">年龄</option>
+                        </optgroup>
+                        <optgroup label="【精确匹配】五行数量对比判断">
+                        <option value="五行数量对比-木">木五行数量</option>
+                        <option value="五行数量对比-火">火五行数量</option>
+                        <option value="五行数量对比-土">土五行数量</option>
+                        <option value="五行数量对比-金">金五行数量</option>
+                        <option value="五行数量对比-水">水五行数量</option>
+                        </optgroup>
+                        <optgroup label="【精确匹配】十神数量对比判断">
+                        <option value="十神数量对比-比肩">比肩数量</option>
+                        <option value="十神数量对比-劫财">劫财数量</option>
+                        <option value="十神数量对比-食神">食神数量</option>
+                        <option value="十神数量对比-伤官">伤官数量</option>
+                        <option value="十神数量对比-正财">正财数量</option>
+                        <option value="十神数量对比-偏财">偏财数量</option>
+                        <option value="十神数量对比-正官">正官数量</option>
+                        <option value="十神数量对比-七杀">七杀数量</option>
+                        <option value="十神数量对比-正印">正印数量</option>
+                        <option value="十神数量对比-偏印">偏印数量</option>
+                        <option value="十神数量对比-比劫">比劫数量</option>
+                        <option value="十神数量对比-食伤">食伤数量</option>
+                        <option value="十神数量对比-财星">财星数量</option>
+                        <option value="十神数量对比-官杀">官杀数量</option>
+                        <option value="十神数量对比-印星">印星数量</option>
+                        </optgroup>
+                        <optgroup label="【包含匹配】五行判断">
+                        <option value="包含-八字天干五行">八字天干五行</option>
+                        <option value="包含-八字地支五行">八字地支五行</option>
+                        <option value="包含-八字大运天干五行">八字天干五行＋大运天干五行</option>
+                        <option value="包含-八字大运地支五行">八字地支五行+大运地支五行</option>
+                        <option value="包含-八字大运流年天干五行">八字天干五行＋大运天干五行+流年天干五行</option>
+                        <option value="包含-八字大运流年地支五行">八字地支五行+大运地支五行+流年地支五行</option>
+                        <option value="包含-八字大运流年流月天干五行">八字天干五行＋大运天干五行+流年天干五行+流月天干五行</option>
+                        <option value="包含-八字大运流年流月地支五行">八字地支五行+大运地支五行+流年地支五行+流月地支五行</option>
+                        </optgroup>
+                        <optgroup label="【包含匹配】十神判断(区分阴阳)">
+                        <option value="包含-八字天干十神">八字天干十神</option>
+                        <option value="包含-八字地支十神">八字地支十神</option>
+                        <option value="包含-八字大运天干十神">八字天干十神＋大运天干十神</option>
+                        <option value="包含-八字大运地支十神">八字地支十神+大运地支十神</option>
+                        <option value="包含-八字大运流年天干十神">八字天干十神＋大运天干十神+流年天干十神</option>
+                        <option value="包含-八字大运流年地支十神">八字地支十神+大运地支十神+流年地支十神</option>
+                        <option value="包含-八字大运流年流月天干十神">八字天干十神＋大运天干十神+流年天干十神+流月天干十神</option>
+                        <option value="包含-八字大运流年流月地支十神">八字地支十神+大运地支十神+流年地支十神+流月地支十神</option>
+                        </optgroup>
+                        <optgroup label="【包含匹配】十神判断(不区分阴阳)">
+                        <option value="包含-八字天干十神组">八字天干十神组</option>
+                        <option value="包含-八字地支十神组">八字地支十神组</option>
+                        <option value="包含-八字大运天干十神组">八字天干十神组＋大运天干十神组</option>
+                        <option value="包含-八字大运地支十神组">八字地支十神组+大运地支十神组</option>
+                        <option value="包含-八字大运流年天干十神组">八字天干十神组＋大运天干十神组+流年天干十神组</option>
+                        <option value="包含-八字大运流年地支十神组">八字地支十神组+大运地支十神组+流年地支十神组</option>
+                        <option value="包含-八字大运流年流月天干十神组">八字天干十神组＋大运天干十神组+流年天干十神组+流月天干十神组</option>
+                        <option value="包含-八字大运流年流月地支十神组">八字地支十神组+大运地支十神组+流年地支十神组+流月地支十神组</option>
+                        </optgroup>
+                        <optgroup label="【包含匹配】干支判断">
+                        <option value="包含-年干">年干</option>
+                        <option value="包含-月干">月干</option>
+                        <option value="包含-日干">日干</option>
+                        <option value="包含-时干">时干</option>
+                        <option value="包含-大运干">大运干</option>
+                        <option value="包含-流年干">流年干</option>
+                        <option value="包含-流月干">流月干</option>
+                        <option value="包含-年支">年支</option>
+                        <option value="包含-月支">月支</option>
+                        <option value="包含-日支">日支</option>
+                        <option value="包含-时支">时支</option>
+                        <option value="包含-大运支">大运支</option>
+                        <option value="包含-流年支">流年支</option>
+                        <option value="包含-流月支">流月支</option>
+                        </optgroup>
                         <optgroup label="【精确匹配】干支判断">
                         <option value="年干">年干</option>
                         <option value="月干">月干</option>
@@ -1488,83 +2049,28 @@
                         <option value="干支数量-戌">戌数量</option>
                         <option value="干支数量-亥">亥数量</option>
                         </optgroup>
-                        <optgroup label="【精确匹配】性别判断">
-                        <option value="性别">性别</option>
+                        <optgroup label="【精确匹配】数据存在性判断">
+                        <option value="存在大运">存在大运</option>
+                        <option value="存在流年">存在流年</option>
+                        <option value="存在流月">存在流月</option>
                         </optgroup>
-                        <optgroup label="【比较判断】年龄判断">
-                        <option value="年龄">年龄</option>
-                        </optgroup>
-                        <optgroup label="【精确匹配】五行数量对比判断">
-                        <option value="五行数量对比-木">木五行数量</option>
-                        <option value="五行数量对比-火">火五行数量</option>
-                        <option value="五行数量对比-土">土五行数量</option>
-                        <option value="五行数量对比-金">金五行数量</option>
-                        <option value="五行数量对比-水">水五行数量</option>
-                        </optgroup>
-                        <optgroup label="【精确匹配】十神数量对比判断">
-                        <option value="十神数量对比-比肩">比肩数量</option>
-                        <option value="十神数量对比-劫财">劫财数量</option>
-                        <option value="十神数量对比-食神">食神数量</option>
-                        <option value="十神数量对比-伤官">伤官数量</option>
-                        <option value="十神数量对比-正财">正财数量</option>
-                        <option value="十神数量对比-偏财">偏财数量</option>
-                        <option value="十神数量对比-正官">正官数量</option>
-                        <option value="十神数量对比-七杀">七杀数量</option>
-                        <option value="十神数量对比-正印">正印数量</option>
-                        <option value="十神数量对比-偏印">偏印数量</option>
-                        <option value="十神数量对比-比劫">比劫数量</option>
-                        <option value="十神数量对比-食伤">食伤数量</option>
-                        <option value="十神数量对比-财星">财星数量</option>
-                        <option value="十神数量对比-官杀">官杀数量</option>
-                        <option value="十神数量对比-印星">印星数量</option>
-                        </optgroup>
-                        <optgroup label="【包含匹配】五行判断">
-                        <option value="包含-八字天干五行">八字天干五行</option>
-                        <option value="包含-八字地支五行">八字地支五行</option>
-                        <option value="包含-八字大运天干五行">八字天干五行＋大运天干五行</option>
-                        <option value="包含-八字大运地支五行">八字地支五行+大运地支五行</option>
-                        <option value="包含-八字大运流年天干五行">八字天干五行＋大运天干五行+流年天干五行</option>
-                        <option value="包含-八字大运流年地支五行">八字地支五行+大运地支五行+流年地支五行</option>
-                        <option value="包含-八字大运流年流月天干五行">八字天干五行＋大运天干五行+流年天干五行+流月天干五行</option>
-                        <option value="包含-八字大运流年流月地支五行">八字地支五行+大运地支五行+流年地支五行+流月地支五行</option>
-                        </optgroup>
-                        <optgroup label="【包含匹配】十神判断(区分阴阳)">
-                        <option value="包含-八字天干十神">八字天干十神</option>
-                        <option value="包含-八字地支十神">八字地支十神</option>
-                        <option value="包含-八字大运天干十神">八字天干十神＋大运天干十神</option>
-                        <option value="包含-八字大运地支十神">八字地支十神+大运地支十神</option>
-                        <option value="包含-八字大运流年天干十神">八字天干十神＋大运天干十神+流年天干十神</option>
-                        <option value="包含-八字大运流年地支十神">八字地支十神+大运地支十神+流年地支十神</option>
-                        <option value="包含-八字大运流年流月天干十神">八字天干十神＋大运天干十神+流年天干十神+流月天干十神</option>
-                        <option value="包含-八字大运流年流月地支十神">八字地支十神+大运地支十神+流年地支十神+流月地支十神</option>
-                        </optgroup>
-                        <optgroup label="【包含匹配】十神判断(不区分阴阳)">
-                        <option value="包含-八字天干十神组">八字天干十神组</option>
-                        <option value="包含-八字地支十神组">八字地支十神组</option>
-                        <option value="包含-八字大运天干十神组">八字天干十神组＋大运天干十神组</option>
-                        <option value="包含-八字大运地支十神组">八字地支十神组+大运地支十神组</option>
-                        <option value="包含-八字大运流年天干十神组">八字天干十神组＋大运天干十神组+流年天干十神组</option>
-                        <option value="包含-八字大运流年地支十神组">八字地支十神组+大运地支十神组+流年地支十神组</option>
-                        <option value="包含-八字大运流年流月天干十神组">八字天干十神组＋大运天干十神组+流年天干十神组+流月天干十神组</option>
-                        <option value="包含-八字大运流年流月地支十神组">八字地支十神组+大运地支十神组+流年地支十神组+流月地支十神组</option>
-                        </optgroup>
-                        <optgroup label="【包含匹配】干支判断">
-                        <option value="包含-年干">年干</option>
-                        <option value="包含-月干">月干</option>
-                        <option value="包含-日干">日干</option>
-                        <option value="包含-时干">时干</option>
-                        <option value="包含-大运干">大运干</option>
-                        <option value="包含-流年干">流年干</option>
-                        <option value="包含-流月干">流月干</option>
-                        <option value="包含-年支">年支</option>
-                        <option value="包含-月支">月支</option>
-                        <option value="包含-日支">日支</option>
-                        <option value="包含-时支">时支</option>
-                        <option value="包含-大运支">大运支</option>
-                        <option value="包含-流年支">流年支</option>
-                        <option value="包含-流月支">流月支</option>
+                        <optgroup label="【精确匹配】触发范围判断">
+                        <option value="触发范围">触发范围</option>
                         </optgroup>
                     </select>
+                        <div class="custom-field-trigger" tabindex="0" role="combobox" aria-haspopup="listbox">
+                            <span class="custom-field-text">选择字段</span>
+                            <span class="custom-field-arrow">▼</span>
+                        </div>
+                        <div class="custom-field-dropdown">
+                            <div class="custom-field-search-box">
+                                <input type="text" class="custom-field-search-input" placeholder="🔍 搜索字段...">
+                            </div>
+                            <div class="custom-field-options">
+                                <!-- 选项由 JS 动态构建 -->
+                            </div>
+                        </div>
+                    </div>
                     <select class="condition-op w-24 p-2 border rounded">
                         <option value="eq">等于</option>
                         <option value="ne">不等于</option>
@@ -1688,10 +2194,10 @@
                 </div>
                 <div class="flex gap-2 items-center">
                     <select id="rule-page-size" class="p-1 border rounded text-sm">
-                        <option value="5">每页5条</option>
-                        <option value="10" selected>每页10条</option>
+                        <option value="4">每页4条</option>
+                        <option value="8" selected>每页8条</option>
                         <option value="20">每页20条</option>
-                        <option value="50">每页50条</option>
+                        <option value="40">每页40条</option>
                     </select>
                     <span id="rule-page-info" class="text-sm text-gray-500">第 1 页 / 共 1 页</span>
                     <div class="flex gap-1">
@@ -1710,10 +2216,10 @@
                 <div></div>
                 <div class="flex gap-2 items-center">
                     <select id="rule-page-size-bottom" class="p-1 border rounded text-sm">
-                        <option value="5">每页5条</option>
-                        <option value="10" selected>每页10条</option>
+                        <option value="4">每页4条</option>
+                        <option value="8" selected>每页8条</option>
                         <option value="20">每页20条</option>
-                        <option value="50">每页50条</option>
+                        <option value="40">每页40条</option>
                     </select>
                     <span id="rule-page-info-bottom" class="text-sm text-gray-500">第 1 页 / 共 1 页</span>
                     <div class="flex gap-1">
@@ -1803,8 +2309,8 @@
                             <option value="asc">准确率从低到高</option>
                         </select>
                         <select id="accuracy-page-size" class="p-1 border rounded text-sm">
-                            <option value="5">每页5条</option>
-                            <option value="10" selected>每页10条</option>
+                            <option value="4">每页4条</option>
+                            <option value="8" selected>每页8条</option>
                             <option value="20">每页20条</option>
                         </select>
                     </div>
@@ -1993,16 +2499,19 @@
 
         <!-- 案例列表 -->
         <div class="bg-white p-4 rounded shadow">
-            <h3 class="text-lg font-bold text-amber-800 mb-3">📚 案例列表</h3>
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-bold text-amber-800">📚 案例列表</h3>
+                <button id="case-view-toggle" class="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm font-bold hover:bg-gray-300 transition-colors">☰ 简洁视图</button>
+            </div>
             
             <!-- 分页控制 -->
             <div class="flex justify-between items-center mb-3">
                 <div class="flex gap-2 items-center">
                     <select id="case-page-size" class="p-1 border rounded text-sm">
-                        <option value="5">每页5条</option>
-                        <option value="10" selected>每页10条</option>
+                        <option value="4">每页4条</option>
+                        <option value="8" selected>每页8条</option>
                         <option value="20">每页20条</option>
-                        <option value="50">每页50条</option>
+                        <option value="40">每页40条</option>
                     </select>
                     <span id="case-page-info" class="text-sm text-gray-500">第 1 页 / 共 1 页</span>
                 </div>
@@ -2012,8 +2521,24 @@
                 </div>
             </div>
             
-            <div id="case-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[550px] overflow-y-auto">
+            <!-- 详细视图列表 -->
+            <div id="case-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <p class="text-gray-500 col-span-full">暂无案例，添加后显示</p>
+            </div>
+            
+            <!-- 简洁视图列表 -->
+            <div id="case-list-simple" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 mt-3">
+            </div>
+            
+            <!-- 内联详情区 -->
+            <div id="case-detail-area" class="mt-4 hidden border border-amber-300 rounded-lg overflow-hidden">
+                <div class="bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-white" id="inline-case-title">案例详情</h3>
+                    <button id="close-case-detail" class="text-white hover:text-gray-200 text-xl leading-none">&times;</button>
+                </div>
+                <div id="case-detail-body" class="p-4">
+                    <!-- 由JS动态填充 -->
+                </div>
             </div>
         </div>
     </div>
@@ -2374,13 +2899,13 @@
 
     <!-- 添加/编辑案例弹窗 -->
     <div id="case-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
-        <div class="bg-white rounded-lg p-4 w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4">
+        <div class="bg-white rounded-lg p-4 w-[88vw] h-[85vh] mx-4 shadow-2xl flex flex-col">
+            <div class="flex justify-between items-center mb-4 shrink-0">
                 <h3 class="text-lg font-bold" id="case-modal-title">添加案例</h3>
                 <button id="close-case-modal" class="text-gray-500 hover:text-gray-700">✕</button>
             </div>
             
-            <div class="space-y-4">
+            <div class="space-y-4 flex-1 overflow-y-auto min-h-0">
                 <!-- 案例标题 -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">案例标题</label>
@@ -2601,7 +3126,7 @@
                 </div>
                 
                 <!-- 八字表格置顶区域 -->
-                <div id="view-bazi-sticky-wrapper" class="sticky top-0 z-10 bg-white/95 backdrop-blur-sm py-2 -mx-2 px-2 shadow-lg rounded-lg border border-amber-200">
+                <div id="view-bazi-sticky-wrapper" class="sticky top-0 z-20 bg-white/95 backdrop-blur-sm py-2 -mx-2 px-2 shadow-lg rounded-lg border border-amber-200">
                     <!-- 八字 - 详细显示 -->
                     <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-lg border border-amber-200">
                         <div class="text-sm text-amber-600 font-medium mb-2 flex items-center gap-2">
@@ -2639,7 +3164,7 @@
                         </button>
                         <div id="adjust-panel-view" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
                             <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
-                                <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                                <div class="flex-1 flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll justify-center">
                                     <!-- 比劫 -->
                                     <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
                                         <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
@@ -2913,13 +3438,13 @@
     const GAN_YINYANG = {甲:'阳',乙:'阴',丙:'阳',丁:'阴',戊:'阳',己:'阴',庚:'阳',辛:'阴',壬:'阳',癸:'阴'};
     const DI_ZHU_MAIN = {子:'癸',丑:'己',寅:'甲',卯:'乙',辰:'戊',巳:'丙',午:'丁',未:'己',申:'庚',酉:'辛',戌:'戊',亥:'壬'};
     const FULL_SHEN = ['比肩','劫财','食神','伤官','偏财','正财','七杀','正官','偏印','正印'];
-    const GROUPED_SHEN = ['比劫','食伤','财','官杀','印'];
+    const GROUPED_SHEN = ['比劫','食伤','财星','官杀','印星'];
     const SHEN_TO_GROUP = {
         比肩: '比劫', 劫财: '比劫',
         食神: '食伤', 伤官: '食伤',
-        正财: '财', 偏财: '财',
+        正财: '财星', 偏财: '财星',
         正官: '官杀', 七杀: '官杀',
-        正印: '印', 偏印: '印'
+        正印: '印星', 偏印: '印星'
     };
     const WU_LIST = ['木','火','土','金','水'];
     const RULE_KEY='bazi_rules_final';
@@ -3127,6 +3652,12 @@
             caseSearch: document.getElementById('case-search'),
             caseSearchBtn: document.getElementById('case-search-btn'),
             caseList: document.getElementById('case-list'),
+            caseViewToggle: document.getElementById('case-view-toggle'),
+            caseListSimple: document.getElementById('case-list-simple'),
+            caseDetailArea: document.getElementById('case-detail-area'),
+            closeCaseDetail: document.getElementById('close-case-detail'),
+            inlineCaseTitle: document.getElementById('inline-case-title'),
+            caseDetailBody: document.getElementById('case-detail-body'),
             addCaseBtn: document.getElementById('add-case-btn'),
             manageCategoryBtn: document.getElementById('manage-category'),
             manageDifficultyBtn: document.getElementById('manage-difficulty'),
@@ -3274,7 +3805,7 @@
     
     // 十神数量调节功能
     function initStatsAdjust() {
-        const resetBtns = ['reset-adjust', 'reset-adjust-view', 'reset-adjust-research', 'reset-adjust-compare', 'reset-adjust-detail'];
+        const resetBtns = ['reset-adjust', 'reset-adjust-view', 'reset-adjust-research', 'reset-adjust-compare', 'reset-adjust-detail', 'reset-adjust-inline'];
         resetBtns.forEach(btnId => {
             const btn = document.getElementById(btnId);
             if (btn) {
@@ -3322,7 +3853,7 @@
     function renderShenSources() {
         var settings = window.shenSourceSettings || getShenSourceSettings();
         var groups = ['bijie','shishang','caixing','guansha','yinxing'];
-        var prefixes = ['','research-','view-'];
+        var prefixes = ['','research-','view-','inline-'];
         var suffixes = ['','-detail','-compare'];
         prefixes.forEach(function(pre) {
             suffixes.forEach(function(suf) {
@@ -3445,7 +3976,7 @@
         const offset = cache.statsOffset || {};
         const groups = ['bijie', 'shishang', 'caixing', 'guansha', 'yinxing'];
         const chineseNames = { 'bijie': '比劫', 'shishang': '食伤', 'caixing': '财星', 'guansha': '官杀', 'yinxing': '印星' };
-        const prefixes = ['', '-view', '-research', '-compare', '-detail'];
+        const prefixes = ['', '-view', '-research', '-compare', '-detail', '-inline'];
         
         prefixes.forEach(prefix => {
             groups.forEach(name => {
@@ -3503,6 +4034,30 @@
             const tianSpan = document.getElementById('view-shen-tian-' + name);
             const diSpan = document.getElementById('view-shen-di-' + name);
             const totalSpan = document.getElementById('view-shen-total-' + name);
+            
+            if (tianSpan && diSpan && totalSpan) {
+                const baseTian = parseInt(tianSpan.dataset.base || tianSpan.textContent) || 0;
+                const baseDi = parseInt(diSpan.dataset.base || diSpan.textContent) || 0;
+                
+                let newTian = baseTian + groupOffset.tian;
+                let newDi = baseDi + groupOffset.di;
+                if (newTian < 0) newTian = 0;
+                if (newDi < 0) newDi = 0;
+                
+                tianSpan.textContent = newTian;
+                diSpan.textContent = newDi;
+                totalSpan.textContent = newTian + newDi;
+            }
+        });
+        
+        // 处理案例详情内联(inline)的十神卡片
+        groups.forEach(name => {
+            const chineseName = chineseNames[name];
+            const groupOffset = offset[chineseName] || {tian: 0, di: 0};
+            
+            const tianSpan = document.getElementById('inline-shen-tian-' + name);
+            const diSpan = document.getElementById('inline-shen-di-' + name);
+            const totalSpan = document.getElementById('inline-shen-total-' + name);
             
             if (tianSpan && diSpan && totalSpan) {
                 const baseTian = parseInt(tianSpan.dataset.base || tianSpan.textContent) || 0;
@@ -3593,7 +4148,7 @@
         var settings = window.shenSourceSettings || getShenSourceSettings();
         var markerTxt = markerType === 'dayun' ? (settings.dayun || '●') : (settings.liunian || '■');
         var engNames = {比劫:'bijie', 食伤:'shishang', 财星:'caixing', 官杀:'guansha', 印星:'yinxing'};
-        var prefixes = ['', 'research-', 'view-'];
+        var prefixes = ['', 'research-', 'view-', 'inline-'];
         var suffixes = ['', '-detail', '-compare'];
         ['比劫', '食伤', '财星', '官杀', '印星'].forEach(function(name) {
             ['tian', 'di'].forEach(function(type) {
@@ -3624,6 +4179,22 @@
     };
     
     document.addEventListener('click', (e) => {
+        // 处理重置按钮
+        const resetBtn = e.target.closest('[id^="reset-adjust"]');
+        if (resetBtn) {
+            cache.statsOffset = {
+                比劫: {tian: 0, di: 0},
+                食伤: {tian: 0, di: 0},
+                财星: {tian: 0, di: 0},
+                官杀: {tian: 0, di: 0},
+                印星: {tian: 0, di: 0}
+            };
+            updateAdjustDisplay();
+            updateAllShenCardNumbers();
+            try { if (typeof calcAll === 'function') calcAll(); } catch(e) {}
+            return;
+        }
+        
         // 处理折叠/展开按钮
         const toggleBtn = e.target.closest('[id^="toggle-adjust-panel"]');
         if (toggleBtn) {
@@ -3631,8 +4202,22 @@
             const panel = document.getElementById('adjust-panel' + suffix);
             const arrow = document.getElementById('adjust-panel-arrow' + suffix);
             if (panel && arrow) {
+                const isClosing = !panel.classList.contains('hidden');
                 panel.classList.toggle('hidden');
                 arrow.textContent = panel.classList.contains('hidden') ? '▼' : '▲';
+                // 关闭时自动重置数量
+                if (isClosing) {
+                    cache.statsOffset = {
+                        比劫: {tian: 0, di: 0},
+                        食伤: {tian: 0, di: 0},
+                        财星: {tian: 0, di: 0},
+                        官杀: {tian: 0, di: 0},
+                        印星: {tian: 0, di: 0}
+                    };
+                    updateAdjustDisplay();
+                    updateAllShenCardNumbers();
+                    try { if (typeof calcAll === 'function') calcAll(); } catch(e) {}
+                }
             }
             return;
         }
@@ -3669,7 +4254,7 @@
     });
     
     function updateAdjustDisplay() {
-        const prefixes = ['', '-view', '-research', '-compare', '-detail'];
+        const prefixes = ['', '-view', '-research', '-compare', '-detail', '-inline'];
         const groups = ['比劫', '食伤', '财星', '官杀', '印星'];
         const types = ['tian', 'di'];
         
@@ -3702,7 +4287,8 @@
             '-view': 'view-shen-tian-',
             '-research': 'research-shen-tian-',
             '-detail': 'research-shen-tian-',
-            '-compare': 'research-shen-tian-'
+            '-compare': 'research-shen-tian-',
+            '-inline': 'inline-shen-tian-'
         };
         // detail/compare 需要额外追加面板后缀
         const suffixNeedsAppend = ['-detail', '-compare'];
@@ -5414,9 +6000,9 @@
     }
     
     // 案例详情页十神卡片定位函数（与其他页面保持一致）
-    function positionViewShenCards() {
-        var container = document.getElementById('view-shen-container');
-        var svg = document.getElementById('view-shen-arrows');
+    function positionViewShenCards(prefix = 'view') {
+        var container = document.getElementById(prefix + '-shen-container');
+        var svg = document.getElementById(prefix + '-shen-arrows');
         if (!container || !svg) return;
         
         var containerWidth = container.offsetWidth;
@@ -5434,7 +6020,7 @@
         var cardWidth = isMobile ? 100 : 120;
         var cardHalf = cardWidth / 2;
         
-        var shenIds = ['view-shen-bijie', 'view-shen-shishang', 'view-shen-caixing', 'view-shen-guansha', 'view-shen-yinxing'];
+        var shenIds = [prefix + '-shen-bijie', prefix + '-shen-shishang', prefix + '-shen-caixing', prefix + '-shen-guansha', prefix + '-shen-yinxing'];
         var angles = [0, 72, 144, 216, 288]; // 五等分角度
         
         // 存储每个卡片的中心位置
@@ -5494,7 +6080,7 @@
     }
     
     // 更新案例详情页十神关系图
-    function updateViewShenRelation(bazi, dayunData, liunianData) {
+    function updateViewShenRelation(bazi, dayunData, liunianData, prefix = 'view') {
         if (!bazi) return;
         
         const riGan = bazi.dayGan;
@@ -5583,11 +6169,11 @@
         });
         
         // 更新十神关系图 - 十神对应的五行
-        document.getElementById('view-wu-bijie').textContent = shenWuXing.比劫;
-        document.getElementById('view-wu-shishang').textContent = shenWuXing.食伤;
-        document.getElementById('view-wu-caixing').textContent = shenWuXing.财星;
-        document.getElementById('view-wu-guansha').textContent = shenWuXing.官杀;
-        document.getElementById('view-wu-yinxing').textContent = shenWuXing.印星;
+        document.getElementById(prefix + '-wu-bijie').textContent = shenWuXing.比劫;
+        document.getElementById(prefix + '-wu-shishang').textContent = shenWuXing.食伤;
+        document.getElementById(prefix + '-wu-caixing').textContent = shenWuXing.财星;
+        document.getElementById(prefix + '-wu-guansha').textContent = shenWuXing.官杀;
+        document.getElementById(prefix + '-wu-yinxing').textContent = shenWuXing.印星;
         
         // 动态更新十神卡片颜色（与其他页面保持一致）
         const updateShenCardColor = (elementId, wuxing) => {
@@ -5625,20 +6211,20 @@
             }
         };
         
-        updateShenCardColor('view-shen-bijie', shenWuXing.比劫);
-        updateShenCardColor('view-shen-shishang', shenWuXing.食伤);
-        updateShenCardColor('view-shen-caixing', shenWuXing.财星);
-        updateShenCardColor('view-shen-guansha', shenWuXing.官杀);
-        updateShenCardColor('view-shen-yinxing', shenWuXing.印星);
+        updateShenCardColor(prefix + '-shen-bijie', shenWuXing.比劫);
+        updateShenCardColor(prefix + '-shen-shishang', shenWuXing.食伤);
+        updateShenCardColor(prefix + '-shen-caixing', shenWuXing.财星);
+        updateShenCardColor(prefix + '-shen-guansha', shenWuXing.官杀);
+        updateShenCardColor(prefix + '-shen-yinxing', shenWuXing.印星);
         
         // 更新十神数量
         const shenGroups = ['bijie', 'shishang', 'caixing', 'guansha', 'yinxing'];
         const chineseGroups = ['比劫', '食伤', '财星', '官杀', '印星'];
         shenGroups.forEach((name, idx) => {
             const cn = chineseGroups[idx];
-            const tSpan = document.getElementById('view-shen-tian-' + name);
-            const dSpan = document.getElementById('view-shen-di-' + name);
-            const totalSpan = document.getElementById('view-shen-total-' + name);
+            const tSpan = document.getElementById(prefix + '-shen-tian-' + name);
+            const dSpan = document.getElementById(prefix + '-shen-di-' + name);
+            const totalSpan = document.getElementById(prefix + '-shen-total-' + name);
             const vOffset = (cache.statsOffset?.[cn]) || {tian: 0, di: 0};
             if (tSpan) {
                 tSpan.dataset.base = groupTian[cn] - vOffset.tian;
@@ -5686,8 +6272,8 @@
             }
             shenGroups.forEach(function(name, idx) {
                 var cn = chineseGroups[idx];
-                var tSpan = document.getElementById('view-shen-tian-' + name);
-                var dSpan = document.getElementById('view-shen-di-' + name);
+                var tSpan = document.getElementById(prefix + '-shen-tian-' + name);
+                var dSpan = document.getElementById(prefix + '-shen-di-' + name);
                 if (tSpan && viewSrcTian[cn].length > 0) tSpan.dataset.source = viewSrcTian[cn].join(',');
                 if (dSpan && viewSrcDi[cn].length > 0) dSpan.dataset.source = viewSrcDi[cn].join(',');
             });
@@ -5733,7 +6319,7 @@
         }
         
         // 定位十神卡片
-        setTimeout(positionViewShenCards, 50);
+        setTimeout(function() { positionViewShenCards(prefix); }, 50);
     }
     
     // 在指定位置绘制箭头头部
@@ -6255,12 +6841,435 @@
                 const shen = p==='t' ? getExactShen(data[k]?.t, data.ri.t) : getDiShen(data[k]?.d, data.ri.t);
                 actual = SHEN_TO_GROUP[shen] || '';
                 
-                if(c.op === 'eq') res = actual === c.val;
-                else if(c.op === 'ne') res = actual !== c.val;
+                // 向后兼容：旧数据存的十神组值可能是'财'/'印'（无星）
+                const expectedVal = c.val === '财' ? '财星' : c.val === '印' ? '印星' : c.val;
+                if(c.op === 'eq') res = actual === expectedVal;
+                else if(c.op === 'ne') res = actual !== expectedVal;
+            }
+            // === 原局大运流年五行数量(整体,天干+地支)分支 ===
+            else if(c.field.startsWith('原局大运流年五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
+                const name = c.field.replace('原局大运流年五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t && WU_XING[p.t] === name) cnt++;
+                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                });
+                if(data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
+                if(data.dayun?.d && WU_XING[data.dayun.d] === name) cnt++;
+                if(data.liunian?.t && WU_XING[data.liunian.t] === name) cnt++;
+                if(data.liunian?.d && WU_XING[data.liunian.d] === name) cnt++;
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运流年天干五行数量-')){
+                const name = c.field.replace('原局大运流年天干五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t && WU_XING[p.t] === name) cnt++;
+                });
+                if(data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
+                if(data.liunian?.t && WU_XING[data.liunian.t] === name) cnt++;
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运流年地支五行数量-')){
+                const name = c.field.replace('原局大运流年地支五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                });
+                if(data.dayun?.d && WU_XING[data.dayun.d] === name) cnt++;
+                if(data.liunian?.d && WU_XING[data.liunian.d] === name) cnt++;
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            // === 原局大运流年十神数量(区分阴阳,整体)分支 ===
+            else if(c.field.startsWith('原局大运流年十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局大运流年十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
+                if(data.liunian?.t) { const s = getExactShen(data.liunian.t, rg); if(s === name) cnt++; }
+                if(data.liunian?.d) { const s = getDiShen(data.liunian.d, rg); if(s === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运流年天干十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局大运流年天干十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
+                if(data.liunian?.t) { const s = getExactShen(data.liunian.t, rg); if(s === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运流年地支十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局大运流年地支十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                });
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
+                if(data.liunian?.d) { const s = getDiShen(data.liunian.d, rg); if(s === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            // === 原局大运流年十神数量(不区分阴阳,整体)分支 ===
+            else if(c.field.startsWith('原局大运流年十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
+                const name = c.field.replace('原局大运流年十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.liunian?.t) { const s = getExactShen(data.liunian.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.liunian?.d) { const s = getDiShen(data.liunian.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运流年天干十神数量-')){
+                const name = c.field.replace('原局大运流年天干十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.liunian?.t) { const s = getExactShen(data.liunian.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运流年地支十神数量-')){
+                const name = c.field.replace('原局大运流年地支十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.liunian?.d) { const s = getDiShen(data.liunian.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            // === 原局大运五行数量(整体,天干+地支)分支 ===
+            else if(c.field.startsWith('原局大运五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
+                const name = c.field.replace('原局大运五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t && WU_XING[p.t] === name) cnt++;
+                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                });
+                if(data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
+                if(data.dayun?.d && WU_XING[data.dayun.d] === name) cnt++;
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运天干五行数量-')){
+                const name = c.field.replace('原局大运天干五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t && WU_XING[p.t] === name) cnt++;
+                });
+                if(data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运地支五行数量-')){
+                const name = c.field.replace('原局大运地支五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                });
+                if(data.dayun?.d && WU_XING[data.dayun.d] === name) cnt++;
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            // === 原局大运十神数量(区分阴阳)分支 ===
+            else if(c.field.startsWith('原局大运十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局大运十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运天干十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局大运天干十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运地支十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局大运地支十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                });
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            // === 原局大运十神数量(不区分阴阳)分支 ===
+            else if(c.field.startsWith('原局大运十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
+                const name = c.field.replace('原局大运十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运天干十神数量-')){
+                const name = c.field.replace('原局大运天干十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局大运地支十神数量-')){
+                const name = c.field.replace('原局大运地支十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            // === 原局五行数量分支 ===
+            else if(c.field.startsWith('原局五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
+                const name = c.field.replace('原局五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t && WU_XING[p.t] === name) cnt++;
+                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局天干五行数量-')){
+                const name = c.field.replace('原局天干五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t && WU_XING[p.t] === name) cnt++;
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局地支五行数量-')){
+                const name = c.field.replace('原局地支五行数量-', '');
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
             }
             else if(c.field.startsWith('五行数量-')){
                 const name = c.field.replace('五行数量-', '');
                 const cnt = stats.wuCount[name] || 0;
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局天干十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局天干十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局地支十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
+                const name = c.field.replace('原局地支十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
+                const name = c.field.replace('原局十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局天干十神数量-')){
+                const name = c.field.replace('原局天干十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+            }
+            else if(c.field.startsWith('原局地支十神数量-')){
+                const name = c.field.replace('原局地支十神数量-', '');
+                let cnt = 0;
+                const rg = data.ri?.t;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                pillars.forEach(p => {
+                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                });
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -6290,6 +7299,21 @@
                 if(c.val === '不限') res = true;
                 else if(c.op === 'eq') res = gender === c.val;
                 else if(c.op === 'ne') res = gender !== c.val;
+            }
+            else if(c.field === '存在大运' || c.field === '存在流年' || c.field === '存在流月'){
+                const key = c.field === '存在大运' ? 'dayun' : c.field === '存在流年' ? 'liunian' : 'liuyue';
+                const hasData = !!(data[key] && data[key].t);
+                const valIsYes = c.val === '是';
+                if(c.op === 'eq') res = hasData === valIsYes;
+                else if(c.op === 'ne') res = hasData !== valIsYes;
+            }
+            else if(c.field === '触发范围'){
+                const hasDayun = !!(data.dayun && data.dayun.t);
+                const hasLiunian = !!(data.liunian && data.liunian.t);
+                const hasLiuyue = !!(data.liuyue && data.liuyue.t);
+                const scope = !hasDayun ? '仅原局' : !hasLiunian ? '原局+大运' : !hasLiuyue ? '原局+大运+流年' : '原局+大运+流年+流月';
+                if(c.op === 'eq') res = scope === c.val;
+                else if(c.op === 'ne') res = scope !== c.val;
             }
             else if (c.field === '年龄') {
                 if (data.effectiveAge == null) {
@@ -6360,11 +7384,13 @@
                     sourceValues = [data[map[fieldType]]?.d || ''].filter(v => v);
                 }
                 
+                // 向后兼容：旧数据存的十神组值可能是'财'/'印'（无星）
+                const normalizeGroupVal = (v) => v === '财' ? '财星' : v === '印' ? '印星' : v;
                 if(c.op === 'in'){
-                    res = targetValues.every(tv => sourceValues.includes(tv));
+                    res = targetValues.every(tv => sourceValues.includes(normalizeGroupVal(tv)));
                 }
                 else if(c.op === 'nin'){
-                    res = targetValues.every(tv => !sourceValues.includes(tv));
+                    res = targetValues.every(tv => !sourceValues.includes(normalizeGroupVal(tv)));
                 }
             }
             
@@ -6944,7 +7970,6 @@
                 // 这是一个条件项
                 const item = createConditionItemElement();
                 container.appendChild(item);
-                bindItemEvents(item);
                 
                 const fieldSel = item.querySelector('.condition-field');
                 const opSel = item.querySelector('.condition-op');
@@ -6953,8 +7978,10 @@
                 const valInput = item.querySelector('.condition-val-input');
                 const valCheckbox = item.querySelector('.condition-val-checkbox');
                 
-                // 先设置字段值
+                // 先设置字段值（需在 bindItemEvents / initCustomFieldSelect 之前）
                 fieldSel.value = child.field || '';
+                
+                bindItemEvents(item);
                 
                 // 触发onchange初始化值控件（这会重置opSel的选项）
                 if (fieldSel.onchange) {
@@ -7030,6 +8057,7 @@
     
     // 绑定条件项事件
     function bindItemEvents(item) {
+        initCustomFieldSelect(item);
         const fieldSel = item.querySelector('.condition-field');
         const opSel = item.querySelector('.condition-op');
         const valSel = item.querySelector('.condition-val-select');
@@ -7074,6 +8102,16 @@
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择性别</option><option value="男">男</option><option value="女">女</option><option value="不限">不限</option>';
+            }
+            else if(field === '存在大运' || field === '存在流年' || field === '存在流月'){
+                opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
+                valSel.classList.remove('hidden');
+                valSel.innerHTML = '<option value="">请选择</option><option value="是">是</option><option value="否">否</option>';
+            }
+            else if(field === '触发范围'){
+                opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
+                valSel.classList.remove('hidden');
+                valSel.innerHTML = '<option value="">请选择触发范围</option><option value="仅原局">仅原局</option><option value="原局+大运">原局+大运</option><option value="原局+大运+流年">原局+大运+流年</option><option value="原局+大运+流年+流月">原局+大运+流年+流月</option>';
             }
             else if (field === '年龄') {
                 opSel.innerHTML = '<option value="gt">大于</option><option value="ge">大于等于</option><option value="lt">小于</option><option value="le">小于等于</option>';
@@ -7145,11 +8183,231 @@
         };
     }
 
+    // 初始化自定义字段下拉框（搜索+折叠）
+    function initCustomFieldSelect(item) {
+        const wrapper = item.querySelector('.condition-field-wrapper');
+        if (!wrapper) return;
+        const hiddenSelect = wrapper.querySelector('.condition-field');
+        const trigger = wrapper.querySelector('.custom-field-trigger');
+        const textSpan = wrapper.querySelector('.custom-field-text');
+        const arrow = wrapper.querySelector('.custom-field-arrow');
+        const dropdown = wrapper.querySelector('.custom-field-dropdown');
+        const searchInput = wrapper.querySelector('.custom-field-search-input');
+        const optionsContainer = wrapper.querySelector('.custom-field-options');
+        
+        // 构建下拉选项
+        function buildOptions(filter = '') {
+            optionsContainer.innerHTML = '';
+            let groups = Array.from(hiddenSelect.querySelectorAll('optgroup'));
+            const pinnedLabels = JSON.parse(localStorage.getItem('pinnedFieldGroups') || '[]');
+            
+            // 置顶的分组排到前面（按置顶顺序）
+            groups.sort((a, b) => {
+                const aPinned = pinnedLabels.indexOf(a.label);
+                const bPinned = pinnedLabels.indexOf(b.label);
+                if (aPinned !== -1 && bPinned !== -1) return aPinned - bPinned;
+                if (aPinned !== -1) return -1;
+                if (bPinned !== -1) return 1;
+                return 0;
+            });
+            
+            let hasVisible = false;
+            
+            groups.forEach(group => {
+                const label = group.label;
+                const opts = group.querySelectorAll('option');
+                const isPinned = pinnedLabels.includes(label);
+                let groupHtml = '';
+                let groupHasVisible = false;
+                
+                opts.forEach(opt => {
+                    const val = opt.value;
+                    const text = opt.textContent;
+                    if (!val) return;
+                    // 搜索过滤：匹配字段值或标签文字
+                    const match = !filter || val.includes(filter) || text.includes(filter);
+                    const displayClass = match ? '' : 'hidden-option';
+                    if (match) groupHasVisible = true;
+                    groupHtml += `<div class="custom-field-option ${displayClass}" data-value="${val}">${text}</div>`;
+                });
+                
+                if (groupHasVisible) hasVisible = true;
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'custom-field-group';
+                groupDiv.innerHTML = `
+                    <div class="custom-field-group-header" data-collapsible="true">
+                        <span class="pin-star ${isPinned ? 'pinned' : ''}" data-pin="true" title="${isPinned ? '取消置顶' : '置顶此分组'}">${isPinned ? '★' : '☆'}</span>
+                        <span>${label}</span>
+                        <span class="collapse-arrow">▼</span>
+                    </div>
+                    <div class="custom-field-group-options">${groupHtml}</div>
+                `;
+                // 搜索时自动过滤隐藏组
+                if (!groupHasVisible && filter) groupDiv.style.display = 'none';
+                optionsContainer.appendChild(groupDiv);
+            });
+            
+            if (!hasVisible && filter) {
+                optionsContainer.innerHTML = '<div class="custom-field-no-results">未找到匹配的字段</div>';
+            }
+            
+            // 绑定选项点击事件
+            optionsContainer.querySelectorAll('.custom-field-option').forEach(el => {
+                el.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    selectOption(this.dataset.value, this.textContent);
+                });
+            });
+            
+            // 绑定组折叠事件
+            optionsContainer.querySelectorAll('.custom-field-group-header').forEach(header => {
+                const starEl = header.querySelector('[data-pin="true"]');
+                // 点击星标切换置顶
+                if (starEl) {
+                    starEl.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const label = this.parentElement.querySelector('span:not(.pin-star):not(.collapse-arrow)').textContent;
+                        let pinned = JSON.parse(localStorage.getItem('pinnedFieldGroups') || '[]');
+                        const idx = pinned.indexOf(label);
+                        if (idx === -1) {
+                            pinned.unshift(label);
+                        } else {
+                            pinned.splice(idx, 1);
+                        }
+                        localStorage.setItem('pinnedFieldGroups', JSON.stringify(pinned));
+                        // 刷新下拉框（保持搜索过滤和折叠状态）
+                        const filterVal = searchInput.value;
+                        const wasOpen = dropdown.classList.contains('show');
+                        buildOptions(filterVal);
+                        // 让分组展开/折叠状态恢复为默认展开
+                    });
+                }
+                // 点击其他地方（非星标）切换折叠
+                header.addEventListener('click', function(e) {
+                    if (e.target.closest('[data-pin="true"]')) return;
+                    e.stopPropagation();
+                    const groupOpts = this.nextElementSibling;
+                    const arrowEl = this.querySelector('.collapse-arrow');
+                    if (groupOpts) {
+                        groupOpts.classList.toggle('collapsed');
+                        if (arrowEl) arrowEl.classList.toggle('collapsed');
+                    }
+                });
+            });
+        }
+        
+        // 选择选项
+        function selectOption(val, text) {
+            // 更新隐藏 select
+            hiddenSelect.value = val;
+            // 更新显示
+            textSpan.textContent = text;
+            textSpan.classList.add('selected');
+            // 高亮已选项
+            optionsContainer.querySelectorAll('.custom-field-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.value === val);
+            });
+            // 关闭下拉
+            closeDropdown();
+            // 触发 change 事件（与原有逻辑兼容）
+            const evt = new Event('change', { bubbles: true });
+            hiddenSelect.dispatchEvent(evt);
+        }
+        
+        // 打开下拉
+        function openDropdown() {
+            const filter = searchInput.value;
+            buildOptions(filter);
+            dropdown.classList.add('show');
+            trigger.classList.add('active');
+            arrow.classList.add('open');
+            // 聚焦搜索框
+            setTimeout(() => searchInput.focus(), 50);
+            // 全局点击关闭
+            document.addEventListener('click', closeOnOutsideClick);
+        }
+        
+        // 关闭下拉
+        function closeDropdown() {
+            dropdown.classList.remove('show');
+            trigger.classList.remove('active');
+            arrow.classList.remove('open');
+            document.removeEventListener('click', closeOnOutsideClick);
+        }
+        
+        function closeOnOutsideClick(e) {
+            if (!wrapper.contains(e.target)) {
+                closeDropdown();
+            }
+        }
+        
+        // 触发点击
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (dropdown.classList.contains('show')) {
+                closeDropdown();
+            } else {
+                // 关闭其他打开的 dropdown
+                document.querySelectorAll('.custom-field-dropdown.show').forEach(d => {
+                    if (d !== dropdown) {
+                        d.classList.remove('show');
+                        d.closest('.condition-field-wrapper').querySelector('.custom-field-trigger').classList.remove('active');
+                        d.closest('.condition-field-wrapper').querySelector('.custom-field-arrow').classList.remove('open');
+                    }
+                });
+                openDropdown();
+            }
+        });
+        
+        // 搜索输入
+        searchInput.addEventListener('input', function() {
+            buildOptions(this.value);
+        });
+        
+        // 键盘导航
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDropdown();
+            } else if (e.key === 'Enter') {
+                const visible = optionsContainer.querySelector('.custom-field-option:not(.hidden-option)');
+                if (visible) {
+                    selectOption(visible.dataset.value, visible.textContent);
+                }
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const items = [...optionsContainer.querySelectorAll('.custom-field-option:not(.hidden-option)')];
+                if (!items.length) return;
+                const currentIdx = items.findIndex(el => el.classList.contains('highlighted'));
+                let nextIdx;
+                if (e.key === 'ArrowDown') {
+                    nextIdx = currentIdx < items.length - 1 ? currentIdx + 1 : 0;
+                } else {
+                    nextIdx = currentIdx > 0 ? currentIdx - 1 : items.length - 1;
+                }
+                items.forEach(el => el.classList.remove('highlighted'));
+                if (items[nextIdx]) {
+                    items[nextIdx].classList.add('highlighted');
+                    items[nextIdx].scrollIntoView({ block: 'nearest' });
+                }
+            }
+        });
+        
+        // 同步初始值
+        if (hiddenSelect.value) {
+            const selectedOpt = hiddenSelect.options[hiddenSelect.selectedIndex];
+            if (selectedOpt && selectedOpt.text && selectedOpt.text !== '选择字段') {
+                textSpan.textContent = selectedOpt.text;
+                textSpan.classList.add('selected');
+            }
+        }
+    }
+
     // 绑定值控件（通用所有五行/十神字段）
     function bindValControl() {
         const conditionItems = DOM.ruleConditions.querySelectorAll('.condition-item');
         
         conditionItems.forEach((item) => {
+            initCustomFieldSelect(item);
             const fieldSel = item.querySelector('.condition-field');
             const opSel = item.querySelector('.condition-op');
             const valSel = item.querySelector('.condition-val-select');
@@ -7193,6 +8451,16 @@
                     opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                     valSel.classList.remove('hidden');
                     valSel.innerHTML = '<option value="">请选择性别</option><option value="男">男</option><option value="女">女</option><option value="不限">不限</option>';
+                }
+                else if(field === '存在大运' || field === '存在流年' || field === '存在流月'){
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
+                    valSel.classList.remove('hidden');
+                    valSel.innerHTML = '<option value="">请选择</option><option value="是">是</option><option value="否">否</option>';
+                }
+                else if(field === '触发范围'){
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
+                    valSel.classList.remove('hidden');
+                    valSel.innerHTML = '<option value="">请选择触发范围</option><option value="仅原局">仅原局</option><option value="原局+大运">原局+大运</option><option value="原局+大运+流年">原局+大运+流年</option><option value="原局+大运+流年+流月">原局+大运+流年+流月</option>';
                 }
                 else if(field.startsWith('五行数量对比-')){
                     opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -7932,7 +9200,6 @@
                         rule.conditions.forEach((c, i) => {
                             const item = createConditionItemElement();
                             groupChildren.appendChild(item);
-                            bindItemEvents(item);
                             
                             const fieldSel = item.querySelector('.condition-field');
                             const opSel = item.querySelector('.condition-op');
@@ -7941,7 +9208,10 @@
                             const valInput = item.querySelector('.condition-val-input');
                             const valCheckbox = item.querySelector('.condition-val-checkbox');
                             
+                            // 先设置字段值（需在 bindItemEvents / initCustomFieldSelect 之前）
                             fieldSel.value = c.field || '';
+                            
+                            bindItemEvents(item);
                             
                             // 触发onchange初始化值控件
                             if (fieldSel.onchange) {
@@ -8723,9 +9993,9 @@
                         DOM.tabRule.className = 'nav-btn nav-btn-default';
                         DOM.tabCase.className = 'nav-btn nav-btn-active';
                         loadCases();
-                        // 打开查看案例弹窗
+                        // 打开查看案例
                         setTimeout(() => {
-                            openViewCaseModal(caseId);
+                            openCaseDetailInline(caseId);
                         }, 100);
                     };
                 });
@@ -11012,7 +12282,7 @@ function getAllTagCategories() {
         if (isAdminUser) {
             if (!isEditingCategories) {
                 html += `
-                    <button id="manage-categories-btn" class="px-4 py-2.5 rounded-lg text-sm font-bold bg-purple-600 text-white hover:bg-purple-700 transition-transform shadow-md">⚙️ 管理分类</button>
+                    <button id="manage-tag-categories-btn" class="px-4 py-2.5 rounded-lg text-sm font-bold bg-purple-600 text-white hover:bg-purple-700 transition-transform shadow-md">⚙️ 管理分类</button>
                 `;
             } else {
                 html += `
@@ -11034,7 +12304,7 @@ function getAllTagCategories() {
             });
             
             // 管理分类按钮
-            const manageBtn = document.getElementById('manage-categories-btn');
+            const manageBtn = document.getElementById('manage-tag-categories-btn');
             if (manageBtn) {
                 manageBtn.addEventListener('click', () => {
                     isEditingCategories = true;
@@ -13271,7 +14541,7 @@ function getAllTagCategories() {
                         </button>
                         <div id="adjust-panel-research" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
                             <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
-                                <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                                <div class="flex-1 flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll justify-center">
                                     <!-- 比劫 -->
                                     <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
                                         <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
@@ -13828,7 +15098,7 @@ function getAllTagCategories() {
                     </button>
                     <div id="adjust-panel-detail" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">
                         <div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">
-                            <div class="flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll lg:justify-center">
+                            <div class="flex-1 flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll justify-center">
                                 <!-- 比劫 -->
                                 <div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="比劫">
                                     <div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">比劫</div>
@@ -15535,6 +16805,26 @@ function getAllTagCategories() {
             if (e.key === 'Enter') loadCases();
         };
         
+        // 视图切换按钮
+        if (DOM.caseViewToggle) {
+            DOM.caseViewToggle.addEventListener('click', function() {
+                caseViewMode = caseViewMode === 'detailed' ? 'simple' : 'detailed';
+                DOM.caseViewToggle.textContent = caseViewMode === 'detailed' ? '☰ 简洁视图' : '📋 详细视图';
+                DOM.caseViewToggle.classList.toggle('bg-amber-500', caseViewMode === 'simple');
+                DOM.caseViewToggle.classList.toggle('text-white', caseViewMode === 'simple');
+                DOM.caseViewToggle.classList.toggle('bg-gray-200', caseViewMode === 'detailed');
+                DOM.caseViewToggle.classList.toggle('text-gray-700', caseViewMode === 'detailed');
+                loadCases();
+            });
+        }
+        
+        // 关闭内联详情按钮
+        if (DOM.closeCaseDetail) {
+            DOM.closeCaseDetail.addEventListener('click', function() {
+                DOM.caseDetailArea.classList.add('hidden');
+            });
+        }
+        
         // 刷新案例按钮
         const refreshCasesBtn = document.getElementById('refresh-cases-btn');
         if (refreshCasesBtn) {
@@ -16068,6 +17358,8 @@ function getAllTagCategories() {
 
     // 案例分页状态
     let currentCasePage = 1;
+    let caseViewMode = 'detailed'; // 'detailed' | 'simple'
+    let currentViewCaseData = null; // 当前内联详情的案例数据
     
     // 案例跨页选择状态（存储选中的案例ID）
     let selectedCasesSet = new Set();
@@ -16154,9 +17446,16 @@ function getAllTagCategories() {
         
         if (filteredCases.length === 0) {
             DOM.caseList.innerHTML = '<p class="text-gray-500 col-span-full text-center py-8">暂无案例，添加后显示</p>';
+            DOM.caseListSimple.innerHTML = '<p class="text-gray-500 col-span-full text-center py-8">暂无案例，添加后显示</p>';
+            DOM.caseList.classList.remove('hidden');
+            DOM.caseListSimple.classList.add('hidden');
             updateCasePagination(0);
             return;
         }
+
+        // 显示/隐藏视图
+        DOM.caseList.classList.toggle('hidden', caseViewMode === 'simple');
+        DOM.caseListSimple.classList.toggle('hidden', caseViewMode === 'detailed');
         
         // 分页处理
         const pageSize = parseInt(document.getElementById('case-page-size')?.value || '10');
@@ -16234,6 +17533,16 @@ function getAllTagCategories() {
             `;
         }).join('');
         
+        // 渲染简洁视图
+        DOM.caseListSimple.innerHTML = pageData.map(c => {
+            const baziStr = c.bazi ? `${c.bazi.yearGan}${c.bazi.yearZhi} ${c.bazi.monthGan}${c.bazi.monthZhi} ${c.bazi.dayGan}${c.bazi.dayZhi} ${c.bazi.hourGan}${c.bazi.hourZhi}` : '';
+            return `
+                <div class="case-simple-item" data-id="${c.id}">
+                    ${c.title}
+                </div>
+            `;
+        }).join('');
+        
         // 绑定事件（使用事件委托，避免时序问题）
         if (!caseEventsInitialized) {
             caseEventsInitialized = true;
@@ -16280,7 +17589,15 @@ function getAllTagCategories() {
                 // 处理案例卡片点击（查看详情）
                 const card = e.target.closest('.case-card');
                 if (card) {
-                    openViewCaseModal(card.dataset.id);
+                    openCaseDetailInline(card.dataset.id);
+                }
+            });
+            
+            // 简洁视图点击事件（单独绑定）
+            DOM.caseListSimple.addEventListener('click', function(e) {
+                const item = e.target.closest('.case-simple-item');
+                if (item) {
+                    openCaseDetailInline(item.dataset.id);
                 }
             });
         }
@@ -17093,6 +18410,306 @@ function getAllTagCategories() {
         currentViewCaseId = null;
     }
 
+    // 内联显示案例详情（替代弹窗）
+    function openCaseDetailInline(id) {
+        const caseItem = caseCache.cases.find(c => c.id === id);
+        if (!caseItem) return;
+        currentViewCaseData = caseItem;
+        
+        DOM.inlineCaseTitle.textContent = caseItem.title || '案例详情';
+        
+        // 生成详情内容
+        let html = '';
+        
+        // 基本信息
+        html += '<div class="flex flex-wrap gap-2 mb-3">';
+        html += `<span class="px-3 py-1 bg-blue-100 text-blue-600 rounded text-sm font-medium">${caseItem.category || ''}</span>`;
+        html += `<span class="px-3 py-1 bg-amber-100 text-amber-600 rounded text-sm font-medium">${caseItem.difficulty || ''}</span>`;
+        html += `<span class="px-3 py-1 bg-gray-100 text-gray-500 rounded text-sm font-medium">${caseItem.gender || ''}</span>`;
+        html += `<span class="px-3 py-1 bg-gray-100 text-gray-500 rounded text-sm font-mono">ID: ${caseItem.id}</span>`;
+        html += '</div>';
+        
+        if (caseItem.birthDate) {
+            html += `<div class="text-sm text-gray-500 mb-3">📅 出生日期：${formatBirthDate(caseItem.birthDate)}</div>`;
+        }
+        
+        // 八字排盘表
+        if (caseItem.bazi) {
+            const bazi = caseItem.bazi;
+            const riGan = bazi.dayGan;
+            
+            html += '<div class="bazi-table-wrap"><div class="section-title">📊 八字排盘</div>';
+            html += '<table class="w-full border-collapse text-sm text-center">';
+            html += '<thead><tr class="bg-amber-50"><th class="border p-1.5 w-[14.28%]">年柱</th><th class="border p-1.5 w-[14.28%]">月柱</th><th class="border p-1.5 w-[14.28%]">日柱</th><th class="border p-1.5 w-[14.28%]">时柱</th><th class="border p-1.5 w-[14.28%] bg-purple-50">大运</th><th class="border p-1.5 w-[14.28%] bg-orange-50">流年</th></tr></thead>';
+            html += '<tbody>';
+            
+            function getColor(wuxing) {
+                const c = getWuXingColor(wuxing);
+                return c ? c.text : '';
+            }
+            
+            // 天干十神
+            html += '<tr>';
+            const shenGans = ['yearGan','monthGan','dayGan','hourGan'];
+            for (const key of shenGans) {
+                const gan = bazi[key];
+                const shen = getExactShen(gan, riGan) || '-';
+                const wuxing = WU_XING[gan] || '';
+                const color = getColor(wuxing);
+                html += `<td class="border p-1 font-bold ${color}">${shen}</td>`;
+            }
+            html += '<td id="inline-dayun-shen-gan" class="border p-1 font-bold bg-purple-50">-</td>';
+            html += '<td id="inline-liunian-shen-gan" class="border p-1 font-bold bg-orange-50">-</td>';
+            html += '</tr>';
+            
+            // 天干
+            html += '<tr>';
+            for (const key of shenGans) {
+                const gan = bazi[key];
+                const wuxing = WU_XING[gan] || '';
+                const color = getColor(wuxing);
+                html += `<td class="border p-1 font-bold ${color}">${gan}<span class="text-xs ml-0.5">(${wuxing})</span></td>`;
+            }
+            html += '<td id="inline-dayun-gan" class="border p-1 font-bold bg-purple-50">-</td>';
+            html += '<td id="inline-liunian-gan" class="border p-1 font-bold bg-orange-50">-</td>';
+            html += '</tr>';
+            
+            // 地支
+            html += '<tr>';
+            const zhiKeys = ['yearZhi','monthZhi','dayZhi','hourZhi'];
+            for (const key of zhiKeys) {
+                const zhi = bazi[key];
+                const wuxing = WU_XING[zhi] || '';
+                const color = getColor(wuxing);
+                html += `<td class="border p-1 font-bold ${color}">${zhi}<span class="text-xs ml-0.5">(${wuxing})</span></td>`;
+            }
+            html += '<td id="inline-dayun-zhi" class="border p-1 font-bold bg-purple-50">-</td>';
+            html += '<td id="inline-liunian-zhi" class="border p-1 font-bold bg-orange-50">-</td>';
+            html += '</tr>';
+            
+            // 地支十神
+            html += '<tr>';
+            for (const key of zhiKeys) {
+                const zhi = bazi[key];
+                const shen = getDiShen(zhi, riGan) || '-';
+                const wuxing = WU_XING[zhi] || '';
+                const color = getColor(wuxing);
+                html += `<td class="border p-1 font-bold ${color}">${shen}</td>`;
+            }
+            html += '<td id="inline-dayun-shen-zhi" class="border p-1 font-bold bg-purple-50">-</td>';
+            html += '<td id="inline-liunian-shen-zhi" class="border p-1 font-bold bg-orange-50">-</td>';
+            html += '</tr>';
+            
+            html += '</tbody></table></div>';
+            
+            // 十神关系图
+            html += '<div class="mt-4 bg-white rounded-lg border p-4"><h4 class="text-lg font-bold text-amber-800 mb-3 text-center">十神关系图</h4>';
+            // 数量调节面板（嵌入十神关系图内）
+            html += '<div class="mb-3">';
+            html += '<button id="toggle-adjust-panel-inline" class="w-full px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors flex items-center justify-center gap-2">';
+            html += '<span>🔧</span><span>数量调节</span><span id="adjust-panel-arrow-inline">▼</span></button>';
+            html += '<div id="adjust-panel-inline" class="hidden mt-2 bg-white border border-gray-200 rounded-lg p-2">';
+            html += '<div class="flex flex-col lg:flex-row lg:items-center lg:gap-3">';
+            html += '<div class="flex-1 flex flex-nowrap overflow-x-auto gap-2 pb-1 adjust-scroll justify-center">';
+            var adjGroups = {'比劫':'bijie','食伤':'shishang','财星':'caixing','官杀':'guansha','印星':'yinxing'};
+            Object.keys(adjGroups).forEach(function(sg) {
+                var eng = adjGroups[sg];
+                html += '<div class="adjust-card flex-shrink-0 w-[88px] lg:w-[110px] text-center bg-gray-50 rounded-lg py-2 px-1.5 border border-gray-200" data-shen-group="'+sg+'">';
+                html += '<div class="adjust-card-name font-bold text-gray-600 text-xs lg:text-sm leading-tight">'+sg+'</div>';
+                ['tian','di'].forEach(function(tp) {
+                    var label = tp === 'tian' ? '天' : '地';
+                    html += '<div class="flex items-center justify-between px-0.5 mt-1">';
+                    html += '<span class="adjust-card-label text-[9px] lg:text-[10px] text-gray-400 w-3 leading-none">'+label+'</span>';
+                    html += '<div class="flex items-center gap-px">';
+                    html += '<button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="'+sg+'" data-type="'+tp+'" data-op="dec">−</button>';
+                    html += '<span class="adjust-card-value w-5 lg:w-6 text-center text-[10px] lg:text-xs font-bold" id="adjust-'+tp+'-'+eng+'-inline">0</span>';
+                    html += '<button class="adjust-btn adjust-card-btn w-5 h-5 lg:w-6 lg:h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-[10px] lg:text-xs leading-none hover:bg-gray-300" data-group="'+sg+'" data-type="'+tp+'" data-op="inc">+</button>';
+                    html += '</div></div>';
+                });
+                html += '</div>';
+            });
+            html += '</div>';
+            html += '<button id="reset-adjust-inline" class="flex-shrink-0 px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">🔄 恢复默认</button>';
+            html += '</div></div></div>';
+            html += '<div class="relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-1 sm:p-4 border-2 border-gray-200">';
+            html += '<svg id="inline-shen-arrows" class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>';
+            html += '<div class="flex justify-center mb-2"><div class="shen-toggle-group">';
+            html += '<button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode(\'all\')">全部</button>';
+            html += '<button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode(\'tian\')">天干</button>';
+            html += '<button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode(\'di\')">地支</button>';
+            html += '<button class="shen-settings-gear" onclick="openShenSettingsModal()" title="标识符设置">⚙</button>';
+            html += '</div></div>';
+            html += '<div id="inline-shen-container" class="relative w-full mx-auto" style="height: 480px;">';
+            html += '<div id="inline-shen-bijie" class="absolute text-center z-10"><div class="rounded-lg p-1.5 shadow-md w-30 h-30 flex flex-col justify-center items-center leading-tight"><div class="font-bold text-sm">比劫<span id="inline-wu-bijie" class="ml-1">木</span></div><div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="inline-shen-tian-bijie">0</span></div><div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="inline-shen-di-bijie">0</span></div><div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5"><span class="font-bold text-sm">总数: <span id="inline-shen-total-bijie">0</span></span></div></div></div>';
+            html += '<div id="inline-shen-shishang" class="absolute text-center z-10"><div class="rounded-lg p-1.5 shadow-md w-30 h-30 flex flex-col justify-center items-center leading-tight"><div class="font-bold text-sm">食伤<span id="inline-wu-shishang" class="ml-1">火</span></div><div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="inline-shen-tian-shishang">0</span></div><div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="inline-shen-di-shishang">0</span></div><div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5"><span class="font-bold text-sm">总数: <span id="inline-shen-total-shishang">0</span></span></div></div></div>';
+            html += '<div id="inline-shen-caixing" class="absolute text-center z-10"><div class="rounded-lg p-1.5 shadow-md w-30 h-30 flex flex-col justify-center items-center leading-tight"><div class="font-bold text-sm">财星<span id="inline-wu-caixing" class="ml-1">土</span></div><div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="inline-shen-tian-caixing">0</span></div><div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="inline-shen-di-caixing">0</span></div><div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5"><span class="font-bold text-sm">总数: <span id="inline-shen-total-caixing">0</span></span></div></div></div>';
+            html += '<div id="inline-shen-guansha" class="absolute text-center z-10"><div class="rounded-lg p-1.5 shadow-md w-30 h-30 flex flex-col justify-center items-center leading-tight"><div class="font-bold text-sm">官杀<span id="inline-wu-guansha" class="ml-1">金</span></div><div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="inline-shen-tian-guansha">0</span></div><div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="inline-shen-di-guansha">0</span></div><div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5"><span class="font-bold text-sm">总数: <span id="inline-shen-total-guansha">0</span></span></div></div></div>';
+            html += '<div id="inline-shen-yinxing" class="absolute text-center z-10"><div class="rounded-lg p-1.5 shadow-md w-30 h-30 flex flex-col justify-center items-center leading-tight"><div class="font-bold text-sm">印星<span id="inline-wu-yinxing" class="ml-1">水</span></div><div class="shen-tian-line shen-count-row text-sm mt-0.5"><span class="shen-label">天干:</span> <span id="inline-shen-tian-yinxing">0</span></div><div class="shen-di-line shen-count-row text-sm"><span class="shen-label">地支:</span> <span id="inline-shen-di-yinxing">0</span></div><div class="shen-total-line rounded px-1.5 py-0.5 mt-0.5"><span class="font-bold text-sm">总数: <span id="inline-shen-total-yinxing">0</span></span></div></div></div>';
+            html += '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs text-gray-500 text-center z-10 shengke-legend"><div class="bg-white/90 px-3 py-1.5 rounded-full shadow-sm"><div class="flex items-center gap-1 justify-center"><span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span>相生</span><span class="flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-full"></span>相克</span></div></div></div>';
+            html += '</div></div></div>';
+        }
+        
+        // 描述
+        if (caseItem.description) {
+            html += `<div class="section-title mt-4">📝 案例描述</div>`;
+            html += `<div class="event-card"><div class="event-analysis">${caseItem.description}</div></div>`;
+        }
+        
+        // 分析
+        if (caseItem.analysis) {
+            html += `<div class="section-title mt-4">🔍 案例分析</div>`;
+            html += `<div class="event-card"><div class="event-analysis">${caseItem.analysis}</div></div>`;
+        }
+        
+        // 时间线事件
+        if (caseItem.timeline && caseItem.timeline.length > 0) {
+            html += `<div class="section-title mt-4">📋 事件时间线</div>`;
+            
+            // 分离大运事件和流年事件
+            const dayunEvents = caseItem.timeline.filter(t => t.isDayun);
+            const liunianEvents = caseItem.timeline.filter(t => !t.isDayun);
+            
+            if (dayunEvents.length > 0) {
+                html += `<div class="font-semibold text-gray-600 mb-2">📌 大运事件</div>`;
+                dayunEvents.sort((a,b) => (a.year||'').localeCompare(b.year||'')).forEach((t, idx) => {
+                    const startYear = parseInt(t.dayunStartYear) || 0;
+                    const endYear = parseInt(t.dayunEndYear) || 0;
+                    html += `<div class="event-card dayun-card border-purple-300" data-dayun-index="${idx}"><div class="event-year text-purple-800">${t.year || ''}</div>`;
+                    if (t.dayunGan) {
+                        html += `<div class="font-bold text-purple-700 mt-1">${t.dayunGan}${t.dayunZhi}（${t.dayunGanShen}）</div>`;
+                    }
+                    if (t.event) html += `<div class="event-desc">${t.event}</div>`;
+                    if (t.analysis) html += `<div class="event-analysis">${t.analysis}</div>`;
+                    
+                    // 嵌套渲染下属流年
+                    const childLiunian = liunianEvents.filter(lt => {
+                        const ly = parseInt(lt.year);
+                        return ly >= startYear && ly <= endYear;
+                    });
+                    if (childLiunian.length > 0) {
+                        html += `<div class="mt-2 pt-2 border-t border-purple-200">`;
+                        childLiunian.sort((a,b) => parseInt(a.year) - parseInt(b.year)).forEach((lt, li) => {
+                            html += `<div class="liunian-card bg-orange-50 border border-orange-200 rounded p-2 mb-1 ml-3 cursor-pointer hover:bg-orange-100 transition-colors" data-liunian-index="${liunianEvents.indexOf(lt)}">`;
+                            html += `<div class="font-bold text-orange-700">${lt.year || ''}</div>`;
+                            if (lt.liunianGan) {
+                                html += `<div class="font-bold text-orange-600">${lt.liunianGan}${lt.liunianZhi}（${lt.liunianGanShen}）</div>`;
+                            }
+                            if (lt.event) html += `<div class="text-gray-700 mt-0.5">${lt.event}</div>`;
+                            if (lt.analysis) html += `<div class="text-gray-500 mt-0.5 pl-2 border-l-2 border-orange-300">${lt.analysis}</div>`;
+                            html += `</div>`;
+                        });
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                });
+            }
+        }
+        
+        DOM.caseDetailBody.innerHTML = html;
+        DOM.caseDetailArea.classList.remove('hidden');
+        
+        // 渲染十神关系图
+        setTimeout(() => {
+            const shenContainer = document.getElementById('inline-shen-arrows');
+            if (shenContainer && caseItem.bazi) {
+                updateViewShenRelation(caseItem.bazi, null, null, 'inline');
+            }
+        }, 50);
+        
+        // 高亮匹配的简洁视图项
+        DOM.caseListSimple.querySelectorAll('.case-simple-item').forEach(el => {
+            el.classList.toggle('active', el.dataset.id === id);
+        });
+        
+        // 事件卡片点击更新八字排盘大运/流年列
+        DOM.caseDetailBody.onclick = function(e) {
+            // 先判断流年（流年嵌套在大运内，需优先处理）
+            const liunianCard = e.target.closest('.liunian-card');
+            if (liunianCard) {
+                const idx = parseInt(liunianCard.dataset.liunianIndex);
+                const timeline = currentViewCaseData ? currentViewCaseData.timeline : [];
+                const liunianList = timeline.filter(t => !t.isDayun);
+                liunianList.sort((a,b) => parseInt(a.year) - parseInt(b.year));
+                const liunian = liunianList[idx];
+                if (!liunian) return;
+                
+                // 同时填充对应大运列 - 查找父级大运的真实数据
+                const liunianYear = parseInt(liunian.year);
+                const parentDayun = timeline.filter(t => t.isDayun).find(d => {
+                    const startY = parseInt(d.dayunStartYear);
+                    const endY = parseInt(d.dayunEndYear);
+                    return liunianYear >= startY && liunianYear <= endY;
+                });
+                if (parentDayun && parentDayun.dayunGan) {
+                    const dgColor = getWuXingColor(parentDayun.dayunGanWuXing);
+                    const dzColor = getWuXingColor(parentDayun.dayunZhiWuXing);
+                    const dsg = document.getElementById('inline-dayun-shen-gan');
+                    const dg = document.getElementById('inline-dayun-gan');
+                    const dz = document.getElementById('inline-dayun-zhi');
+                    const dsz = document.getElementById('inline-dayun-shen-zhi');
+                    if (dsg) dsg.innerHTML = `<span class="font-bold ${dgColor ? dgColor.text : ''}">${parentDayun.dayunGanShen || '-'}</span>`;
+                    if (dg) dg.innerHTML = `<span class="font-bold ${dgColor ? dgColor.text : ''}">${parentDayun.dayunGan}</span><span class="text-xs ml-1 ${dgColor ? dgColor.text : ''}">(${parentDayun.dayunGanWuXing || '-'})</span>`;
+                    if (dz) dz.innerHTML = `<span class="font-bold ${dzColor ? dzColor.text : ''}">${parentDayun.dayunZhi}</span><span class="text-xs ml-1 ${dzColor ? dzColor.text : ''}">(${parentDayun.dayunZhiWuXing || '-'})</span>`;
+                    if (dsz) dsz.innerHTML = `<span class="font-bold ${dzColor ? dzColor.text : ''}">${parentDayun.dayunZhiShen || '-'}</span>`;
+                }
+                
+                // 填充流年列
+                if (liunian.liunianGan) {
+                    const lgColor = getWuXingColor(liunian.liunianGanWuXing);
+                    const lzColor = getWuXingColor(liunian.liunianZhiWuXing);
+                    const shenGan = document.getElementById('inline-liunian-shen-gan');
+                    const gan = document.getElementById('inline-liunian-gan');
+                    const zhi = document.getElementById('inline-liunian-zhi');
+                    const shenZhi = document.getElementById('inline-liunian-shen-zhi');
+                    if (shenGan) shenGan.innerHTML = `<span class="font-bold ${lgColor ? lgColor.text : ''}">${liunian.liunianGanShen || '-'}</span>`;
+                    if (gan) gan.innerHTML = `<span class="font-bold ${lgColor ? lgColor.text : ''}">${liunian.liunianGan || '-'}</span><span class="text-xs ml-1 ${lgColor ? lgColor.text : ''}">(${liunian.liunianGanWuXing || '-'})</span>`;
+                    if (zhi) zhi.innerHTML = `<span class="font-bold ${lzColor ? lzColor.text : ''}">${liunian.liunianZhi || '-'}</span><span class="text-xs ml-1 ${lzColor ? lzColor.text : ''}">(${liunian.liunianZhiWuXing || '-'})</span>`;
+                    if (shenZhi) shenZhi.innerHTML = `<span class="font-bold ${lzColor ? lzColor.text : ''}">${liunian.liunianZhiShen || '-'}</span>`;
+                }
+                // 更新十神关系图
+                updateViewShenRelation(currentViewCaseData.bazi, parentDayun || null, liunian, 'inline');
+                return;
+            }
+            
+            // 再判断大运
+            const dayunCard = e.target.closest('.dayun-card');
+            if (dayunCard) {
+                const idx = parseInt(dayunCard.dataset.dayunIndex);
+                const timeline = currentViewCaseData ? currentViewCaseData.timeline : [];
+                const dayunList = timeline.filter(t => t.isDayun);
+                dayunList.sort((a,b) => (a.year||'').localeCompare(b.year||''));
+                const dayun = dayunList[idx];
+                if (!dayun) return;
+                
+                if (dayun.dayunGan) {
+                    const dgColor = getWuXingColor(dayun.dayunGanWuXing);
+                    const dzColor = getWuXingColor(dayun.dayunZhiWuXing);
+                    const shenGan = document.getElementById('inline-dayun-shen-gan');
+                    const gan = document.getElementById('inline-dayun-gan');
+                    const zhi = document.getElementById('inline-dayun-zhi');
+                    const shenZhi = document.getElementById('inline-dayun-shen-zhi');
+                    if (shenGan) shenGan.innerHTML = `<span class="font-bold ${dgColor ? dgColor.text : ''}">${dayun.dayunGanShen || '-'}</span>`;
+                    if (gan) gan.innerHTML = `<span class="font-bold ${dgColor ? dgColor.text : ''}">${dayun.dayunGan}</span><span class="text-xs ml-1 ${dgColor ? dgColor.text : ''}">(${dayun.dayunGanWuXing || '-'})</span>`;
+                    if (zhi) zhi.innerHTML = `<span class="font-bold ${dzColor ? dzColor.text : ''}">${dayun.dayunZhi}</span><span class="text-xs ml-1 ${dzColor ? dzColor.text : ''}">(${dayun.dayunZhiWuXing || '-'})</span>`;
+                    if (shenZhi) shenZhi.innerHTML = `<span class="font-bold ${dzColor ? dzColor.text : ''}">${dayun.dayunZhiShen || '-'}</span>`;
+                }
+                // 清空流年列
+                ['inline-liunian-shen-gan','inline-liunian-gan','inline-liunian-zhi','inline-liunian-shen-zhi'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = '-';
+                });
+                // 更新十神关系图
+                updateViewShenRelation(currentViewCaseData.bazi, dayun, null, 'inline');
+                return;
+            }
+        };
+        
+        // 滚动到详情区
+        setTimeout(() => {
+            DOM.caseDetailArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+
     // 从查看弹窗打开编辑弹窗
     function editFromViewModal() {
         const caseId = currentViewCaseId;
@@ -17646,9 +19263,9 @@ function loadConditionsToEditor(container, conditions) {
                 const field = item.querySelector('.condition-field');
                 const op = item.querySelector('.condition-op');
                 const logic = item.querySelector('.condition-logic');
-                // 先设字段值
-                if (field) field.value = child.field || '';
                 container.appendChild(item);
+                // 先设字段值（需在 bindItemEvents / initCustomFieldSelect 之前）
+                if (field) field.value = child.field || '';
                 // 绑定事件（设置onchange处理器）
                 bindItemEvents(item);
                 // 触发change以更新op选项和值控件
@@ -21827,7 +23444,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- 条件宏编辑器弹窗 -->
 <div id="macro-editor-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded-lg shadow-xl w-[700px] max-h-[85vh] flex flex-col mx-4">
+    <div class="bg-white rounded-lg shadow-xl w-[95vw] h-[95vh] flex flex-col mx-4">
         <div class="flex justify-between items-center p-4 border-b shrink-0">
             <h3 class="text-lg font-bold text-indigo-800" id="macro-editor-title">新建条件宏</h3>
             <button onclick="closeMacroEditor()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
@@ -21836,6 +23453,18 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="mb-3">
                 <label class="block text-sm font-medium text-gray-700 mb-1">宏名称 <span class="text-red-500">*</span></label>
                 <input type="text" id="macro-editor-name" class="w-full p-2 border rounded" placeholder="例如：身强、正官格...">
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-2">条件定义</label>
+                <div class="border-2 border-indigo-300 rounded-lg p-3 bg-indigo-50">
+                    <div id="macro-conditions" class="mb-3">
+                        <div class="condition-group-root" id="macro-condition-root" data-group-id="macro-root" data-group-logic="and"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="macro-add-group" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs">+ 添加条件组</button>
+                        <button id="macro-add-condition" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs">+ 添加条件</button>
+                    </div>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
@@ -21863,18 +23492,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <input type="checkbox" id="macro-pinned-checkbox" class="w-4 h-4 text-indigo-600 rounded">
                     <span class="text-sm font-medium text-gray-700">📌 置顶（始终排在列表顶部）</span>
                 </label>
-            </div>
-            <div class="mb-3">
-                <label class="block text-sm font-medium text-gray-700 mb-2">条件定义</label>
-                <div class="border-2 border-indigo-300 rounded-lg p-3 bg-indigo-50">
-                    <div id="macro-conditions" class="mb-3">
-                        <div class="condition-group-root" id="macro-condition-root" data-group-id="macro-root" data-group-logic="and"></div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button id="macro-add-group" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs">+ 添加条件组</button>
-                        <button id="macro-add-condition" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs">+ 添加条件</button>
-                    </div>
-                </div>
             </div>
             <div class="flex gap-2 justify-end border-t pt-3">
                 <button id="save-macro-btn" class="px-4 py-2 bg-indigo-600 text-white rounded">💾 保存宏</button>
