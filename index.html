@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3492,6 +3492,26 @@
       }
     }
     
+    /**
+     * 包装大运对象：将 API 返回的纯 JSON 大运对象包装为兼容旧代码
+     * 的 getter 方法形式（getGanZhi/getStartAge/getStartYear/getEndYear）
+     */
+    function wrapDayunObject(dy) {
+      if (!dy) return dy;
+      // 如果已经有方法则直接返回
+      if (typeof dy.getGanZhi === 'function') return dy;
+      return {
+        ganZhi: dy.ganZhi,
+        startAge: dy.startAge,
+        startYear: dy.startYear,
+        endYear: dy.endYear,
+        getGanZhi: function() { return dy.ganZhi; },
+        getStartAge: function() { return dy.startAge; },
+        getStartYear: function() { return dy.startYear; },
+        getEndYear: function() { return dy.endYear; }
+      };
+    }
+    
     let DOM = {};
     let _userOwnCats = []; // 当前用户自己创建的分类，在 loadCategories 中赋值
     
@@ -4815,8 +4835,8 @@
                                 div.onclick = function() {
                                     document.querySelectorAll('.dayun-item').forEach(function(item) { item.classList.remove('active'); });
                                     div.classList.add('active');
-                                    currentDaYun = dy;
-                                    window.currentDaYun = dy;
+                                    currentDaYun = wrapDayunObject(dy);
+                                    window.currentDaYun = wrapDayunObject(dy);
                                     
                                     var dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
                                     var dayunZhiSelect = document.querySelector('.dizhi[data-type="dayun"]');
