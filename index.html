@@ -3482,7 +3482,7 @@
       }
       var cacheKey = birthDate + '_' + birthTime + '_' + gender;
       if (BAZI_API_CACHE[cacheKey]) {
-        try { return JSON.parse(BAZI_API_CACHE[cacheKey]); } catch(e) {}
+        try { var cached = JSON.parse(BAZI_API_CACHE[cacheKey]); return cached.data || cached; } catch(e) {}
       }
       
       var xhr = new XMLHttpRequest();
@@ -4742,12 +4742,12 @@
                     div.className = 'liunian-item' + (isCurrentYear ? ' current-year' : '');
                     div.innerHTML = '<div class="liunian-year">' + yr + '</div><div class="liunian-age">' + currentAge + '岁</div><div class="liunian-ganzhi">' + yg.gan + yg.zhi + '</div>';
                     
-                    (function(y, g, zh, yr2, gz) {
-                        div.onclick = function() {
+                    (function(y, g, zh, yr2, gz, d) {
+                        d.onclick = function() {
                             document.querySelectorAll('.liunian-item').forEach(function(item) {
                                 item.classList.remove('active');
                             });
-                            div.classList.add('active');
+                            d.classList.add('active');
                             
                             var liunianGanSelect = document.querySelector('.tiangan[data-type="liunian"]');
                             var liunianZhiSelect = document.querySelector('.dizhi[data-type="liunian"]');
@@ -4760,7 +4760,7 @@
                                 updateLiuYueList(g, yr2);
                             }
                         };
-                    })(yr, yg.gan, yg.zhi, yr, yg.ganZhi);
+                    })(yr, yg.gan, yg.zhi, yr, yg.ganZhi, div);
                     
                     liunianContainer.appendChild(div);
                 }
