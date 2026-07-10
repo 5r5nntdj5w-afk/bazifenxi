@@ -3505,7 +3505,10 @@
           BAZI_API_CACHE[cacheKey] = xhr.responseText;
           return result.data;
         }
-        throw new Error(result && result.error ? result.error : 'API 返回异常');
+        // 如果 API 返回了 detail 字段（诊断信息），一并显示
+        var errMsg = result && result.error ? result.error : 'API 返回异常';
+        if (result && result.detail) errMsg += ' [' + result.detail + ']';
+        throw new Error(errMsg);
       } else {
         throw new Error('API 请求失败: HTTP ' + xhr.status);
       }
