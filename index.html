@@ -21148,7 +21148,6 @@ async function openEditPaymentModal() {
                                 <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-case-${index}" ${(extractPermissionsFromFeatures(tier.features) || {}).case === true ? 'checked' : ''}> 案例库</label>
                                 <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-research-${index}" ${(extractPermissionsFromFeatures(tier.features) || {}).research === true ? 'checked' : ''}> 事项研究</label>
                                 <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-tag-${index}" ${(extractPermissionsFromFeatures(tier.features) || {}).tag === true ? 'checked' : ''}> 标签管理</label>
-                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-data-${index}" ${(extractPermissionsFromFeatures(tier.features) || {}).data === true ? 'checked' : ''}> 数据管理</label>
                             </div>
                             <p class="text-xs text-gray-400 mt-1">八字分析对所有用户默认开放，其他功能仅勾选后该套餐会员才能访问</p>
                         </div>
@@ -21283,7 +21282,6 @@ async function openEditPaymentModal() {
                         <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-case-${newIndex}"> 案例库</label>
                         <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-research-${newIndex}"> 事项研究</label>
                         <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-tag-${newIndex}"> 标签管理</label>
-                        <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" id="tier-perm-data-${newIndex}"> 数据管理</label>
                     </div>
                     <p class="text-xs text-gray-400 mt-1">八字分析对所有用户默认开放</p>
                 </div>
@@ -21366,8 +21364,7 @@ async function openEditPaymentModal() {
                 rule: document.getElementById(`tier-perm-rule-${i}`)?.checked ?? false,
                 case: document.getElementById(`tier-perm-case-${i}`)?.checked ?? false,
                 research: document.getElementById(`tier-perm-research-${i}`)?.checked ?? false,
-                tag: document.getElementById(`tier-perm-tag-${i}`)?.checked ?? false,
-                data: document.getElementById(`tier-perm-data-${i}`)?.checked ?? false
+                tag: document.getElementById(`tier-perm-tag-${i}`)?.checked ?? false
             };
             // 读取断语分类权限
             const catsContainer = document.getElementById(`tier-rule-cats-${i}`);
@@ -21399,7 +21396,7 @@ async function openEditPaymentModal() {
                 defaultPermLevel: permissions.default_perm_level,
                 macroDefaultPermLevel: permissions.macro_default_perm_level,
                 macroAllowedTags: permissions.macro_allowed_tags || [],
-                permSignature: { bazi: permissions.bazi, rule: permissions.rule, case: permissions.case, research: permissions.research, tag: permissions.tag, data: permissions.data }
+                permSignature: { bazi: permissions.bazi, rule: permissions.rule, case: permissions.case, research: permissions.research, tag: permissions.tag }
             });
             // 将权限JSON编码到features字段中（避免需要新增数据库列）
             const permsStr = JSON.stringify(permissions);
@@ -22773,13 +22770,7 @@ async function loadUserList(page = 1, searchEmail = '', sortBy = 'created_at_des
                 }
                 // 仍未匹配到时，尝试用权限特征兜底判断
                 if (!currentTier) {
-                    if (permissions.rule && permissions.case && permissions.data) {
-                        const fullTier = availableTiers.find(t => {
-                            const tp = extractPermissionsFromFeatures(t.features);
-                            return tp && tp.data === true;
-                        });
-                        if (fullTier) currentTier = fullTier.tier;
-                    } else if (permissions.rule && permissions.case) {
+                    if (permissions.rule && permissions.case) {
                         const midTier = availableTiers.find(t => {
                             const tp = extractPermissionsFromFeatures(t.features);
                             return tp && tp.rule === true && tp.case === true;
@@ -22800,9 +22791,9 @@ async function loadUserList(page = 1, searchEmail = '', sortBy = 'created_at_des
             } else {
                 // 无动态数据时保留默认按钮
                 tierButtonsHtml = `
-                    <button onclick="setUserLevel('${user.user_id}', '${user.email}', 'basic')" class="px-2 py-1 text-xs rounded ${!permissions.rule && !permissions.case && !permissions.data ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">基础版</button>
-                    <button onclick="setUserLevel('${user.user_id}', '${user.email}', 'pro')" class="px-2 py-1 text-xs rounded ${permissions.rule && permissions.case && !permissions.data ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">专业版</button>
-                    <button onclick="setUserLevel('${user.user_id}', '${user.email}', 'premium')" class="px-2 py-1 text-xs rounded ${permissions.rule && permissions.case && permissions.data ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">高级版</button>
+                    <button onclick="setUserLevel('${user.user_id}', '${user.email}', 'basic')" class="px-2 py-1 text-xs rounded ${!permissions.rule && !permissions.case ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">基础版</button>
+                    <button onclick="setUserLevel('${user.user_id}', '${user.email}', 'pro')" class="px-2 py-1 text-xs rounded ${permissions.rule && permissions.case ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">专业版</button>
+                    <button onclick="setUserLevel('${user.user_id}', '${user.email}', 'premium')" class="px-2 py-1 text-xs rounded ${permissions.rule && permissions.case ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">高级版</button>
                 `;
             }
             
@@ -22835,8 +22826,7 @@ async function loadUserList(page = 1, searchEmail = '', sortBy = 'created_at_des
                         断语管理${permissions.rule ? '✓' : '✗'}, 
                         案例库${permissions.case ? '✓' : '✗'}, 
                         事项研究${permissions.research ? '✓' : '✗'}, 
-                        标签管理${permissions.tag ? '✓' : '✗'}, 
-                        数据管理${permissions.data ? '✓' : '✗'}
+                        标签管理${permissions.tag ? '✓' : '✗'}
                     </div>
                     
                     ${!isAdmin ? `
@@ -22912,7 +22902,7 @@ async function setUserLevel(userId, email, level) {
     console.log('设置用户等级:', { userId, email, level });
     
     // 从 payment_settings 表动态获取该套餐的权限配置
-    let permissions = { bazi: true, rule: false, case: false, research: false, tag: false, data: false };
+    let permissions = { bazi: true, rule: false, case: false, research: false, tag: false };
     let expireDate = calculateExpireDate(30);
     let levelName = level;
     
@@ -23024,7 +23014,6 @@ function editUserPermissions(userId, email) {
                                 <label class="flex items-center gap-2"><input type="checkbox" id="edit-case" ${permissions.case ? 'checked' : ''}> 案例库</label>
                                 <label class="flex items-center gap-2"><input type="checkbox" id="edit-research" ${permissions.research ? 'checked' : ''}> 事项研究</label>
                                 <label class="flex items-center gap-2"><input type="checkbox" id="edit-tag" ${permissions.tag ? 'checked' : ''}> 标签管理</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" id="edit-data" ${permissions.data ? 'checked' : ''}> 数据管理</label>
                             </div>
                         </div>
                         <div>
@@ -23058,8 +23047,7 @@ async function saveUserPermissions(userId) {
         rule: document.getElementById('edit-rule').checked,
         case: document.getElementById('edit-case').checked,
         research: document.getElementById('edit-research').checked,
-        tag: document.getElementById('edit-tag').checked,
-        data: document.getElementById('edit-data').checked
+        tag: document.getElementById('edit-tag').checked
     };
     const expireDate = document.getElementById('edit-expire').value || 'permanent';
     
@@ -23207,7 +23195,7 @@ async function loadUserPermissionsDisplay() {
                 }
             } else {
                 // 无动态数据时用回退逻辑
-                if (permissions.rule && permissions.case && permissions.data) {
+                if (permissions.rule && permissions.case) {
                     tierName = '高级版'; tierClass = 'px-3 py-1 bg-purple-600 text-white rounded text-sm';
                 } else if (permissions.rule && permissions.case) {
                     tierName = '专业版'; tierClass = 'px-3 py-1 bg-blue-600 text-white rounded text-sm';
@@ -23215,9 +23203,7 @@ async function loadUserPermissionsDisplay() {
             }
         } catch (e) {
             // 出错时回退
-            if (permissions.rule && permissions.case && permissions.data) {
-                tierName = '高级版'; tierClass = 'px-3 py-1 bg-purple-600 text-white rounded text-sm';
-            } else if (permissions.rule && permissions.case) {
+            if (permissions.rule && permissions.case) {
                 tierName = '专业版'; tierClass = 'px-3 py-1 bg-blue-600 text-white rounded text-sm';
             }
         }
@@ -23240,8 +23226,7 @@ async function loadUserPermissionsDisplay() {
             { key: 'rule', name: '断语管理' },
             { key: 'case', name: '案例库' },
             { key: 'research', name: '事项研究' },
-            { key: 'tag', name: '标签管理' },
-            { key: 'data', name: '数据管理' }
+            { key: 'tag', name: '标签管理' }
         ];
         
         permListEl.innerHTML = allPerms.map(p => {
