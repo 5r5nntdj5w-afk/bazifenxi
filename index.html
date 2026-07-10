@@ -3454,6 +3454,44 @@
     const AGE_CONFIG_KEY='bazi_age_config'; // 类别年龄限制配置
     const MACRO_KEY='bazi_condition_macros'; // 条件宏定义
     
+    // ===== API 配置 =====
+    // 八字排盘云函数 API（腾讯云 SCF），保护核心计算逻辑
+    const API_BAZI_URL = 'https://1254456257-fkggh2mgvo.ap-shanghai.tencentscf.com/api/bazi';
+    const BAZI_API_CACHE = {}; // API 结果缓存（避免重复请求）
+    
+    // 调用排盘 API
+    function callBaziApi(birthDate, birthTime, gender, calendarType, isLeapMonth) {
+      var cacheKey = birthDate + '_' + birthTime + '_' + gender;
+      if (BAZI_API_CACHE[cacheKey]) {
+        try { return JSON.parse(BAZI_API_CACHE[cacheKey]); } catch(e) {}
+      }
+      
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', API_BAZI_URL, false); // 同步请求
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      
+      var body = JSON.stringify({
+        birthDate: birthDate,
+        birthTime: birthTime,
+        gender: gender,
+        calendarType: calendarType || 'solar',
+        isLeapMonth: isLeapMonth || false
+      });
+      
+      xhr.send(body);
+      
+      if (xhr.status === 200) {
+        var result = JSON.parse(xhr.responseText);
+        if (result && result.success && result.data) {
+          BAZI_API_CACHE[cacheKey] = xhr.responseText;
+          return result.data;
+        }
+        throw new Error(result && result.error ? result.error : 'API 返回异常');
+      } else {
+        throw new Error('API 请求失败: HTTP ' + xhr.status);
+      }
+    }
+    
     let DOM = {};
     let _userOwnCats = []; // 当前用户自己创建的分类，在 loadCategories 中赋值
     
@@ -4506,7 +4544,7 @@
         const paipanResult = document.getElementById('paipan-result');
         
         let currentDaYun = null;
-        let daYunList = [];
+        let daYunData = [];
 
         // 清除流年选择和流月选择
         function clearLiuNianSelection() {
@@ -4515,37 +4553,26 @@
             const liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
             const liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
             
-            if (liunianGanSelect) {
-                liunianGanSelect.value = '';
-            }
+            if (liunianGanSelect) liunianGanSelect.value = '';
             if (liunianZhiSelect) {
                 liunianZhiSelect.value = '';
                 liunianZhiSelect.innerHTML = '<option value="">支</option>';
             }
-            
-            // 清除流月选择
-            if (liuyueGanSelect) {
-                liuyueGanSelect.value = '';
-            }
+            if (liuyueGanSelect) liuyueGanSelect.value = '';
             if (liuyueZhiSelect) {
                 liuyueZhiSelect.value = '';
                 liuyueZhiSelect.innerHTML = '<option value="">支</option>';
             }
-            
-            // 隐藏流月列表
             const liuyueListDiv = document.getElementById('liuyue-list');
-            if (liuyueListDiv) {
-                liuyueListDiv.classList.add('hidden');
-            }
+            if (liuyueListDiv) liuyueListDiv.classList.add('hidden');
         }
 
-        // 清除出生日期记录（当手动修改八字时）
         function clearBirthData() {
             window.lastPaipanData = null;
             window.currentDaYun = null;
         }
 
-        // 更新流年列表
+        // 更新流年列表（支持 JSON 对象格式）
         function updateLiuNianList(dayun) {
             const liunianContainer = document.getElementById('liunian-container');
             const liunianListDiv = document.getElementById('liunian-list');
@@ -4558,49 +4585,45 @@
             liunianContainer.innerHTML = '';
             
             if (dayun) {
-                const startYear = dayun.getStartYear();
-                const ganZhi = dayun.getGanZhi();
-                const startAge = dayun.getStartAge();
-                // 获取大运的实际年数（大运持续年数）
-                const duration = dayun.getEndYear() - startYear + 1;
+                var startYear = dayun.startYear;
+                var ganZhi = dayun.ganZhi;
+                var gan = dayun.gan || ganZhi.charAt(0);
+                var zhi = dayun.zhi || ganZhi.charAt(1);
+                var startAge = dayun.startAge;
+                var endYear = dayun.endYear;
+                var duration = endYear - startYear + 1;
                 
-                liunianTitle.textContent = `${ganZhi}大运（${startAge}岁起）流年`;
+                liunianTitle.textContent = ganZhi + '大运（' + startAge + '岁起）流年';
                 
-                // 生成当前大运的流年（根据实际大运年数）
-                for (let i = 0; i < duration && i < 10; i++) {
-                    const year = startYear + i;
-                    // 使用自定义函数计算年干支（基于60甲子循环）
-                    const { gan, zhi } = getYearGanZhi(year);
-                    const isCurrentYear = year === currentYear;
-                    const currentAge = startAge + i;
+                for (var i = 0; i < duration && i < 10; i++) {
+                    var yr = startYear + i;
+                    var yg = getYearGanZhi(yr);
+                    var isCurrentYear = yr === currentYear;
+                    var currentAge = startAge + i;
 
-                    const div = document.createElement('div');
+                    var div = document.createElement('div');
                     div.className = 'liunian-item' + (isCurrentYear ? ' current-year' : '');
-                    div.innerHTML = `<div class="liunian-year">${year}</div><div class="liunian-age">${currentAge}岁</div><div class="liunian-ganzhi">${gan}${zhi}</div>`;
+                    div.innerHTML = '<div class="liunian-year">' + yr + '</div><div class="liunian-age">' + currentAge + '岁</div><div class="liunian-ganzhi">' + yg.gan + yg.zhi + '</div>';
                     
-                    div.onclick = function() {
-                        // 移除其他选中状态
-                        document.querySelectorAll('.liunian-item').forEach(item => {
-                            item.classList.remove('active');
-                        });
-                        // 添加当前选中状态
-                        div.classList.add('active');
-                        
-                        // 填充八字输入区的流年
-                        const liunianGanSelect = document.querySelector('.tiangan[data-type="liunian"]');
-                        const liunianZhiSelect = document.querySelector('.dizhi[data-type="liunian"]');
-
-                        if (liunianGanSelect && liunianZhiSelect) {
-                            liunianGanSelect.value = gan;
-                            const validDizhi = getValidDizhiByGan(gan);
-                            renderDizhiSelect(liunianZhiSelect, validDizhi);
-                            liunianZhiSelect.value = zhi;
-                            calcAll();
+                    (function(y, g, zh, yr2, gz) {
+                        div.onclick = function() {
+                            document.querySelectorAll('.liunian-item').forEach(function(item) {
+                                item.classList.remove('active');
+                            });
+                            div.classList.add('active');
                             
-                            // 更新流月列表（根据流年干支）
-                            updateLiuYueList(gan, year);
-                        }
-                    };
+                            var liunianGanSelect = document.querySelector('.tiangan[data-type="liunian"]');
+                            var liunianZhiSelect = document.querySelector('.dizhi[data-type="liunian"]');
+                            if (liunianGanSelect && liunianZhiSelect) {
+                                liunianGanSelect.value = g;
+                                var validDizhi = getValidDizhiByGan(g);
+                                renderDizhiSelect(liunianZhiSelect, validDizhi);
+                                liunianZhiSelect.value = zh;
+                                calcAll();
+                                updateLiuYueList(g, yr2);
+                            }
+                        };
+                    })(yr, yg.gan, yg.zhi, yr, yg.ganZhi);
                     
                     liunianContainer.appendChild(div);
                 }
@@ -4611,56 +4634,29 @@
             }
         }
 
-        // 五虎遁：根据年干计算流月干支
-        // 口诀：甲己之年丙作首，乙庚之岁戊为头，丙辛必定寻庚起，丁壬壬位顺行流，戊癸何方发，甲寅之上好追求
         function getLiuYueGanZhi(yearGan, month) {
-            const TIANGAN = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
-            const DIZHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-            
-            // 正月地支索引（寅为正月，索引2）
+            const TIANGAN = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+            const DIZHI = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
             const baseZhiIndex = 2;
-            
-            // 根据年干确定正月天干索引
             let firstMonthGanIndex;
             switch(yearGan) {
-                case '甲':
-                case '己':
-                    firstMonthGanIndex = 2; // 丙
-                    break;
-                case '乙':
-                case '庚':
-                    firstMonthGanIndex = 4; // 戊
-                    break;
-                case '丙':
-                case '辛':
-                    firstMonthGanIndex = 6; // 庚
-                    break;
-                case '丁':
-                case '壬':
-                    firstMonthGanIndex = 8; // 壬
-                    break;
-                case '戊':
-                case '癸':
-                    firstMonthGanIndex = 0; // 甲
-                    break;
-                default:
-                    firstMonthGanIndex = 0;
+                case '甲': case '己': firstMonthGanIndex = 2; break;
+                case '乙': case '庚': firstMonthGanIndex = 4; break;
+                case '丙': case '辛': firstMonthGanIndex = 6; break;
+                case '丁': case '壬': firstMonthGanIndex = 8; break;
+                case '戊': case '癸': firstMonthGanIndex = 0; break;
+                default: firstMonthGanIndex = 0;
             }
-            
-            // 计算当前月份的天干和地支索引
             const ganIndex = (firstMonthGanIndex + month - 1) % 10;
             const zhiIndex = (baseZhiIndex + month - 1) % 12;
-            
             return {
-                gan: TIANGAN[ganIndex],
-                zhi: DIZHI[zhiIndex],
+                gan: TIANGAN[ganIndex], zhi: DIZHI[zhiIndex],
                 ganZhi: TIANGAN[ganIndex] + DIZHI[zhiIndex],
                 month: month,
-                monthName: ['', '正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'][month]
+                monthName: ['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'][month]
             };
         }
 
-        // 更新流月列表
         function updateLiuYueList(yearGan, year) {
             const liuyueContainer = document.getElementById('liuyue-container');
             const liuyueListDiv = document.getElementById('liuyue-list');
@@ -4668,53 +4664,37 @@
             const now = new Date();
             const currentYear = now.getFullYear();
             const currentMonth = now.getMonth() + 1;
-
             if (!liuyueContainer || !liuyueListDiv || !liuyueTitle) return;
-
             liuyueContainer.innerHTML = '';
-            
-            liuyueTitle.textContent = `${year}年流月`;
-            
-            // 生成12个流月
+            liuyueTitle.textContent = year + '年流月';
             for (let month = 1; month <= 12; month++) {
                 const { gan, zhi, monthName } = getLiuYueGanZhi(yearGan, month);
                 const isCurrentMonth = year === currentYear && month === currentMonth;
-
                 const div = document.createElement('div');
                 div.className = 'liuyue-item' + (isCurrentMonth ? ' current-month' : '');
-                div.innerHTML = `<div class="liuyue-month">${monthName}</div><div class="liuyue-ganzhi">${gan}${zhi}</div>`;
-                
-                div.onclick = function() {
-                    // 移除其他选中状态
-                    document.querySelectorAll('.liuyue-item').forEach(item => {
-                        item.classList.remove('active');
-                    });
-                    // 添加当前选中状态
-                    div.classList.add('active');
-                    
-                    // 填充八字输入区的流月
-                    const liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
-                    const liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
-
-                    if (liuyueGanSelect && liuyueZhiSelect) {
-                        liuyueGanSelect.value = gan;
-                        const validDizhi = getValidDizhiByGan(gan);
-                        renderDizhiSelect(liuyueZhiSelect, validDizhi);
-                        liuyueZhiSelect.value = zhi;
-                        calcAll();
-                    }
-                };
-                
+                div.innerHTML = '<div class="liuyue-month">' + monthName + '</div><div class="liuyue-ganzhi">' + gan + zhi + '</div>';
+                (function(g, zh) {
+                    div.onclick = function() {
+                        document.querySelectorAll('.liuyue-item').forEach(function(item) { item.classList.remove('active'); });
+                        div.classList.add('active');
+                        var liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
+                        var liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
+                        if (liuyueGanSelect && liuyueZhiSelect) {
+                            liuyueGanSelect.value = g;
+                            var validDizhi = getValidDizhiByGan(g);
+                            renderDizhiSelect(liuyueZhiSelect, validDizhi);
+                            liuyueZhiSelect.value = zh;
+                            calcAll();
+                        }
+                    };
+                })(gan, zhi);
                 liuyueContainer.appendChild(div);
             }
-            
             liuyueListDiv.classList.remove('hidden');
         }
 
-        // 检查 DOM 元素是否存在
         console.log('btnAutoPaipan:', btnAutoPaipan);
         console.log('birthInput:', birthInput);
-        console.log('Solar:', typeof Solar);
 
         if (!btnAutoPaipan) {
             console.error('btn-auto-paipan element not found');
@@ -4723,218 +4703,134 @@
 
         btnAutoPaipan.onclick = function() {
             try {
-                const inputVal = birthInput.value.trim();
+                var inputVal = birthInput.value.trim();
+                if (!inputVal) { alert('请输入出生年月日时分！'); return; }
+                if (inputVal.length < 4) { alert('年份至少需要 4 位数字！'); return; }
 
-                if (!inputVal) {
-                    alert('请输入出生年月日时分！');
-                    return;
-                }
-
-                // 解析输入格式：198805022130 或补零格式如 000205022130
-                if (inputVal.length < 4) {
-                    alert('年份至少需要 4 位数字！');
-                    return;
-                }
-
-                // 确保年份部分至少有4位，不足4位则在前面补0
-                let paddedInput = inputVal;
+                var paddedInput = inputVal;
                 if (inputVal.length < 14) {
-                    // 补齐年份到4位
-                    const yearPart = inputVal.substring(0, Math.min(4, inputVal.length));
-                    const paddedYear = yearPart.padStart(4, '0');
+                    var yearPart = inputVal.substring(0, Math.min(4, inputVal.length));
+                    var paddedYear = yearPart.padStart(4, '0');
                     paddedInput = paddedYear + inputVal.substring(4);
                 }
 
-                const year = parseInt(paddedInput.substring(0, 4));
-                const month = parseInt(paddedInput.substring(4, 6));
-                const day = parseInt(paddedInput.substring(6, 8));
-                
-                let hour = 0;
-                let minute = 0;
-                
-                if (paddedInput.length >= 10) {
-                    hour = parseInt(paddedInput.substring(8, 10));
-                }
-                if (paddedInput.length >= 12) {
-                    minute = parseInt(paddedInput.substring(10, 12));
-                }
+                var year = parseInt(paddedInput.substring(0, 4));
+                var month = parseInt(paddedInput.substring(4, 6));
+                var day = parseInt(paddedInput.substring(6, 8));
+                var hour = paddedInput.length >= 10 ? parseInt(paddedInput.substring(8, 10)) : 0;
+                var minute = paddedInput.length >= 12 ? parseInt(paddedInput.substring(10, 12)) : 0;
 
-                // 验证日期（lunar库支持年份范围：1-9999）
-                if (year < 1 || year > 9999) {
-                    alert('年份必须在 1-9999 之间！');
-                    return;
-                }
-                if (month < 1 || month > 12) {
-                    alert('月份必须在 01-12 之间！');
-                    return;
-                }
-                if (day < 1 || day > 31) {
-                    alert('日期必须在 01-31 之间！');
-                    return;
-                }
-                if (hour < 0 || hour > 23) {
-                    alert('小时必须在 00-23 之间！');
-                    return;
-                }
-                if (minute < 0 || minute > 59) {
-                    alert('分钟必须在 00-59 之间！');
-                    return;
-                }
+                if (year < 1 || year > 9999) { alert('年份必须在 1-9999 之间！'); return; }
+                if (month < 1 || month > 12) { alert('月份必须在 01-12 之间！'); return; }
+                if (day < 1 || day > 31) { alert('日期必须在 01-31 之间！'); return; }
+                if (hour < 0 || hour > 23) { alert('小时必须在 00-23 之间！'); return; }
+                if (minute < 0 || minute > 59) { alert('分钟必须在 00-59 之间！'); return; }
 
-                const gender = parseInt(birthGender.value);
-                const calendarType = document.getElementById('calendar-type').value;
-                const isLeapMonth = document.getElementById('is-leap-month').value === 'true';
-                const sect = 1; // 固定使用流派 1：晚子时
+                var gender = parseInt(birthGender.value);
+                var calendarType = document.getElementById('calendar-type').value;
+                var isLeapMonth = document.getElementById('is-leap-month').value === 'true';
 
-                // 使用 lunar-javascript 库计算八字
-                if (typeof Solar === 'undefined') {
-                    alert('排盘库未加载，请刷新页面重试！');
-                    return;
-                }
+                // 构造 API 参数
+                var birthDateStr = String(year).padStart(4,'0') + String(month).padStart(2,'0') + String(day).padStart(2,'0');
+                var birthTimeStr = String(hour).padStart(2,'0') + String(minute).padStart(2,'0');
 
-                let solar;
-                if (calendarType === 'lunar') {
-                    // 农历转公历（支持闰月）
-                    console.log('农历输入：', year, month, day, hour, minute, '闰月:', isLeapMonth);
-                    // lunar-javascript库使用负数月份表示闰月：闰2月 = -2
-                    const lunarMonth = isLeapMonth ? -month : month;
-                    console.log('转换后农历月份:', lunarMonth);
-                    // 创建农历日期对象
-                    const lunarDate = Lunar.fromYmd(year, lunarMonth, day);
-                    // 转换为公历
-                    const solarDate = lunarDate.getSolar();
-                    // 创建带时分秒的公历对象
-                    solar = Solar.fromYmdHms(solarDate.getYear(), solarDate.getMonth(), solarDate.getDay(), hour, minute, 0);
-                    console.log('转换为公历：', solar.getYear(), solar.getMonth(), solar.getDay(), solar.getHour(), solar.getMinute());
-                } else {
-                    // 公历直接使用
-                    console.log('公历输入：', year, month, day, hour, minute);
-                    solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
-                }
-                const lunar = solar.getLunar();
-                const eightChar = lunar.getEightChar();
-                eightChar.setSect(sect);
+                console.log('调用排盘 API:', birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
 
-                // 获取八字各柱
-                const yearGan = eightChar.getYearGan();
-                const yearZhi = eightChar.getYearZhi();
-                const monthGan = eightChar.getMonthGan();
-                const monthZhi = eightChar.getMonthZhi();
-                const dayGan = eightChar.getDayGan();
-                const dayZhi = eightChar.getDayZhi();
-                const hourGan = eightChar.getTimeGan();
-                const hourZhi = eightChar.getTimeZhi();
+                // === 通过 API 排盘（核心计算在云函数，不在客户端暴露）===
+                var apiData = callBaziApi(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
+                var bd = apiData.bazi;
+                var dayunResults = apiData.dayun;     // API 返回的大运列表（含断语）
+                var liunianResults = apiData.liunian;   // API 返回的流年列表（含断语）
+                var qiyun = apiData.qiyun;
+                var shishenGan = apiData.shishenGan;
+                var shishenZhi = apiData.shishenZhi;
+
+                // 提取八字各柱
+                var yearGan = bd.nian.gan;
+                var yearZhi = bd.nian.zhi;
+                var monthGan = bd.yue.gan;
+                var monthZhi = bd.yue.zhi;
+                var dayGan = bd.ri.gan;
+                var dayZhi = bd.ri.zhi;
+                var hourGan = bd.shi.gan;
+                var hourZhi = bd.shi.zhi;
 
                 console.log('八字:', yearGan, yearZhi, monthGan, monthZhi, dayGan, dayZhi, hourGan, hourZhi);
 
-                // 填充天干地支选择框（仅八字，不填充大运和流年）
-                const typeMap = {
+                // 填充天干地支选择框
+                var typeMap = {
                     'nian': { gan: yearGan, zhi: yearZhi },
                     'yue': { gan: monthGan, zhi: monthZhi },
                     'ri': { gan: dayGan, zhi: dayZhi },
                     'shi': { gan: hourGan, zhi: hourZhi }
                 };
-
-                for (const type in typeMap) {
-                    const gan = typeMap[type].gan;
-                    const zhi = typeMap[type].zhi;
-
-                    const ganSelect = document.querySelector(`.tiangan[data-type="${type}"]`);
-                    const zhiSelect = document.querySelector(`.dizhi[data-type="${type}"]`);
-
+                for (var type in typeMap) {
+                    var gan = typeMap[type].gan;
+                    var zhi = typeMap[type].zhi;
+                    var ganSelect = document.querySelector('.tiangan[data-type="' + type + '"]');
+                    var zhiSelect = document.querySelector('.dizhi[data-type="' + type + '"]');
                     if (ganSelect && zhiSelect) {
                         ganSelect.value = gan;
-                        const validDizhi = getValidDizhiByGan(gan);
+                        var validDizhi = getValidDizhiByGan(gan);
                         renderDizhiSelect(zhiSelect, validDizhi);
                         zhiSelect.value = zhi;
                     }
                 }
 
-                // 计算大运（获取 12 步大运）
-                const yun = eightChar.getYun(gender, 1); // 固定使用流派 1
-                const startYear = yun.getStartYear();
-                const isForward = yun.isForward();
-                const startSolar = yun.getStartSolar();
-
-                console.log('起运信息:', startYear, isForward);
-
-                // 获取所有大运（获取 12 步大运）
-                daYunList = yun.getDaYun(12);
-                
-                // 从第一个大运获取起运年龄
-                let startAge = 0;
-                if (daYunList && daYunList.length > 0) {
-                    startAge = daYunList[0].getStartAge();
-                }
-
-                console.log('起运年龄:', startAge);
+                // 构建 dayunData（JSON 格式，与 API 返回一致）
+                daYunData = dayunResults || [];
+                var startAge = (daYunData.length > 0) ? daYunData[0].startAge : 0;
+                var startYearNum = (daYunData.length > 0) ? daYunData[0].startYear : 0;
+                var isForward = qiyun ? qiyun.isForward : true;
 
                 // 显示起运信息
-                const qiyunInfo = document.getElementById('qiyun-info');
-                const qiyunText = document.getElementById('qiyun-text');
-                console.log('qiyunInfo:', qiyunInfo);
-                
+                var qiyunInfo = document.getElementById('qiyun-info');
+                var qiyunText = document.getElementById('qiyun-text');
                 if (qiyunInfo && qiyunText) {
-                    let qiyunStr = `起运年龄：${startAge}岁 `;
-                    qiyunStr += `| 起运时间：${startYear}年${startSolar ? startSolar.getMonth() : 0}月${startSolar ? startSolar.getDay() : 0}日 `;
-                    qiyunStr += `| 大运方向：${isForward ? '顺行' : '逆行'}`;
+                    var qiyunStr = '起运年龄：' + startAge + '岁 ';
+                    qiyunStr += '| 起运时间：' + startYearNum + '年 ';
+                    qiyunStr += '| 大运方向：' + (isForward ? '顺行' : '逆行');
                     qiyunText.textContent = qiyunStr;
                     qiyunInfo.classList.remove('hidden');
                 }
 
                 // 显示大运列表
-                const dayunContainer = document.getElementById('dayun-container');
-                const dayunListDiv = document.getElementById('dayun-list');
-                console.log('dayunContainer:', dayunContainer, 'dayunListDiv:', dayunListDiv);
-
+                var dayunContainer = document.getElementById('dayun-container');
+                var dayunListDiv = document.getElementById('dayun-list');
                 if (dayunContainer && dayunListDiv) {
                     dayunContainer.innerHTML = '';
+                    if (daYunData && daYunData.length > 0) {
+                        daYunData.forEach(function(dayun, index) {
+                            var gz = dayun.ganZhi || '';
+                            var g = gz.charAt(0);
+                            var zh = gz.charAt(1);
+                            var age = dayun.startAge;
+                            var yr = dayun.startYear;
 
-                    if (daYunList && daYunList.length > 0) {
-                        console.log('大运列表:', daYunList);
-                        daYunList.forEach((dayun, index) => {
-                            const ganZhi = dayun.getGanZhi();
-                            const gan = ganZhi.charAt(0);
-                            const zhi = ganZhi.charAt(1);
-                            const age = dayun.getStartAge();
-                            const year = dayun.getStartYear();
-
-                            const div = document.createElement('div');
+                            var div = document.createElement('div');
                             div.className = 'dayun-item';
-                            div.innerHTML = `<div class="dayun-year">${year}</div><div class="dayun-age">${age}岁起</div><div class="dayun-ganzhi">${gan}${zhi}</div>`;
+                            div.innerHTML = '<div class="dayun-year">' + yr + '</div><div class="dayun-age">' + age + '岁起</div><div class="dayun-ganzhi">' + gz + '</div>';
                             
-                            div.onclick = function() {
-                                // 移除其他选中状态
-                                document.querySelectorAll('.dayun-item').forEach(item => {
-                                    item.classList.remove('active');
-                                });
-                                // 添加当前选中状态
-                                div.classList.add('active');
-                                
-                                // 更新当前大运
-                                currentDaYun = dayun;
-                                window.currentDaYun = dayun;
-                                
-                                // 填充八字输入区的大运
-                                const dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
-                                const dayunZhiSelect = document.querySelector('.dizhi[data-type="dayun"]');
-
-                                if (dayunGanSelect && dayunZhiSelect) {
-                                    dayunGanSelect.value = gan;
-                                    const validDizhi = getValidDizhiByGan(gan);
-                                    renderDizhiSelect(dayunZhiSelect, validDizhi);
-                                    dayunZhiSelect.value = zhi;
-                                }
-                                
-                                // 清除之前的流年选择
-                                clearLiuNianSelection();
-                                
-                                // 更新流年列表为当前大运的流年
-                                updateLiuNianList(dayun);
-                                
-                                // 触发计算
-                                calcAll();
-                            };
+                            (function(dy, gg, zzh) {
+                                div.onclick = function() {
+                                    document.querySelectorAll('.dayun-item').forEach(function(item) { item.classList.remove('active'); });
+                                    div.classList.add('active');
+                                    currentDaYun = dy;
+                                    window.currentDaYun = dy;
+                                    
+                                    var dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
+                                    var dayunZhiSelect = document.querySelector('.dizhi[data-type="dayun"]');
+                                    if (dayunGanSelect && dayunZhiSelect) {
+                                        dayunGanSelect.value = gg;
+                                        var vd = getValidDizhiByGan(gg);
+                                        renderDizhiSelect(dayunZhiSelect, vd);
+                                        dayunZhiSelect.value = zzh;
+                                    }
+                                    clearLiuNianSelection();
+                                    updateLiuNianList(dy);
+                                    calcAll();
+                                };
+                            })(dayun, g, zh);
                             
                             dayunContainer.appendChild(div);
                         });
@@ -4943,51 +4839,32 @@
                 }
 
                 // 默认选中第一个大运
-                if (daYunList && daYunList.length > 0) {
-                    const firstDayunDiv = dayunContainer.querySelector('.dayun-item');
-                    if (firstDayunDiv) {
-                        firstDayunDiv.click();
-                    }
+                if (daYunData && daYunData.length > 0) {
+                    var firstDayunDiv = dayunContainer.querySelector('.dayun-item');
+                    if (firstDayunDiv) firstDayunDiv.click();
                 }
 
                 // 显示排盘结果
-                const bazi = `${yearGan}${yearZhi} ${monthGan}${monthZhi} ${dayGan}${dayZhi} ${hourGan}${hourZhi}`;
-                let resultText = `八字：${bazi}`;
-                resultText += ` | 起运年龄：${startAge}岁`;
-                resultText += ` | 大运方向：${isForward ? '顺行' : '逆行'}`;
-
+                var baziStr = yearGan + yearZhi + ' ' + monthGan + monthZhi + ' ' + dayGan + dayZhi + ' ' + hourGan + hourZhi;
+                var resultText = '八字：' + baziStr;
+                resultText += ' | 起运年龄：' + startAge + '岁';
+                resultText += ' | 大运方向：' + (isForward ? '顺行' : '逆行');
                 paipanResult.textContent = resultText;
                 paipanResult.classList.remove('hidden');
 
                 // 保存排盘数据（用于历史记录）
                 window.lastPaipanData = {
-                    birthYear: year,
-                    birthMonth: month,
-                    birthDay: day,
-                    birthHour: hour,
-                    birthMinute: minute,
-                    gender: gender,
-                    bazi: {
-                        nian: { t: yearGan, d: yearZhi },
-                        yue: { t: monthGan, d: monthZhi },
-                        ri: { t: dayGan, d: dayZhi },
-                        shi: { t: hourGan, d: hourZhi }
-                    },
-                    daYunList: daYunList.map(d => ({
-                        gan: d.getGanZhi().charAt(0),
-                        zhi: d.getGanZhi().charAt(1),
-                        startAge: d.getStartAge(),
-                        startYear: d.getStartYear()
-                    })),
-                    qiyunInfo: {
-                        age: startAge,
-                        year: startYear,
-                        month: startSolar ? startSolar.getMonth() : 0,
-                        day: startSolar ? startSolar.getDay() : 0
-                    }
+                    birthYear: year, birthMonth: month, birthDay: day,
+                    birthHour: hour, birthMinute: minute, gender: gender,
+                    bazi: { nian: { t: yearGan, d: yearZhi }, yue: { t: monthGan, d: monthZhi }, ri: { t: dayGan, d: dayZhi }, shi: { t: hourGan, d: hourZhi } },
+                    daYunList: daYunData.map(function(d) {
+                        var gz2 = d.ganZhi || '';
+                        return { gan: gz2.charAt(0), zhi: gz2.charAt(1), startAge: d.startAge, startYear: d.startYear };
+                    }),
+                    qiyunInfo: { age: startAge, year: startYearNum, month: 0, day: 0 }
                 };
 
-                // 触发计算
+                // 触发计算（使用本地规则匹配）
                 calcAll();
             } catch (error) {
                 console.error('自动排盘出错:', error);
@@ -15891,20 +15768,16 @@ function getAllTagCategories() {
 
     // 自动排盘
     function autoPaipan() {
-        let birthDate = DOM.caseBirthDate.value.trim();
-        
+        var birthDate = DOM.caseBirthDate.value.trim();
         if (!birthDate || birthDate.length < 4) {
             alert('请先输入至少4位数字的出生年份');
             return;
         }
         
         try {
-            // 尝试解析日期格式
-            // 支持格式：198805022030 或 1988-05-02 20:30
-            let year, month, day, hour = 0, minute = 0;
-            
-            // 检测是否是 YYYY-MM-DD 格式（可能带时间）
-            const dateTimeMatch = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+            // 解析日期格式：198805022030 或 1988-05-02 20:30
+            var year, month, day, hour = 0, minute = 0;
+            var dateTimeMatch = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
             if (dateTimeMatch) {
                 year = parseInt(dateTimeMatch[1]);
                 month = parseInt(dateTimeMatch[2]);
@@ -15912,14 +15785,11 @@ function getAllTagCategories() {
                 hour = dateTimeMatch[4] ? parseInt(dateTimeMatch[4]) : 0;
                 minute = dateTimeMatch[5] ? parseInt(dateTimeMatch[5]) : 0;
             } else {
-                // 纯数字格式，确保年份部分至少有4位，不足4位则在前面补0
-                let paddedBirthDate = birthDate;
+                var paddedBirthDate = birthDate;
                 if (birthDate.length < 14) {
-                    const yearPart = birthDate.substring(0, Math.min(4, birthDate.length));
-                    const paddedYear = yearPart.padStart(4, '0');
-                    paddedBirthDate = paddedYear + birthDate.substring(4);
+                    var yearPart = birthDate.substring(0, Math.min(4, birthDate.length));
+                    paddedBirthDate = yearPart.padStart(4, '0') + birthDate.substring(4);
                 }
-                
                 year = parseInt(paddedBirthDate.substring(0, 4));
                 month = parseInt(paddedBirthDate.substring(4, 6));
                 day = parseInt(paddedBirthDate.substring(6, 8));
@@ -15927,116 +15797,80 @@ function getAllTagCategories() {
                 minute = paddedBirthDate.length >= 12 ? parseInt(paddedBirthDate.substring(10, 12)) : 0;
             }
             
-            // 验证日期有效性（lunar库支持年份范围：1-9999）
-            if (year < 1 || year > 9999) {
-                alert('年份必须在 1-9999 之间！');
-                return;
-            }
-            if (month < 1 || month > 12) {
-                alert('月份必须在 01-12 之间！');
-                return;
-            }
-            if (day < 1 || day > 31) {
-                alert('日期必须在 01-31 之间！');
-                return;
-            }
+            if (year < 1 || year > 9999) { alert('年份必须在 1-9999 之间！'); return; }
+            if (month < 1 || month > 12) { alert('月份必须在 01-12 之间！'); return; }
+            if (day < 1 || day > 31) { alert('日期必须在 01-31 之间！'); return; }
             
-            // 使用与八字分析页面相同的排盘方法
-            if (typeof Solar === 'undefined') {
-                alert('排盘库未加载，请刷新页面重试！');
-                return;
-            }
+            var calendarType = document.getElementById('case-calendar-type').value;
+            var isLeapMonth = document.getElementById('case-is-leap-month').value === 'true';
+            var genderStr = DOM.caseGender.value;
+            var gender = (genderStr === '男') ? 1 : 0;
             
-            const calendarType = document.getElementById('case-calendar-type').value;
-            const isLeapMonth = document.getElementById('case-is-leap-month').value === 'true';
-            let solar;
-            if (calendarType === 'lunar') {
-                // 农历转公历（支持闰月）
-                console.log('案例库-农历输入：', year, month, day, hour, minute, '闰月:', isLeapMonth);
-                // lunar-javascript库使用负数月份表示闰月：闰2月 = -2
-                const lunarMonth = isLeapMonth ? -month : month;
-                console.log('案例库-转换后农历月份:', lunarMonth);
-                // 创建农历日期对象
-                const lunarDate = Lunar.fromYmd(year, lunarMonth, day);
-                // 转换为公历
-                const solarDate = lunarDate.getSolar();
-                // 创建带时分秒的公历对象
-                solar = Solar.fromYmdHms(solarDate.getYear(), solarDate.getMonth(), solarDate.getDay(), hour, minute, 0);
-                console.log('案例库-转换为公历：', solar.getYear(), solar.getMonth(), solar.getDay(), solar.getHour(), solar.getMinute());
-            } else {
-                // 公历直接使用
-                console.log('案例库-公历输入：', year, month, day, hour, minute);
-                solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
-            }
-            const lunar = solar.getLunar();
-            const eightChar = lunar.getEightChar();
-            eightChar.setSect(1); // 使用流派 1：晚子时
+            // 构造 API 参数
+            var birthDateStr = String(year).padStart(4,'0') + String(month).padStart(2,'0') + String(day).padStart(2,'0');
+            var birthTimeStr = String(hour).padStart(2,'0') + String(minute).padStart(2,'0');
             
-            // 获取八字各柱
-            const bazi = {
-                yearGan: eightChar.getYearGan(),
-                yearZhi: eightChar.getYearZhi(),
-                monthGan: eightChar.getMonthGan(),
-                monthZhi: eightChar.getMonthZhi(),
-                dayGan: eightChar.getDayGan(),
-                dayZhi: eightChar.getDayZhi(),
-                hourGan: eightChar.getTimeGan(),
-                hourZhi: eightChar.getTimeZhi()
+            console.log('案例库-调用排盘 API:', birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
+            
+            // === 通过 API 排盘 ===
+            var apiData = callBaziApi(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
+            var bd = apiData.bazi;
+            var dayunResults = apiData.dayun;
+            
+            // 填充八字选择框
+            var bazi = {
+                yearGan: bd.nian.gan, yearZhi: bd.nian.zhi,
+                monthGan: bd.yue.gan, monthZhi: bd.yue.zhi,
+                dayGan: bd.ri.gan, dayZhi: bd.ri.zhi,
+                hourGan: bd.shi.gan, hourZhi: bd.shi.zhi
             };
-            
             setBaziValues(bazi);
             
-            // ===== 计算大运 =====
-            // 性别需要转换为数值：男=1，女=0（与八字分析页面一致）
-            const genderStr = DOM.caseGender.value;
-            const gender = genderStr === '男' ? 1 : 0;
-            const yun = eightChar.getYun(gender, 1); // 固定使用流派 1
-            
-            // 获取所有大运（获取 12 步大运）- 保持原始对象数组
-            daYunList = yun.getDaYun(12);
+            // 构建大运数据（JSON 格式）
+            daYunList = (dayunResults || []).map(function(dy) {
+                return {
+                    ganZhi: dy.ganZhi,
+                    gan: dy.gan || (dy.ganZhi ? dy.ganZhi.charAt(0) : ''),
+                    zhi: dy.zhi || (dy.ganZhi ? dy.ganZhi.charAt(1) : ''),
+                    startAge: dy.startAge,
+                    startYear: dy.startYear,
+                    endYear: dy.endYear,
+                    index: dy.index
+                };
+            });
             
             // 显示大运-流年选择界面
-            const selector = document.getElementById('case-dayun-liunian-selector');
-            const dayunContainer = document.getElementById('case-dayun-container');
+            var selector = document.getElementById('case-dayun-liunian-selector');
+            var dayunContainer = document.getElementById('case-dayun-container');
             
             if (selector && dayunContainer) {
                 selector.classList.remove('hidden');
                 dayunContainer.innerHTML = '';
                 
-                // 显示大运列表
                 if (daYunList && daYunList.length > 0) {
-                    daYunList.forEach((dayun, index) => {
-                        const ganZhi = dayun.getGanZhi();
-                        const startAge = dayun.getStartAge();
-                        const startYear = dayun.getStartYear();
+                    daYunList.forEach(function(dayun, index) {
+                        var gz = dayun.ganZhi || '';
+                        var age = dayun.startAge;
+                        var yr = dayun.startYear;
                         
-                        const div = document.createElement('div');
+                        var div = document.createElement('div');
                         div.className = 'dayun-item';
-                        div.innerHTML = `<div class="dayun-year">${startYear}</div><div class="dayun-age">${startAge}岁起</div><div class="dayun-ganzhi">${ganZhi}</div>`;
+                        div.innerHTML = '<div class="dayun-year">' + yr + '</div><div class="dayun-age">' + age + '岁起</div><div class="dayun-ganzhi">' + gz + '</div>';
                         
-                        div.onclick = function() {
-                            // 移除其他选中状态
-                            document.querySelectorAll('#case-dayun-container .dayun-item').forEach(item => {
-                                item.classList.remove('active');
-                            });
-                            // 添加当前选中状态
-                            div.classList.add('active');
-                            
-                            // 添加大运事件到时间线
-                            addDayunEventFromDayun(dayun);
-                            
-                            // 显示该大运的流年列表
-                            updateCaseLiuNianList(dayun);
-                        };
+                        (function(dy) {
+                            div.onclick = function() {
+                                document.querySelectorAll('#case-dayun-container .dayun-item').forEach(function(item) { item.classList.remove('active'); });
+                                div.classList.add('active');
+                                addDayunEventFromDayun(dy);
+                                updateCaseLiuNianList(dy);
+                            };
+                        })(dayun);
                         
                         dayunContainer.appendChild(div);
                     });
                     
-                    // 默认选中第一个大运
-                    const firstDayunDiv = dayunContainer.querySelector('.dayun-item');
-                    if (firstDayunDiv) {
-                        firstDayunDiv.click();
-                    }
+                    var firstDayunDiv = dayunContainer.querySelector('.dayun-item');
+                    if (firstDayunDiv) firstDayunDiv.click();
                 }
             }
             
