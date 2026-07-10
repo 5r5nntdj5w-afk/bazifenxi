@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3456,18 +3456,37 @@
     
     // ===== API 配置 =====
     // 八字排盘云函数 API（腾讯云 SCF），保护核心计算逻辑
-    const API_BAZI_URL = 'https://1254456257-fkggh2mgvo.ap-shanghai.tencentscf.com/api/bazi';
+    // 地址从 Supabase app_config 表动态读取，参照 FALLBACK_CONFIG.api_bazi_url
+    // 如需更新，在 app_config 表中添加 config_key='api_bazi_url' 的行即可
     const BAZI_API_CACHE = {}; // API 结果缓存（避免重复请求）
+    
+    // 获取排盘 API 地址：优先使用数据库配置，其次使用 GitHub Secrets 注入的地址
+    function getApiBaziUrl() {
+      if (typeof APP_CONFIG !== 'undefined' && APP_CONFIG && APP_CONFIG.api_bazi_url) {
+        return APP_CONFIG.api_bazi_url;
+      }
+      // 兜底：GitHub Actions 部署时从 Secrets 注入的地址
+      if (typeof FALLBACK_CONFIG !== 'undefined' && FALLBACK_CONFIG.api_bazi_url) {
+        var url = FALLBACK_CONFIG.api_bazi_url;
+        // 如果占位符未被替换（本地开发未配置 config.local.js），返回空
+        if (url && url.indexOf('%') === -1) return url;
+      }
+      return '';
+    }
     
     // 调用排盘 API
     function callBaziApi(birthDate, birthTime, gender, calendarType, isLeapMonth) {
+      var apiUrl = getApiBaziUrl();
+      if (!apiUrl) {
+        throw new Error('排盘 API 地址未配置。请通过 Supabase app_config 表设置 api_bazi_url，或在 GitHub Secrets 中配置 API_BAZI_URL');
+      }
       var cacheKey = birthDate + '_' + birthTime + '_' + gender;
       if (BAZI_API_CACHE[cacheKey]) {
         try { return JSON.parse(BAZI_API_CACHE[cacheKey]); } catch(e) {}
       }
       
       var xhr = new XMLHttpRequest();
-      xhr.open('POST', API_BAZI_URL, false); // 同步请求
+      xhr.open('POST', apiUrl, false); // 同步请求
       xhr.setRequestHeader('Content-Type', 'application/json');
       
       var body = JSON.stringify({
@@ -10287,7 +10306,8 @@
     const FALLBACK_CONFIG = {
         supabase_url: LOCAL_CFG.supabase_url || 'https://ehwwolyofgzuwrmyklow.supabase.co',
         supabase_key: LOCAL_CFG.supabase_key || 'sb_publishable_C4jCCwIuVc9YbqNGYS68aw_lWwl8r55',
-        admin_email: LOCAL_CFG.admin_email || 'jsqdzz@qq.com,matigang@163.com,893365913@qq.com'
+        admin_email: LOCAL_CFG.admin_email || 'jsqdzz@qq.com,matigang@163.com,893365913@qq.com',
+        api_bazi_url: LOCAL_CFG.api_bazi_url || 'https://1254456257-fkggh2mgvo.ap-shanghai.tencentscf.com/api/bazi'
     };
     
     // 动态配置变量（从数据库获取）
