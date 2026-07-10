@@ -3481,9 +3481,7 @@
         throw new Error('排盘 API 地址未配置。请通过 Supabase app_config 表设置 api_bazi_url，或在 GitHub Secrets 中配置 API_BAZI_URL');
       }
       var cacheKey = birthDate + '_' + birthTime + '_' + gender;
-      if (BAZI_API_CACHE[cacheKey]) {
-        try { var cached = JSON.parse(BAZI_API_CACHE[cacheKey]); return cached.data || cached; } catch(e) {}
-      }
+      // 不走缓存，每次调用 API 获取最新断语规则
       
       var xhr = new XMLHttpRequest();
       xhr.open('POST', apiUrl, false); // 同步请求
@@ -19488,23 +19486,18 @@ function updateAuthUI(isLoggedIn) {
             if (isAdminUser) adminSection.classList.remove('hidden');
             else adminSection.classList.add('hidden');
         }
-        // 数据管理仅管理员可见
+        // 数据管理标签仅管理员可见（页面内容由导航切换控制）
         if (tabData) {
             if (isAdminUser) tabData.classList.remove('hidden');
             else tabData.classList.add('hidden');
-        }
-        if (pageData) {
-            if (isAdminUser) pageData.classList.remove('hidden');
-            else pageData.classList.add('hidden');
         }
     } else {
         if (userStatus) userStatus.innerHTML = '<span class="text-gray-500">未登录</span>';
         if (authForms) authForms.classList.remove('hidden');
         if (btnSignOut) btnSignOut.classList.add('hidden');
         if (adminSection) adminSection.classList.add('hidden');
-        // 未登录时隐藏数据管理
+        // 未登录时隐藏数据管理标签
         if (tabData) tabData.classList.add('hidden');
-        if (pageData) pageData.classList.add('hidden');
     }
 }
 
