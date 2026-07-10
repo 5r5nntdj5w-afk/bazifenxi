@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3511,6 +3511,9 @@
       }
     }
     
+    /** API 断语缓存：存储 API 返回的断语数据，供 calcAll 使用 */
+    window.apiDuanyuCache = null;
+    
     /**
      * 包装大运对象：将 API 返回的纯 JSON 大运对象包装为兼容旧代码
      * 的 getter 方法形式（getGanZhi/getStartAge/getStartYear/getEndYear）
@@ -4784,6 +4787,17 @@
                 var shishenGan = apiData.shishenGan;
                 var shishenZhi = apiData.shishenZhi;
 
+                // 存储 API 断语缓存（不暴露匹配规则，只存匹配结果）
+                window.apiDuanyuCache = {
+                  base: (apiData.duanyu && apiData.duanyu.base) || [],
+                  dayun: (dayunResults || []).map(function(d) {
+                    return { ganZhi: d.ganZhi, startAge: d.startAge, startYear: d.startYear, duanyu: d.duanyu || [] };
+                  }),
+                  liunian: (liunianResults || []).map(function(d) {
+                    return { year: d.year, ganZhi: d.ganZhi, dayunIndex: d.dayunIndex, duanyu: d.duanyu || [] };
+                  })
+                };
+
                 // 提取八字各柱
                 var yearGan = bd.nian.gan;
                 var yearZhi = bd.nian.zhi;
@@ -4903,7 +4917,7 @@
                     qiyunInfo: { age: startAge, year: startYearNum, month: 0, day: 0 }
                 };
 
-                // 触发计算（使用本地规则匹配）
+                // 使用 API 断语缓存渲染，不再使用本地 matchRules
                 calcAll();
             } catch (error) {
                 console.error('自动排盘出错:', error);
@@ -7464,6 +7478,75 @@
         DOM.duanyuResult.innerHTML = html;
     }
 
+    /** 从 API 断语缓存渲染断语结果 */
+    function renderApiDuanyu() {
+      var apiCache = window.apiDuanyuCache;
+      if (!apiCache) {
+        // 没有缓存（手动编辑模式）
+        cache.matchedByCategory = {};
+        displayDuanyuResult();
+        return;
+      }
+
+      // 读取当前选择器的大运流年
+      var dayunGan = document.querySelector('.tiangan[data-type="dayun"]')?.value || '';
+      var dayunZhi = document.querySelector('.dizhi[data-type="dayun"]')?.value || '';
+      var dayunGanZhi = dayunGan + dayunZhi;
+
+      // 找到当前大运的断语
+      var dayunDuanyu = [];
+      if (dayunGanZhi && apiCache.dayun) {
+        // 查找大运列表中的匹配项（通过 ganZhi 匹配）
+        for (var di = 0; di < apiCache.dayun.length; di++) {
+          if (apiCache.dayun[di].ganZhi === dayunGanZhi) {
+            dayunDuanyu = apiCache.dayun[di].duanyu || [];
+            break;
+          }
+        }
+      }
+
+      // 找到当前流年的断语
+      var liunianDuanyu = [];
+      var activeLiunianItem = document.querySelector('.liunian-item.active');
+      if (activeLiunianItem && apiCache.liunian) {
+        var yearSpan = activeLiunianItem.querySelector('.liunian-year');
+        if (yearSpan) {
+          var lnYear = parseInt(yearSpan.textContent);
+          if (!isNaN(lnYear)) {
+            for (var li = 0; li < apiCache.liunian.length; li++) {
+              if (apiCache.liunian[li].year === lnYear) {
+                liunianDuanyu = apiCache.liunian[li].duanyu || [];
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // 合并原局 + 大运 + 流年断语
+      var allDuanyu = (apiCache.base || []).concat(dayunDuanyu).concat(liunianDuanyu);
+
+      // 按 category 分组（与 displayDuanyuResult 兼容的格式）
+      var matchedByCategory = {};
+      for (var idx = 0; idx < allDuanyu.length; idx++) {
+        var item = allDuanyu[idx];
+        var cat = item.category || '未分类';
+        if (!matchedByCategory[cat]) matchedByCategory[cat] = [];
+        // 检查是否已存在相同断语（去重）
+        var text = item.duanyu || '';
+        var exists = false;
+        for (var ci = 0; ci < matchedByCategory[cat].length; ci++) {
+          if (matchedByCategory[cat][ci].text === text) { exists = true; break; }
+        }
+        if (!exists) {
+          matchedByCategory[cat].push({ text: text, rule: null });
+        }
+      }
+
+      cache.matchedByCategory = matchedByCategory;
+      displayDuanyuResult();
+    }
+
     // 全局计算
     function calcAll(){
         cache.statsCache = null;
@@ -7756,12 +7839,16 @@
         }
         cache.lastCalcData = data;
         positionShenCards(); // 更新十神卡片位置
-        matchRules(data);
+        // 使用 API 断语缓存渲染（保护断语规则不暴露在客户端）
+        renderApiDuanyu();
         saveHistory(data);
     }
 
     function clearCalc(){
         DOM.statPanel.classList.add('hidden');
+        // 清空断语缓存
+        window.apiDuanyuCache = null;
+        cache.matchedByCategory = {};
         document.querySelectorAll('[id^="wu-tian-"],[id^="wu-di-"]').forEach(e=>e.innerHTML='-');
         document.querySelectorAll('[id^="shen-tian-"],[id^="shen-di-"]').forEach(e=>e.textContent=e.id==='shen-tian-ri'?'比肩':'-');
         DOM.duanyuResult.innerHTML='<p class="text-gray-500 text-center">请输入八字，系统将自动分析</p>';
