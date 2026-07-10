@@ -22,10 +22,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          API_BAZI_URL: ${{ secrets.API_BAZI_URL }}
         run: |
           sed -i "s#%SUPABASE_URL%#$SUPABASE_URL#g" index.html
           sed -i "s#%SUPABASE_KEY%#$SUPABASE_KEY#g" index.html
           sed -i "s#%ADMIN_EMAIL%#$ADMIN_EMAIL#g" index.html
+          sed -i "s#%API_BAZI_URL%#$API_BAZI_URL#g" index.html
       
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
