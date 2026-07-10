@@ -3518,6 +3518,98 @@
     window.apiDuanyuCache = null;
     
     /**
+     * 研究/案例详情页 API 断语缓存
+     * 按出生信息（出生日期+性别）缓存 API 返回的完整排盘数据
+     */
+    var _researchDuanyuCache = {};
+    
+    /**
+     * 从 caseData 中提取出生信息并调用 API（带缓存）
+     * @param {string} birthDate - 出生日期（支持 YYYY-MM-DD HH 或 YYYYMMDDHH 格式）
+     * @param {string} gender - 性别（'男' 或 '女'）
+     * @returns {object|null} API 返回的 data 对象，失败返回 null
+     */
+    function getApiDataForBaziCache(birthDate, gender) {
+      var dateStr, timeStr;
+      if (birthDate.includes('-')) {
+        var parts = birthDate.split('-');
+        var y = parts[0].padStart(4, '0');
+        var m = parts[1].padStart(2, '0');
+        var dAndH = parts[2];
+        var d = dAndH.substring(0, 2).padStart(2, '0');
+        var h = dAndH.length > 2 ? dAndH.substring(3, 5).padStart(2, '0') : '00';
+        dateStr = y + m + d;
+        timeStr = h + '00';
+      } else {
+        var padded = birthDate.replace(/\s/g, '').padEnd(12, '0').substring(0, 12);
+        dateStr = padded.substring(0, 8);
+        timeStr = padded.substring(8, 12) || '0000';
+      }
+      
+      var cacheKey = dateStr + '_' + timeStr + '_' + (gender === '男' ? 0 : 1);
+      if (_researchDuanyuCache[cacheKey]) return _researchDuanyuCache[cacheKey];
+      
+      try {
+        var g = gender === '男' ? 0 : 1;
+        var apiData = callBaziApi(dateStr, timeStr, g, 'solar', false);
+        _researchDuanyuCache[cacheKey] = apiData;
+        return apiData;
+      } catch(e) {
+        console.error('获取研究页断语缓存失败:', e.message);
+        return null;
+      }
+    }
+    
+    /**
+     * 从 API 缓存中查找大运/流年对应的断语，构建 matchedByCategory
+     * @param {object} apiData - API 返回的 data 对象
+     * @param {string} dayunGanZhi - 大运干支（如 '戊子'）
+     * @param {number} liunianYear - 流年年份
+     * @returns {object} matchedByCategory 对象
+     */
+    function getMatchedByCategoryFromApi(apiData, dayunGanZhi, liunianYear) {
+      var matchedByCategory = {};
+      
+      // 大运断语
+      if (dayunGanZhi && apiData && apiData.dayun) {
+        for (var i = 0; i < apiData.dayun.length; i++) {
+          if (apiData.dayun[i].ganZhi === dayunGanZhi) {
+            (apiData.dayun[i].duanyu || []).forEach(function(item) {
+              var cat = item.category || '其他';
+              var text = item.duanyu || item;
+              if (!matchedByCategory[cat]) matchedByCategory[cat] = [];
+              matchedByCategory[cat].push({
+                text: text,
+                rule: item.rule || { category: cat, duanyu: text }
+              });
+            });
+            break;
+          }
+        }
+      }
+      
+      // 流年断语
+      if (liunianYear !== undefined && apiData && apiData.liunian) {
+        for (var i = 0; i < apiData.liunian.length; i++) {
+          if (apiData.liunian[i].year == liunianYear) {
+            (apiData.liunian[i].duanyu || []).forEach(function(item) {
+              var cat = item.category || '其他';
+              var text = item.duanyu || item;
+              if (!matchedByCategory[cat]) matchedByCategory[cat] = [];
+              matchedByCategory[cat].push({
+                text: text,
+                rule: item.rule || { category: cat, duanyu: text }
+              });
+            });
+            break;
+          }
+        }
+      }
+      
+      return matchedByCategory;
+    }
+    
+    /**
      * 包装大运对象：将 API 返回的纯 JSON 大运对象包装为兼容旧代码
      * 的 getter 方法形式（getGanZhi/getStartAge/getStartYear/getEndYear）
      */
@@ -13026,43 +13118,28 @@ function getAllTagCategories() {
                     }
                     
                     const dayunGanZhi = currentDaYun ? currentDaYun.getGanZhi() : '';
-                    if (typeof matchRules === 'function') {
-                        const matchData = {
-                            nian: { t: yearGan, d: yearZhi },
-                            yue: { t: monthGan, d: monthZhi },
-                            ri: { t: dayGan, d: dayZhi },
-                            shi: { t: hourGan, d: hourZhi },
-                            dayun: currentDaYun ? { t: dayunGanZhi.charAt(0), d: dayunGanZhi.charAt(1) } : { t: '', d: '' },
-                            liunian: liunianData ? { t: liunianData.gan, d: liunianData.zhi } : { t: '', d: '' },
-                            liuyue: { t: '', d: '' },
-                            gender: cd.gender === '男' ? '男' : '女',
-                            effectiveAge: currentDaYun ? currentDaYun.getStartAge() + (isDayun ? 0 : (parseInt(year) - currentDaYun.getStartYear())) : null
-                        };
-                        // 保存 cache 并在匹配后恢复
-                        const savedCache = cache.matchedByCategory;
-                        matchRules(matchData);
-                        const matchedByCategory = cache.matchedByCategory || {};
-                        const matchedCategories = Object.keys(matchedByCategory).sort();
-                        let totalMatched = matchedCategories.reduce((sum, cat) => sum + matchedByCategory[cat].length, 0);
-                        
-                        if (totalMatched > 0) {
-                            const catColorMap = {'格局':'#3B82F6','事业':'#10B981','财运':'#F59E0B','婚姻':'#EC4899','健康':'#EF4444','性格':'#8B5CF6','灾祸':'#F97316'};
-                            let rulesHtml = '';
-                            matchedCategories.forEach(cat => {
-                                const duanyuList = matchedByCategory[cat];
-                                const catColor = catColorMap[cat] || '#6B7280';
-                                duanyuList.forEach(duanyuItem => {
-                                    const duanyuText = duanyuItem.text || duanyuItem;
-                                    const matchedRule = duanyuItem.rule || (cache.rules || []).find(r => r.category === cat && r.duanyu === duanyuText);
-                                    if (!matchedRule) return;
-                                    rulesHtml += '<div class="text-base mb-2 border-b border-gray-100 pb-2">' + renderDuanyu(duanyuText, matchedRule) + '</div>';
-                                });
+                    // 研究页：从 API 缓存获取断语（不暴露客户端规则匹配逻辑）
+                    const apiResearchData = cd && cd.birthDate ? getApiDataForBaziCache(cd.birthDate, cd.gender) : null;
+                    const matchedByCategory = dayunGanZhi ? getMatchedByCategoryFromApi(apiResearchData, dayunGanZhi, isDayun ? undefined : parseInt(year)) : {};
+                    const matchedCategories = Object.keys(matchedByCategory).sort();
+                    let totalMatched = matchedCategories.reduce((sum, cat) => sum + matchedByCategory[cat].length, 0);
+                    
+                    if (totalMatched > 0) {
+                        const catColorMap = {'格局':'#3B82F6','事业':'#10B981','财运':'#F59E0B','婚姻':'#EC4899','健康':'#EF4444','性格':'#8B5CF6','灾祸':'#F97316'};
+                        let rulesHtml = '';
+                        matchedCategories.forEach(cat => {
+                            const duanyuList = matchedByCategory[cat];
+                            const catColor = catColorMap[cat] || '#6B7280';
+                            duanyuList.forEach(duanyuItem => {
+                                const duanyuText = duanyuItem.text || duanyuItem;
+                                const matchedRule = duanyuItem.rule || (cache.rules || []).find(r => r.category === cat && r.duanyu === duanyuText);
+                                if (!matchedRule) return;
+                                rulesHtml += '<div class="text-base mb-2 border-b border-gray-100 pb-2">' + renderDuanyu(duanyuText, matchedRule) + '</div>';
                             });
-                            duanyuHtml = '<div class="mt-2 pt-2 border-t border-gray-200"><h5 class="font-bold text-base text-amber-700 mb-2">📋 匹配断语（' + totalMatched + '条）</h5>' + rulesHtml + '</div>';
-                        } else {
-                            duanyuHtml = '<div class="text-base text-gray-400 mt-2 text-center py-2">无匹配断语</div>';
-                        }
-                        cache.matchedByCategory = savedCache;
+                        });
+                        duanyuHtml = '<div class="mt-2 pt-2 border-t border-gray-200"><h5 class="font-bold text-base text-amber-700 mb-2">📋 匹配断语（' + totalMatched + '条）</h5>' + rulesHtml + '</div>';
+                    } else {
+                        duanyuHtml = '<div class="text-base text-gray-400 mt-2 text-center py-2">无匹配断语</div>';
                     }
                     
                     // 十神关系图统计
@@ -14219,22 +14296,11 @@ function getAllTagCategories() {
             }
         }
         
-        // === 断语匹配：为当前大运/流年匹配断语 ===
-        const matchData = {
-            nian: { t: yearGan, d: yearZhi },
-            yue: { t: monthGan, d: monthZhi },
-            ri: { t: dayGan, d: dayZhi },
-            shi: { t: hourGan, d: hourZhi },
-            dayun: currentDaYun ? { t: dayunGanZhi.charAt(0), d: dayunGanZhi.charAt(1) } : { t: '', d: '' },
-            liunian: liunianData ? { t: liunianData.gan, d: liunianData.zhi } : { t: '', d: '' },
-            liuyue: { t: '', d: '' },
-            gender: caseData.gender === '男' ? '男' : '女',
-            effectiveAge: currentDaYun ? currentDaYun.getStartAge() + (isDayun ? 0 : (parseInt(year) - currentDaYun.getStartYear())) : null
-        };
-        matchRules(matchData);
+        // === 断语匹配：从 API 缓存获取当前大运/流年断语 ===
+        const apiDetailData = caseData && caseData.birthDate ? getApiDataForBaziCache(caseData.birthDate, caseData.gender) : null;
+        const matchedByCategory = dayunGanZhi ? getMatchedByCategoryFromApi(apiDetailData, dayunGanZhi, isDayun ? undefined : parseInt(year)) : {};
         
         // 构建匹配断语HTML
-        const matchedByCategory = cache.matchedByCategory || {};
         const matchedCategories = Object.keys(matchedByCategory).sort();
         const totalMatched = matchedCategories.reduce((sum, cat) => sum + matchedByCategory[cat].length, 0);
         
