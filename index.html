@@ -3459,6 +3459,22 @@
     // 地址从 Supabase app_config 表动态读取，参照 FALLBACK_CONFIG.api_bazi_url
     // 如需更新，在 app_config 表中添加 config_key='api_bazi_url' 的行即可
     const BAZI_API_CACHE = {}; // API 结果缓存（避免重复请求）
+    const BAZI_API_CACHE_TTL = 30 * 1000; // 30 秒缓存 TTL
+    
+    /** 清空客户端 API 缓存，使断语修改后下次调用获取最新数据 */
+    function clearClientApiCache() {
+      Object.keys(BAZI_API_CACHE).forEach(function(key) { delete BAZI_API_CACHE[key]; });
+    }
+    
+    /** 清空 SCF 规则缓存，使断语修改后立即生效 */
+    function clearScfRuleCache() {
+      var apiUrl = getApiBaziUrl();
+      if (!apiUrl) return;
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', apiUrl.replace(/\/api\/bazi$/, '') + '/api/clear-cache', false);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      try { xhr.send('{}'); } catch(e) { console.error('清空 SCF 缓存失败:', e.message); }
+    }
     
     // 获取排盘 API 地址：优先使用数据库配置，其次使用 GitHub Secrets 注入的地址
     function getApiBaziUrl() {
@@ -3481,7 +3497,11 @@
         throw new Error('排盘 API 地址未配置。请通过 Supabase app_config 表设置 api_bazi_url，或在 GitHub Secrets 中配置 API_BAZI_URL');
       }
       var cacheKey = birthDate + '_' + birthTime + '_' + gender;
-      // 不走缓存，每次调用 API 获取最新断语规则
+      // 30 秒客户端缓存，减少重复 API 调用
+      var cached = BAZI_API_CACHE[cacheKey];
+      if (cached && cached._time && (Date.now() - cached._time) < BAZI_API_CACHE_TTL) {
+        return cached.data;
+      }
       
       var xhr = new XMLHttpRequest();
       xhr.open('POST', apiUrl, false); // 同步请求
@@ -3500,7 +3520,7 @@
       if (xhr.status === 200) {
         var result = JSON.parse(xhr.responseText);
         if (result && result.success && result.data) {
-          BAZI_API_CACHE[cacheKey] = xhr.responseText;
+          BAZI_API_CACHE[cacheKey] = { data: result.data, _time: Date.now() };
           return result.data;
         }
         // 如果 API 返回了 detail 字段（诊断信息），一并显示
@@ -8801,6 +8821,8 @@
                 
                 localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
                 reloadAll();
+                clearScfRuleCache();
+                clearClientApiCache();
                 DOM.resetRule.click();
                 alert(editIndex >=0 ? '修改成功！' : '添加成功！');
             } catch (error) {
@@ -8950,6 +8972,8 @@
                     }
                     
                     reloadAll();
+                    clearScfRuleCache();
+                    clearClientApiCache();
                     
                     if (addedCount > 0 || macroAddedCount > 0) {
                         let msg = `✅ 成功导入 ${addedCount} 条断语！`;
@@ -9274,6 +9298,8 @@
                         
                         localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
                         reloadAll();
+                        clearScfRuleCache();
+                        clearClientApiCache();
                         alert(newLevel > 0 ? '已设为公开断语' : '已设为私有断语');
                     } catch (error) {
                         console.error('切换公开状态失败:', error);
@@ -9449,6 +9475,8 @@
                             cache.rules = cache.rules.filter((_,i)=>i!==deleteIndex);
                             localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
                             reloadAll();
+                            clearScfRuleCache();
+                            clearClientApiCache();
                         } catch (error) {
                             console.error('删除断语失败:', error);
                             alert('删除断语失败：' + error.message);
@@ -10421,6 +10449,8 @@
                         localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
                         selectedRulesSet.clear();
                         reloadAll();
+                        clearScfRuleCache();
+                        clearClientApiCache();
                     } catch (error) {
                         console.error('批量删除失败:', error);
                         alert('批量删除失败：' + error.message);
@@ -11064,6 +11094,8 @@
             // 刷新分类下拉和列表
             loadCategories();
             reloadAll();
+            clearScfRuleCache();
+            clearClientApiCache();
         } catch (e) {
             console.error('从云端同步断语失败:', e);
         }
