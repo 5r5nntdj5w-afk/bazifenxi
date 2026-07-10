@@ -1038,7 +1038,7 @@
         <button id="tab-case" class="nav-btn nav-btn-default">案例库</button>
         <button id="tab-tag" class="nav-btn nav-btn-default">标签管理</button>
         <button id="tab-research" class="nav-btn nav-btn-default">事项研究</button>
-        <button id="tab-data" class="nav-btn nav-btn-default">数据管理</button>
+        <button id="tab-data" class="nav-btn nav-btn-default hidden">数据管理</button>
         <button id="tab-login" class="nav-btn nav-btn-default">登录管理</button>
     </div>
 
@@ -19472,6 +19472,10 @@ function updateAuthUI(isLoggedIn) {
     const btnSignOut = document.getElementById('btn-signout');
     const adminSection = document.getElementById('admin-section');
 
+    // 数据管理页面仅管理员可见
+    const tabData = document.getElementById('tab-data');
+    const pageData = document.getElementById('page-data');
+    
     if (isLoggedIn && currentUser) {
         if (userStatus) {
             userStatus.innerHTML = `<span class="text-green-600 font-medium">✓ 已登录：${currentUser.email}</span>`;
@@ -19479,14 +19483,28 @@ function updateAuthUI(isLoggedIn) {
         if (authForms) authForms.classList.add('hidden');
         if (btnSignOut) btnSignOut.classList.remove('hidden');
         // 显示管理员区域（如果是管理员）
-        if (adminSection && isAdmin(currentUser.email)) {
-            adminSection.classList.remove('hidden');
+        const isAdminUser = isAdmin(currentUser.email);
+        if (adminSection) {
+            if (isAdminUser) adminSection.classList.remove('hidden');
+            else adminSection.classList.add('hidden');
+        }
+        // 数据管理仅管理员可见
+        if (tabData) {
+            if (isAdminUser) tabData.classList.remove('hidden');
+            else tabData.classList.add('hidden');
+        }
+        if (pageData) {
+            if (isAdminUser) pageData.classList.remove('hidden');
+            else pageData.classList.add('hidden');
         }
     } else {
         if (userStatus) userStatus.innerHTML = '<span class="text-gray-500">未登录</span>';
         if (authForms) authForms.classList.remove('hidden');
         if (btnSignOut) btnSignOut.classList.add('hidden');
         if (adminSection) adminSection.classList.add('hidden');
+        // 未登录时隐藏数据管理
+        if (tabData) tabData.classList.add('hidden');
+        if (pageData) pageData.classList.add('hidden');
     }
 }
 
