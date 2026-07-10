@@ -8812,6 +8812,15 @@
         };
     }
 
+    // 导出权限判断：只能导出自己的私有断语（能看到≠能导出）
+    function canExportRule(rule) {
+        if (!currentUser) return false;
+        const isOwner = rule.ownerId === currentUser.id || rule.userId === currentUser.id;
+        const permLevel = rule.permissionLevel !== undefined ? rule.permissionLevel : 
+            (rule.isPublic === true || rule.is_public === true ? 3 : 0);
+        return isOwner && permLevel === 0;
+    }
+
     // 导出规则
     function initExportRule() {
         // 批量导出：如果有选中则导出选中，否则导出全部
@@ -8820,24 +8829,32 @@
             let filename = '';
             
             if (selectedRulesSet.size > 0) {
-                // 导出选中的断语（跨页选择）
+                // 导出选中的断语（跨页选择）— 仅限自己的私有断语
+                let exportCount = 0;
                 selectedRulesSet.forEach(ruleKey => {
                     const [category, duanyu] = ruleKey.split('_');
                     const rule = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
-                    if (rule) rulesToExport.push(rule);
+                    if (rule && canExportRule(rule)) {
+                        rulesToExport.push(rule);
+                        exportCount++;
+                    }
                 });
-                filename = `八字规则_选中${selectedRulesSet.size}条_${Date.now()}.json`;
+                if (exportCount === 0) return alert('选中项中没有可导出的断语（仅限自己的私有断语可导出）！');
+                filename = `八字规则_选中${exportCount}条_${Date.now()}.json`;
             } else {
-                // 导出全部断语（含条件宏定义）
-                if (!cache.rules.length) return alert('无规则可导出！');
+                // 导出自己的私有断语 + 自己创建的条件宏
+                const exportableRules = cache.rules.filter(r => canExportRule(r));
+                const currentUserId = getCurrentUserId();
+                const exportableMacros = (cache.conditionMacros || []).filter(m => m.createdBy === currentUserId);
+                if (!exportableRules.length && !exportableMacros.length) return alert('没有可导出的断语和条件宏（仅限自己的私有数据可导出）！');
                 const exportData = {
                     version: 2,
                     exportTime: new Date().toISOString(),
-                    rules: cache.rules,
-                    conditionMacros: getAllMacros()
+                    rules: exportableRules,
+                    conditionMacros: exportableMacros
                 };
                 rulesToExport = exportData;
-                filename = `八字规则_全部${cache.rules.length}条_含宏_${Date.now()}.json`;
+                filename = `八字规则_私有断语${exportableRules.length}条_含宏_${Date.now()}.json`;
             }
             
             const blob = new Blob([JSON.stringify(rulesToExport, null, 2)], {type:'application/json'});
@@ -10980,11 +10997,16 @@
             if (!data || data.length === 0) return;
             
             // 转换为 cache.rules 格式
-            const remoteRules = data.map(row => ({
+            const remoteRules = data.map(row => {
+              // 公开加密（permission_level=2）且非本人的规则 → 剥离 conditions
+              var isEncrypted = row.permission_level === 2;
+              var isOwner = row.user_id === currentUser.id || row.owner_id === currentUser.id;
+              var stripConditions = isEncrypted && !isOwner && !isAdmin(currentUser.email);
+              return {
                 id: row.id,
                 category: row.category || '',
                 duanyu: row.duanyu_text || row.duanyu || '',
-                conditions: row.conditions || { logic: 'and', children: [] },
+                conditions: stripConditions ? null : (row.conditions || { logic: 'and', children: [] }),
                 permissionLevel: row.permission_level !== undefined && row.permission_level !== null ? row.permission_level : 3,
                 isPublic: row.is_public !== undefined && row.is_public !== null ? row.is_public : true,
                 ownerId: row.owner_id || '',
@@ -10992,7 +11014,8 @@
                 description: row.description || '',
                 createTime: row.created_at || new Date().toISOString(),
                 updateTime: row.updated_at || row.created_at || '',
-            }));
+              };
+            });
             
             // 合并：以 id 为 key，远程数据覆盖本地
             const mergedMap = new Map();
@@ -11351,13 +11374,18 @@
 
             for (const cm of data) {
                 const localId = getLocalIdByCloudId(idMapping, 'macros', cm.id);
+                // 公开加密（permission=2）且非本人/非管理员的宏 → 剥离 conditions
+                var isMacroEncrypted = cm.permission === 2;
+                var isMacroOwner = cm.user_id === currentUser.id;
+                var isMacroAdmin = isAdmin(currentUser.email);
+                var stripMacroConditions = isMacroEncrypted && !isMacroOwner && !isMacroAdmin;
                 const macroData = {
                     id: localId || String(cm.id),
                     cloudId: cm.id,
                     name: cm.name,
                     description: cm.description || '',
                     permission: cm.permission !== undefined ? cm.permission : 0,
-                    conditions: cm.conditions || { logic: 'and', children: [] },
+                    conditions: stripMacroConditions ? null : (cm.conditions || { logic: 'and', children: [] }),
                     tags: cm.tags || [],
                     pinned: cm.pinned || false,
                     usageCount: cm.usage_count || 0,
@@ -19548,6 +19576,8 @@ function copyMacroToMine(macroId) {
     const macro = getMacroById(macroId);
     if (!macro) return;
     if (!currentUser) { alert('请先登录'); return; }
+    // 安全检查：如果当前用户无权查看该宏的条件，则不复制条件
+    const canViewConditions = canViewMacroConditions(macro);
     const newMacro = {
         ...macro,
         id: null, // 生成新ID
@@ -19555,6 +19585,7 @@ function copyMacroToMine(macroId) {
         permission: 0, // 复制后默认为私有
         createdBy: getCurrentUserId(),
         description: '', // 复制后清空描述
+        conditions: canViewConditions ? macro.conditions : null, // 无权查看则清空条件
         createTime: new Date().toISOString(),
         updateTime: new Date().toISOString(),
         usageCount: 0,
@@ -19563,6 +19594,10 @@ function copyMacroToMine(macroId) {
         cloudId: undefined
     };
     saveMacro(newMacro);
+    if (!canViewConditions) {
+        alert(`已复制条件宏「${macro.name}」到您的宏列表（条件已加密，复制后无条件内容）`);
+        return;
+    }
     renderMacroList();
     updateMacroTagFilters();
     alert(`已复制条件宏「${macro.name}」到您的宏列表`);
@@ -20426,12 +20461,13 @@ async function syncLocalTagsToCloud() {
 
 // 数据管理 - 导出功能
 function initDataExport() {
-    // 导出全部数据
+    // 导出全部数据（断语仅限自己的私有断语）
     const exportAllBtn = document.getElementById('export-all-data');
     if (exportAllBtn) {
         exportAllBtn.onclick = function() {
+            const exportableRules = (cache.rules || []).filter(r => canExportRule(r));
             const data = {
-                rules: cache.rules || [],
+                rules: exportableRules,
                 categories: cache.categories || [],
                 cases: caseCache.cases || [],
                 caseCategories: caseCache.categories || [],
@@ -20439,21 +20475,24 @@ function initDataExport() {
                 exportTime: new Date().toISOString()
             };
             downloadJson(data, 'paipan-data-all.json');
-            alert('全部数据导出成功！');
+            const ruleCount = exportableRules.length;
+            alert(`全部数据导出成功！（断语仅限自己的私有断语，共 ${ruleCount} 条）`);
         };
     }
     
-    // 仅导出断语库
+    // 仅导出断语库（仅限自己的私有断语）
     const exportRulesBtn = document.getElementById('export-rules-only');
     if (exportRulesBtn) {
         exportRulesBtn.onclick = function() {
+            const exportableRules = (cache.rules || []).filter(r => canExportRule(r));
             const data = {
-                rules: cache.rules || [],
+                rules: exportableRules,
                 categories: cache.categories || [],
                 exportTime: new Date().toISOString()
             };
             downloadJson(data, 'paipan-data-rules.json');
-            alert('断语库导出成功！');
+            const ruleCount = exportableRules.length;
+            alert(`个人断语库导出成功！（仅限自己的私有断语，共 ${ruleCount} 条）`);
         };
     }
     
@@ -22408,11 +22447,17 @@ async function syncCloudToLocal() {
             // 判断是否为公开断语（系统预设）
             const isPublic = rule.is_public === true;
 
+            // 安全保护：公开加密（permission_level=2）且非本人/非管理员的规则 → 剥离 conditions
+            var isEncryptedRule = rule.permission_level === 2;
+            var isRuleOwner = (rule.user_id === user.id) || (rule.owner_id === user.id);
+            var isAdminUser = isAdmin(userData.user.email);
+            var stripRuleConditions = isEncryptedRule && !isRuleOwner && !isAdminUser;
+
             const ruleData = {
                 id: localId || crypto.randomUUID(), // 如果有映射用本地ID，否则生成新ID
                 cloudId: rule.id,
                 category: rule.category,
-                conditions: rule.conditions || [],
+                conditions: stripRuleConditions ? null : (rule.conditions || []),
                 duanyu: rule.duanyu_text,
                 createTime: rule.create_time,
                 isPublic: isPublic, // 标记来源
@@ -22574,6 +22619,9 @@ async function syncCloudToLocal() {
         caseCache.cases = localCases;
         caseCache.eventTags = localTags;
         caseCache.tagCategories = localTagCategories;
+        
+        // 安全清洗：执行权限清洗（第二道防线）
+        cleanUnauthorizedRules();
         
         // 安全移除加载指示器
         if (loadingIndicator && loadingIndicator.parentNode) {
