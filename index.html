@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3512,7 +3512,9 @@
         birthTime: birthTime,
         gender: gender,
         calendarType: calendarType || 'solar',
-        isLeapMonth: isLeapMonth || false
+        isLeapMonth: isLeapMonth || false,
+        currentUserId: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null,
+        isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false
       });
       
       xhr.send(body);
