@@ -11046,11 +11046,11 @@
             cache.rules.forEach(r => { if (r.id) mergedMap.set(r.id, r); });
             remoteRules.forEach(r => { if (r.id) mergedMap.set(r.id, r); });
             
-            // 按条件去重：排除本地无ID但云端已有同条件断语（同分类+同条件）
+            // 按条件去重：排除本地无ID但云端已有同内容断语（同分类+同条件+同内容）
             const remoteConditionKeys = new Set(
-                Array.from(mergedMap.values()).map(r => `${r.category}|${JSON.stringify(r.conditions)}`)
+                Array.from(mergedMap.values()).map(r => `${r.category}|${r.duanyu || ''}|${JSON.stringify(r.conditions)}`)
             );
-            const noIdRules = cache.rules.filter(r => !r.id && !remoteConditionKeys.has(`${r.category}|${JSON.stringify(r.conditions)}`));
+            const noIdRules = cache.rules.filter(r => !r.id && !remoteConditionKeys.has(`${r.category}|${r.duanyu || ''}|${JSON.stringify(r.conditions)}`));
             cache.rules = [...noIdRules, ...Array.from(mergedMap.values())];
             
             // ========== macroRef 迁移：将旧格式本地ID替换为 cloudId ==========
@@ -11173,9 +11173,9 @@
         try {
             // === 1. 清理本地缓存 ===
             const localBefore = cache.rules.length;
-            const seenLocal = new Map(); // key: category|conditions_string → rule
+            const seenLocal = new Map(); // key: category|duanyu|conditions → rule
             for (const r of cache.rules) {
-                const key = `${r.category}|${JSON.stringify(r.conditions)}`;
+                const key = `${r.category}|${r.duanyu || ''}|${JSON.stringify(r.conditions)}`;
                 // 保留有 id 的，或者更新时间更晚的
                 if (!seenLocal.has(key)) {
                     seenLocal.set(key, r);
@@ -11213,11 +11213,11 @@
             if (error) throw error;
             if (!allRules || allRules.length === 0) return;
 
-            const seenDb = new Map(); // key: category|conditions_string → first (latest) record
+            const seenDb = new Map(); // key: category|duanyu_text|conditions → first (latest) record
             const duplicateIds = [];
             for (const row of allRules) {
                 const condStr = typeof row.conditions === 'object' ? JSON.stringify(row.conditions) : String(row.conditions || '');
-                const key = `${row.category || ''}|${condStr}`;
+                const key = `${row.category || ''}|${row.duanyu_text || row.duanyu || ''}|${condStr}`;
                 if (!seenDb.has(key)) {
                     seenDb.set(key, row);
                 } else {
