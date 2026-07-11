@@ -4769,14 +4769,19 @@
         if (!container) return;
         
         let isSticky = false;
+        let originOffsetTop = 0;
         
         const updateSticky = () => {
             if (!container || !pageBazi) return;
             
             const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const currentOffsetTop = container.offsetTop;
             
-            if (scrollTop > currentOffsetTop - 10) {
+            // 只在非浮动时更新位置，因为 fixed 脱离文档流后 offsetTop 会变为 0
+            if (!isSticky) {
+                originOffsetTop = container.offsetTop;
+            }
+            
+            if (scrollTop > originOffsetTop - 10) {
                 if (!isSticky) {
                     container.classList.add('sticky');
                     pageBazi.classList.add('sticky-padding');
