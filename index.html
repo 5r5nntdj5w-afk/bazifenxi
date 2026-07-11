@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8301,6 +8301,15 @@
                     console.debug('[renderConditionGroup] 找到checkbox数量:', checkboxes.length);
                     checkboxes.forEach(function(cb) {
                         var shouldCheck = values.indexOf(cb.value) !== -1;
+                        // 兼容旧数据缩写值："财" 匹配 "财星"，"印" 匹配 "印星"
+                        if (!shouldCheck) {
+                            for (var vi = 0; vi < values.length; vi++) {
+                                if (values[vi].length < cb.value.length && cb.value.startsWith(values[vi])) {
+                                    shouldCheck = true;
+                                    break;
+                                }
+                            }
+                        }
                         console.debug('[renderConditionGroup] checkbox value='+cb.value+' shouldCheck='+shouldCheck);
                         cb.checked = shouldCheck;
                     });
@@ -9573,6 +9582,15 @@
                                 console.debug('[编辑-旧格式] 找到checkbox数量:', checkboxes.length);
                                 checkboxes.forEach(function(cb) {
                                     var shouldCheck = values.indexOf(cb.value) !== -1;
+                                    // 兼容旧数据缩写值："财" 匹配 "财星"，"印" 匹配 "印星"
+                                    if (!shouldCheck) {
+                                        for (var vi = 0; vi < values.length; vi++) {
+                                            if (values[vi].length < cb.value.length && cb.value.startsWith(values[vi])) {
+                                                shouldCheck = true;
+                                                break;
+                                            }
+                                        }
+                                    }
                                     console.debug('[编辑-旧格式] checkbox value='+cb.value+' shouldCheck='+shouldCheck);
                                     cb.checked = shouldCheck;
                                 });
@@ -9667,7 +9685,17 @@
                                     values = [];
                                 }
                                 valCheckbox.querySelectorAll('input').forEach(function(cb) {
-                                    cb.checked = values.indexOf(cb.value) !== -1;
+                                    var shouldCheck = values.indexOf(cb.value) !== -1;
+                                    // 兼容旧数据缩写值："财" 匹配 "财星"，"印" 匹配 "印星"
+                                    if (!shouldCheck) {
+                                        for (var vi = 0; vi < values.length; vi++) {
+                                            if (values[vi].length < cb.value.length && cb.value.startsWith(values[vi])) {
+                                                shouldCheck = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    cb.checked = shouldCheck;
                                 });
                             } else if (!valSel.classList.contains('hidden')) {
                                 valSel.value = c.val || '';
@@ -19589,8 +19617,32 @@ function loadConditionsToEditor(container, conditions) {
                 setTimeout(() => {
                     const valSelect = item.querySelector('.condition-val-select');
                     const valInput = item.querySelector('.condition-val-input');
+                    const valCheckbox = item.querySelector('.condition-val-checkbox');
                     if (!valSelect.classList.contains('hidden')) valSelect.value = child.val || '';
                     if (!valInput.classList.contains('hidden')) valInput.value = child.val || '';
+                    if (!valCheckbox.classList.contains('hidden') && child.val) {
+                        var values;
+                        if (typeof child.val === 'string') {
+                            values = child.val.split(',').filter(function(v) { return v; });
+                        } else if (Array.isArray(child.val)) {
+                            values = child.val.filter(function(v) { return v; });
+                        } else {
+                            values = [];
+                        }
+                        valCheckbox.querySelectorAll('input').forEach(function(cb) {
+                            var shouldCheck = values.indexOf(cb.value) !== -1;
+                            // 兼容旧数据缩写值："财" 匹配 "财星"，"印" 匹配 "印星"
+                            if (!shouldCheck) {
+                                for (var vi = 0; vi < values.length; vi++) {
+                                    if (values[vi].length < cb.value.length && cb.value.startsWith(values[vi])) {
+                                        shouldCheck = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            cb.checked = shouldCheck;
+                        });
+                    }
                 }, 0);
             }
         }
