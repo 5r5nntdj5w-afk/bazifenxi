@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4835,6 +4835,12 @@
         };
     }
 
+    // 清除出生日期记录（供天干地支下拉框操作时调用）
+    function clearBirthData() {
+        window.lastPaipanData = null;
+        window.currentDaYun = null;
+    }
+
     // 自动排盘功能
     function initAutoPaipan() {
         const btnAutoPaipan = document.getElementById('btn-auto-paipan');
@@ -4864,11 +4870,6 @@
             }
             const liuyueListDiv = document.getElementById('liuyue-list');
             if (liuyueListDiv) liuyueListDiv.classList.add('hidden');
-        }
-
-        function clearBirthData() {
-            window.lastPaipanData = null;
-            window.currentDaYun = null;
         }
 
         // 更新流年列表（支持 JSON 对象格式）
@@ -19586,11 +19587,13 @@ function openRuleSelector() {
     }
     
     renderRuleSelectorList();
-    document.getElementById('rule-selector-modal').classList.remove('hidden');
+    var modal = document.getElementById('rule-selector-modal');
+    if (modal) modal.style.display = 'flex';
 }
 
 function closeRuleSelector() {
-    document.getElementById('rule-selector-modal').classList.add('hidden');
+    var modal = document.getElementById('rule-selector-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 function renderRuleSelectorList() {
@@ -24171,7 +24174,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- 选择断语引用弹窗 -->
-<div id="rule-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+<div id="rule-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50" style="display:none">
     <div class="bg-white rounded-lg shadow-xl w-[600px] max-h-[75vh] flex flex-col mx-4">
         <div class="flex justify-between items-center p-4 border-b shrink-0">
             <h3 class="text-lg font-bold text-teal-800">🔗 选择要引用的父级断语</h3>
