@@ -2121,7 +2121,7 @@
                     <option value="性格">性格</option>
                     <option value="灾祸">灾祸</option>
                 </select>
-                <input type="text" id="rule-search" class="flex-1 p-2 border rounded" placeholder="🔍 搜索断语内容..." autocomplete="off">
+                <input type="text" id="rule-search" class="flex-1 p-2 border rounded" placeholder="🔍 搜索断语内容、描述、引用的宏名称..." autocomplete="off">
                 <button id="clear-filter" class="px-3 py-2 bg-gray-200 rounded rule-btn-sm">清空筛选</button>
                 <button id="manage-categories-btn" class="px-3 py-2 bg-amber-600 text-white rounded text-sm rule-btn-sm" onclick="openCategoryManager()">📂 分类管理</button>
                 <button id="manage-macros-btn" class="px-3 py-2 bg-indigo-600 text-white rounded text-sm rule-btn-sm" onclick="openMacroManager()">🧩 条件宏管理</button>
@@ -8287,7 +8287,6 @@
                 
                 // 设置值
                 if (!valCheckbox.classList.contains('hidden') && child.val) {
-                    console.debug('[renderConditionGroup] valCheckbox可见, field='+child.field+' val='+JSON.stringify(child.val)+' type='+typeof child.val);
                     var values;
                     if (typeof child.val === 'string') {
                         values = child.val.split(',').filter(function(v) { return v; });
@@ -8296,9 +8295,7 @@
                     } else {
                         values = [];
                     }
-                    console.debug('[renderConditionGroup] 解析后values:', JSON.stringify(values));
                     var checkboxes = valCheckbox.querySelectorAll('input');
-                    console.debug('[renderConditionGroup] 找到checkbox数量:', checkboxes.length);
                     checkboxes.forEach(function(cb) {
                         var shouldCheck = values.indexOf(cb.value) !== -1;
                         // 兼容旧数据缩写值："财" 匹配 "财星"，"印" 匹配 "印星"
@@ -8310,11 +8307,9 @@
                                 }
                             }
                         }
-                        console.debug('[renderConditionGroup] checkbox value='+cb.value+' shouldCheck='+shouldCheck);
                         cb.checked = shouldCheck;
                     });
                 } else {
-                    console.debug('[renderConditionGroup] valCheckbox隐藏或val为空, hidden='+valCheckbox.classList.contains('hidden')+' field='+child.field+' val=', child.val);
                     if (!valSel.classList.contains('hidden')) {
                         valSel.value = child.val || '';
                     } else {
@@ -8385,7 +8380,6 @@
         // 字段变化时更新值控件
         fieldSel.onchange = function() {
             const field = this.value;
-            console.debug('[onchange] field='+field+' startsWith包含='+field.startsWith('包含-')+' fieldSel.value='+this.value);
             valSel.classList.add('hidden');
             valInput.classList.add('hidden');
             valCheckbox.classList.add('hidden');
@@ -9282,10 +9276,36 @@
         // 先按分类筛选，再按权限过滤
         let filtered = currentFilterCategory === 'all' ? cache.rules : cache.rules.filter(r => r.category === currentFilterCategory);
         filtered = filtered.filter(r => effectiveCats.includes(r.category));
-        // 按关键词搜索断语内容
+        // 按关键词搜索断语内容、描述、引用的宏名称
         if (currentSearchKeyword) {
             const kw = currentSearchKeyword.toLowerCase();
-            filtered = filtered.filter(r => (r.duanyu || '').toLowerCase().includes(kw));
+            filtered = filtered.filter(r => {
+                // 搜索断语内容
+                if ((r.duanyu || '').toLowerCase().includes(kw)) return true;
+                // 搜索断语描述
+                if ((r.description || '').toLowerCase().includes(kw)) return true;
+                // 搜索引用的宏名称（递归遍历条件树中的 macroRef）
+                if (r.conditions) {
+                    var macroKwMatch = false;
+                    (function searchMacro(conds) {
+                        if (!conds || !conds.children) return;
+                        for (var ci = 0; ci < conds.children.length; ci++) {
+                            var ch = conds.children[ci];
+                            if (ch.macroRef) {
+                                var m = getMacroById(ch.macroRef);
+                                if (m && (m.name || '').toLowerCase().includes(kw)) {
+                                    macroKwMatch = true;
+                                    return;
+                                }
+                            }
+                            if (ch.children) searchMacro(ch);
+                            if (macroKwMatch) return;
+                        }
+                    })(r.conditions);
+                    if (macroKwMatch) return true;
+                }
+                return false;
+            });
         }
         
         if (!filtered.length) { 
@@ -9550,8 +9570,6 @@
                             const valInput = item.querySelector('.condition-val-input');
                             const valCheckbox = item.querySelector('.condition-val-checkbox');
                             
-                            console.debug('[编辑-旧格式] 条件'+i+': field='+c.field+' op='+c.op+' val='+JSON.stringify(c.val)+' valType='+typeof c.val);
-                            
                             // 先设置字段值（需在 bindItemEvents / initCustomFieldSelect 之前）
                             fieldSel.value = c.field || '';
                             
@@ -9568,7 +9586,6 @@
                             
                             // 设置值
                             if (!valCheckbox.classList.contains('hidden') && c.val) {
-                                console.debug('[编辑-旧格式] valCheckbox可见, val='+JSON.stringify(c.val)+' type='+typeof c.val);
                                 var values;
                                 if (typeof c.val === 'string') {
                                     values = c.val.split(',').filter(function(v) { return v; });
@@ -9577,9 +9594,7 @@
                                 } else {
                                     values = [];
                                 }
-                                console.debug('[编辑-旧格式] 解析后values:', JSON.stringify(values));
                                 var checkboxes = valCheckbox.querySelectorAll('input');
-                                console.debug('[编辑-旧格式] 找到checkbox数量:', checkboxes.length);
                                 checkboxes.forEach(function(cb) {
                                     var shouldCheck = values.indexOf(cb.value) !== -1;
                                     // 兼容旧数据缩写值："财" 匹配 "财星"，"印" 匹配 "印星"
@@ -9591,11 +9606,9 @@
                                             }
                                         }
                                     }
-                                    console.debug('[编辑-旧格式] checkbox value='+cb.value+' shouldCheck='+shouldCheck);
                                     cb.checked = shouldCheck;
                                 });
                             } else {
-                                console.debug('[编辑-旧格式] valCheckbox隐藏或val为空, hidden='+valCheckbox.classList.contains('hidden')+' val=', c.val);
                                 if (!valSel.classList.contains('hidden')) {
                                     valSel.value = c.val || '';
                                 } else {
@@ -9639,7 +9652,6 @@
                     rootContainer.innerHTML = '';
                 
                     // 检查是否为新的条件组格式
-                    console.debug('[编辑] conditions格式:', rule.conditions ? (rule.conditions.children ? '新格式(有children)' : Array.isArray(rule.conditions) ? '旧格式(数组)' : typeof rule.conditions) : '无conditions');
                     if (rule.conditions && rule.conditions.children) {
                         // 新格式：嵌套条件组
                         renderConditionGroup(rule.conditions, rootContainer);
