@@ -3490,6 +3490,141 @@
       return '';
     }
     
+    /**
+     * 本地排盘（使用前端 lunar-javascript 库，毫秒级完成）
+     * 返回与 SCF API 相同格式的排盘结果（不含断语）
+     */
+    function localPaipan(birthDate, birthTime, gender, calendarType, isLeapMonth) {
+      if (typeof Solar === 'undefined') {
+        throw new Error('排盘库未加载，请检查网络连接');
+      }
+      // 处理农历→公历转换
+      var finalBirthDate = birthDate;
+      if (calendarType === 'lunar') {
+        var y = parseInt(birthDate.substring(0, 4));
+        var m = parseInt(birthDate.substring(4, 6));
+        var d = parseInt(birthDate.substring(6, 8));
+        if (isNaN(y) || isNaN(m) || isNaN(d)) throw new Error('日期解析失败');
+        var lunarMonth = isLeapMonth ? -m : m;
+        var lunarDate = Lunar.fromYmd(y, lunarMonth, d);
+        var solarDate = lunarDate.getSolar();
+        var sy = String(solarDate.getYear()).padStart(4, '0');
+        var sm = String(solarDate.getMonth()).padStart(2, '0');
+        var sd = String(solarDate.getDay()).padStart(2, '0');
+        finalBirthDate = sy + sm + sd;
+      }
+      var year = parseInt(finalBirthDate.substring(0, 4));
+      var month = parseInt(finalBirthDate.substring(4, 6));
+      var day = parseInt(finalBirthDate.substring(6, 8));
+      var hour = parseInt(birthTime.substring(0, 2));
+      var minute = parseInt(birthTime.substring(2, 4));
+      if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) {
+        throw new Error('日期或时间格式无效');
+      }
+      var g = String(gender);
+      var genderStr = (g === '1' || g === '男') ? '男' : '女';
+      var genderNum = genderStr === '男' ? 1 : 0;
+      var solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
+      var lunar = solar.getLunar();
+      var ec = lunar.getEightChar();
+      ec.setSect(1);
+      var bazi = {
+        nian: { gan: ec.getYearGan(), zhi: ec.getYearZhi() },
+        yue:  { gan: ec.getMonthGan(), zhi: ec.getMonthZhi() },
+        ri:   { gan: ec.getDayGan(),   zhi: ec.getDayZhi() },
+        shi:  { gan: ec.getTimeGan(),  zhi: ec.getTimeZhi() }
+      };
+      var shishenGan = {
+        nian: ec.getYearShiShenGan(), yue: ec.getMonthShiShenGan(),
+        ri:   ec.getDayShiShenGan(),   shi: ec.getTimeShiShenGan()
+      };
+      var shishenZhi = {
+        nian: getDiShen(bazi.nian.zhi, bazi.ri.gan),
+        yue:  getDiShen(bazi.yue.zhi, bazi.ri.gan),
+        ri:   getDiShen(bazi.ri.zhi,  bazi.ri.gan),
+        shi:  getDiShen(bazi.shi.zhi, bazi.ri.gan)
+      };
+      var yun = ec.getYun(genderNum, 1);
+      var dyList = yun.getDaYun(12);
+      var dayun = dyList.map(function(dy, i) {
+        var gz = dy.getGanZhi();
+        return {
+          index: i, ganZhi: gz,
+          gan: gz.charAt(0), zhi: gz.charAt(1),
+          startAge: dy.getStartAge(), startYear: dy.getStartYear(), endYear: dy.getEndYear()
+        };
+      });
+      var ss = yun.getStartSolar();
+      var qiyun = {
+        startAge: dayun.length > 0 ? dayun[0].startAge : 0,
+        startYear: yun.getStartYear(),
+        startMonth: ss ? ss.getMonth() : 0,
+        startDay: ss ? ss.getDay() : 0,
+        isForward: yun.isForward()
+      };
+      var currentYear = new Date().getFullYear();
+      var liunian = [];
+      for (var di = 0; di < dayun.length; di++) {
+        var dy = dayun[di];
+        var limit = dy.endYear - dy.startYear + 1;
+        for (var li = 0; li < limit; li++) {
+          var ly = dy.startYear + li;
+          var gz2 = getYearGanZhi(ly);
+          liunian.push({
+            year: ly, gan: gz2.gan, zhi: gz2.zhi, ganZhi: gz2.gan + gz2.zhi,
+            dayunGan: dy.gan, dayunZhi: dy.zhi, dayunGanZhi: dy.ganZhi,
+            dayunIndex: dy.index, isCurrentYear: ly === currentYear
+          });
+        }
+      }
+      return {
+        bazi: bazi, dayun: dayun, liunian: liunian, qiyun: qiyun,
+        shishenGan: shishenGan, shishenZhi: shishenZhi,
+        duanyu: { base: [] }
+      };
+    }
+
+    // 异步调 SCF API 获取断语
+    function callBaziApiAsync(birthDate, birthTime, gender, calendarType, isLeapMonth) {
+      var apiUrl = getApiBaziUrl();
+      if (!apiUrl) return Promise.reject(new Error('排盘 API 地址未配置'));
+      var cacheKey = birthDate + '_' + birthTime + '_' + gender;
+      var cached = BAZI_API_CACHE[cacheKey];
+      if (cached && cached._time && (Date.now() - cached._time) < BAZI_API_CACHE_TTL) {
+        return Promise.resolve(cached.data);
+      }
+      var currentUserIdVal = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null;
+      var isAdminVal = (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false;
+      return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', apiUrl, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            try {
+              var result = JSON.parse(xhr.responseText);
+              if (result && result.success && result.data) {
+                BAZI_API_CACHE[cacheKey] = { data: result.data, _time: Date.now() };
+                resolve(result.data);
+              } else {
+                reject(new Error(result && result.error ? result.error : 'API 返回异常'));
+              }
+            } catch(e) {
+              reject(new Error('解析 API 响应失败: ' + e.message));
+            }
+          } else {
+            reject(new Error('API 请求失败: HTTP ' + xhr.status));
+          }
+        };
+        xhr.onerror = function() { reject(new Error('网络请求失败')); };
+        xhr.send(JSON.stringify({
+          birthDate: birthDate, birthTime: birthTime, gender: gender,
+          calendarType: calendarType || 'solar', isLeapMonth: isLeapMonth || false,
+          currentUserId: currentUserIdVal, isAdmin: isAdminVal
+        }));
+      });
+    }
+
     // 调用排盘 API
     function callBaziApi(birthDate, birthTime, gender, calendarType, isLeapMonth) {
       var apiUrl = getApiBaziUrl();
@@ -4891,27 +5026,19 @@
                 var birthDateStr = String(year).padStart(4,'0') + String(month).padStart(2,'0') + String(day).padStart(2,'0');
                 var birthTimeStr = String(hour).padStart(2,'0') + String(minute).padStart(2,'0');
 
-                console.log('调用排盘 API:', birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
+                console.log('本地排盘:', birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
 
-                // === 通过 API 排盘（核心计算在云函数，不在客户端暴露）===
-                var apiData = callBaziApi(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
-                var bd = apiData.bazi;
-                var dayunResults = apiData.dayun;     // API 返回的大运列表（含断语）
-                var liunianResults = apiData.liunian;   // API 返回的流年列表（含断语）
-                var qiyun = apiData.qiyun;
-                var shishenGan = apiData.shishenGan;
-                var shishenZhi = apiData.shishenZhi;
+                // === Phase 1: 本地排盘（毫秒级即时展示）===
+                var localData = localPaipan(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
+                var bd = localData.bazi;
+                var dayunResults = localData.dayun;
+                var liunianResults = localData.liunian;
+                var qiyun = localData.qiyun;
+                var shishenGan = localData.shishenGan;
+                var shishenZhi = localData.shishenZhi;
 
-                // 存储 API 断语缓存（不暴露匹配规则，只存匹配结果）
-                window.apiDuanyuCache = {
-                  base: (apiData.duanyu && apiData.duanyu.base) || [],
-                  dayun: (dayunResults || []).map(function(d) {
-                    return { ganZhi: d.ganZhi, startAge: d.startAge, startYear: d.startYear, duanyu: d.duanyu || [] };
-                  }),
-                  liunian: (liunianResults || []).map(function(d) {
-                    return { year: d.year, ganZhi: d.ganZhi, dayunIndex: d.dayunIndex, duanyu: d.duanyu || [] };
-                  })
-                };
+                // 断语缓存设为空（稍后由 SCF 异步填充）
+                window.apiDuanyuCache = null;
 
                 // 提取八字各柱
                 var yearGan = bd.nian.gan;
@@ -5026,8 +5153,30 @@
                     qiyunInfo: { age: startAge, year: startYearNum, month: 0, day: 0 }
                 };
 
-                // 使用 API 断语缓存渲染，不再使用本地 matchRules
+                // 使用本地结果渲染（无断语，SCF 返回后自动更新）
                 calcAll();
+
+                // === Phase 2: 异步获取 SCF 断语 ===
+                // 用请求 ID 防止快速重复点击时旧响应覆盖新结果
+                window._paipanReqId = (window._paipanReqId || 0) + 1;
+                var myReqId = window._paipanReqId;
+                callBaziApiAsync(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth).then(function(apiData) {
+                  if (myReqId !== window._paipanReqId) return; // 忽略旧请求
+                  if (apiData && apiData.duanyu) {
+                    window.apiDuanyuCache = {
+                      base: (apiData.duanyu && apiData.duanyu.base) || [],
+                      dayun: (apiData.dayun || []).map(function(d) {
+                        return { ganZhi: d.ganZhi, startAge: d.startAge, startYear: d.startYear, duanyu: d.duanyu || [] };
+                      }),
+                      liunian: (apiData.liunian || []).map(function(d) {
+                        return { year: d.year, ganZhi: d.ganZhi, dayunIndex: d.dayunIndex, duanyu: d.duanyu || [] };
+                      })
+                    };
+                    calcAll();
+                  }
+                }).catch(function(e) {
+                  console.warn('SCF 断语获取失败:', e.message);
+                });
             } catch (error) {
                 console.error('自动排盘出错:', error);
                 alert('排盘出错：' + error.message);
