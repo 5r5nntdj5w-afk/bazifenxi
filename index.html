@@ -4768,19 +4768,15 @@
         
         if (!container) return;
         
-        let offsetTop = 0;
         let isSticky = false;
         
         const updateSticky = () => {
             if (!container || !pageBazi) return;
             
             const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const currentOffsetTop = container.offsetTop;
             
-            if (offsetTop === 0) {
-                offsetTop = container.offsetTop;
-            }
-            
-            if (scrollTop > offsetTop - 10) {
+            if (scrollTop > currentOffsetTop - 10) {
                 if (!isSticky) {
                     container.classList.add('sticky');
                     pageBazi.classList.add('sticky-padding');
@@ -4797,7 +4793,6 @@
         
         DOM.tabBazi.addEventListener('click', () => {
             setTimeout(() => {
-                offsetTop = 0;
                 isSticky = false;
                 container.classList.remove('sticky');
                 if (pageBazi) pageBazi.classList.remove('sticky-padding');
@@ -4814,7 +4809,7 @@
         window.addEventListener('scroll', updateSticky);
         
         window.addEventListener('resize', () => {
-            offsetTop = 0;
+            // noop - offsetTop 每次滚动实时计算
         });
     }
 
