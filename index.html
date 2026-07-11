@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8181,6 +8181,10 @@
         }
         cache.lastCalcData = data;
         positionShenCards(); // 更新十神卡片位置
+        // 如果手动修改了天干地支（与自动排盘数据不一致），清空 API 断语缓存
+        if (!data.hasBirthData) {
+            window.apiDuanyuCache = null;
+        }
         // 使用 API 断语缓存渲染（保护断语规则不暴露在客户端）
         renderApiDuanyu();
         saveHistory(data);
