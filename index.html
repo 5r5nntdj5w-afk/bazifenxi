@@ -8181,12 +8181,14 @@
         }
         cache.lastCalcData = data;
         positionShenCards(); // 更新十神卡片位置
-        // 如果手动修改了天干地支（与自动排盘数据不一致），清空 API 断语缓存
         if (!data.hasBirthData) {
+            // 手动修改了天干地支 → 走本地匹配
             window.apiDuanyuCache = null;
+            matchRules(data);
+        } else {
+            // 使用 API 断语缓存渲染（保护断语规则不暴露在客户端）
+            renderApiDuanyu();
         }
-        // 使用 API 断语缓存渲染（保护断语规则不暴露在客户端）
-        renderApiDuanyu();
         saveHistory(data);
     }
 
@@ -24190,19 +24192,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 <option value="all">全部分类</option>
             </select>
         </div>
-        <div class="p-3 text-xs text-gray-500 border-b bg-gray-50">
-            提示：选择一条父级断语后，子级断语将自动继承其所有条件。引用链：父级条件 <span class="text-teal-600 font-bold">AND</span> 本断语新增条件
-        </div>
-        <div class="p-4 flex-1 overflow-y-auto" id="rule-selector-list">
-            <p class="text-gray-500 text-center py-8">加载中...</p>
-        </div>
-    </div>
-</div>
-
-</body>
-</html>
-
-
         <div class="p-3 text-xs text-gray-500 border-b bg-gray-50">
             提示：选择一条父级断语后，子级断语将自动继承其所有条件。引用链：父级条件 <span class="text-teal-600 font-bold">AND</span> 本断语新增条件
         </div>
