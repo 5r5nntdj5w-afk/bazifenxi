@@ -1581,6 +1581,7 @@
                 <button id="add-condition-group" class="px-4 py-2 bg-purple-600 text-white rounded">+ 添加条件组</button>
                 <button id="add-condition" class="px-4 py-2 bg-blue-600 text-white rounded">+ 添加条件</button>
                 <button id="insert-macro-btn" class="px-4 py-2 bg-indigo-500 text-white rounded">🧩 插入条件宏</button>
+                <button id="insert-rule-ref-btn" class="px-4 py-2 bg-teal-600 text-white rounded">🔗 引用断语</button>
             </div>
             
             <!-- 模板：条件组 -->
@@ -7649,6 +7650,21 @@
                             childResult = false; // 宏不存在视为不匹配
                         }
                     }
+                } else if (child.ruleRef) {
+                    // 断语引用：查找被引用的断语并递归评估其条件
+                    if (visitedMacros.has('rule:' + child.ruleRef)) {
+                        console.warn('检测到断语循环引用:', child.ruleRef);
+                        childResult = false;
+                    } else {
+                        const refRule = (cache.rules || []).find(r => String(r.id) === String(child.ruleRef) || String(r.cloudId) === String(child.ruleRef));
+                        if (refRule && refRule.conditions) {
+                            const newVisited = new Set(visitedMacros);
+                            newVisited.add('rule:' + child.ruleRef);
+                            childResult = evaluateConditionGroup(refRule.conditions, depth + 1, newVisited);
+                        } else {
+                            childResult = false; // 被引用的断语不存在视为不匹配
+                        }
+                    }
                 } else if (child.children) {
                     childResult = evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
                 } else {
@@ -8889,6 +8905,7 @@
             rootContainer.appendChild(initialGroup);
             
             editIndex = -1;
+            window._editingRuleId = null;
         };
     }
 
@@ -8909,6 +8926,13 @@
                 const macroName = child.querySelector('.macro-ref-name')?.value || '';
                 if (macroId) {
                     children.push({ macroRef: macroId, macroName: macroName });
+                }
+            } else if (child.classList.contains('rule-ref-item')) {
+                // 断语引用节点
+                const ruleId = child.querySelector('.rule-ref-id')?.value;
+                const ruleName = child.querySelector('.rule-ref-name')?.value || '';
+                if (ruleId) {
+                    children.push({ ruleRef: ruleId, ruleName: ruleName });
                 }
             } else if (child.classList.contains('condition-item')) {
                 // 收集条件项数据
@@ -9240,6 +9264,50 @@
         return opMap[op] || op;
     }
 
+    // 全局：将条件对象转换为可读文本（支持嵌套结构）
+    function conditionsToText(conditions, depth = 0) {
+        if (!conditions) return '';
+        let text = '';
+        
+        // 如果是数组（旧格式），直接遍历
+        if (Array.isArray(conditions)) {
+            conditions.forEach((c, i) => {
+                if (c.children) {
+                    text += conditionsToText(c.children, depth + 1);
+                } else if (c.macroRef) {
+                    const macro = getMacroById(c.macroRef);
+                    const macroName = macro ? macro.name : (c.macroName || '(已删除)');
+                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}[宏:${macroName}]`;
+                } else if (c.ruleRef) {
+                    const refRule = (cache.rules || []).find(r => String(r.id) === String(c.ruleRef) || String(r.cloudId) === String(c.ruleRef));
+                    const refName = refRule ? refRule.duanyu : (c.ruleName || '(已删除)');
+                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}[引用:${refName}]`;
+                } else {
+                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
+                }
+            });
+        } else if (conditions.children) {
+            conditions.children.forEach((c, i) => {
+                if (i > 0 && text) text += (c.logic === 'and' || conditions.logic === 'and') ? ' 并且 ' : ' 或者 ';
+                if (c.macroRef) {
+                    const macro = getMacroById(c.macroRef);
+                    const macroName = macro ? macro.name : (c.macroName || '(已删除)');
+                    text += `[宏:${macroName}]`;
+                } else if (c.ruleRef) {
+                    const refRule = (cache.rules || []).find(r => String(r.id) === String(c.ruleRef) || String(r.cloudId) === String(c.ruleRef));
+                    const refName = refRule ? refRule.duanyu : (c.ruleName || '(已删除)');
+                    text += `[引用:${refName}]`;
+                } else if (c.children) {
+                    text += conditionsToText(c.children, depth + 1);
+                } else {
+                    text += `${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
+                }
+            });
+        }
+        
+        return text;
+    }
+
     // ==================== 全局显示间距设置 ====================
     function applyDisplaySpacing() {
         const ds = cache.displaySpacing || { fontSize: 16, lineHeight: 1.6, paraSpacing: 24 };
@@ -9335,6 +9403,13 @@
                                     return;
                                 }
                             }
+                            if (ch.ruleRef) {
+                                var refR = (cache.rules || []).find(function(rr) { return String(rr.id) === String(ch.ruleRef) || String(rr.cloudId) === String(ch.ruleRef); });
+                                if (refR && (refR.duanyu || '').toLowerCase().includes(kw)) {
+                                    macroKwMatch = true;
+                                    return;
+                                }
+                            }
                             if (ch.children) searchMacro(ch);
                             if (macroKwMatch) return;
                         }
@@ -9378,45 +9453,6 @@
         updateRulePagination(sorted.length, totalPages);
         
         DOM.ruleList.innerHTML = '';
-        
-        // 辅助函数：将条件对象转换为可读文本（支持嵌套结构）
-        function conditionsToText(conditions, depth = 0) {
-            if (!conditions) return '';
-            let text = '';
-            
-            // 如果是数组（旧格式），直接遍历
-            if (Array.isArray(conditions)) {
-                conditions.forEach((c, i) => {
-                    if (c.children) {
-                        // 嵌套条件组
-                        text += conditionsToText(c.children, depth + 1);
-                    } else if (c.macroRef) {
-                        const macro = getMacroById(c.macroRef);
-                        const macroName = macro ? macro.name : (c.macroName || '(已删除)');
-                        text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}[宏:${macroName}]`;
-                    } else {
-                        text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
-                    }
-                });
-            } else if (conditions.children) {
-                // 新格式：对象带有 children
-                conditions.children.forEach((c, i) => {
-                    if (i > 0 && text) text += (c.logic === 'and' || conditions.logic === 'and') ? ' 并且 ' : ' 或者 ';
-                    if (c.macroRef) {
-                        const macro = getMacroById(c.macroRef);
-                        const macroName = macro ? macro.name : (c.macroName || '(已删除)');
-                        text += `[宏:${macroName}]`;
-                    } else if (c.children) {
-                        // 嵌套条件组
-                        text += conditionsToText(c.children, depth + 1);
-                    } else {
-                        text += `${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
-                    }
-                });
-            }
-            
-            return text;
-        }
         
         pageData.forEach((rule, idx) => {
             const div = document.createElement('div');
@@ -9491,6 +9527,7 @@
                                 <span class="font-bold">【${rule.category}】</span>
                                 ${sourceLabel}
                                 ${hasMacroRef(rule) ? '<span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">🧩 宏</span>' : ''}
+                                ${hasRuleRef(rule) ? '<span class="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">🔗 引用</span>' : ''}
                             </div>
                             <div class="text-sm break-words">条件：${condText}</div>
                             <div class="text-green-700 break-words">断语：${formatDuanyu(rule.duanyu || '')}</div>
@@ -9574,6 +9611,7 @@
             if (copyBtn && !copyBtn.disabled) {
                 copyBtn.onclick = () => {
                     editIndex = -1;
+                    window._editingRuleId = null;
                     DOM.ruleCategory.value = rule.category;
                     DOM.ruleDuanyu.innerHTML = '（复制）' + rule.duanyu;
                     if (DOM.ruleDescription) DOM.ruleDescription.value = '';
@@ -9676,6 +9714,7 @@
             if (editBtn) {
                 editBtn.onclick = () => {
                     editIndex = cache.rules.findIndex(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
+                    window._editingRuleId = rule.id || rule.cloudId || null;
                     DOM.ruleCategory.value = rule.category;
                     DOM.ruleDuanyu.innerHTML = rule.duanyu && rule.duanyu.includes('<') ? rule.duanyu : formatDuanyu(rule.duanyu || '');
                     
@@ -11473,6 +11512,19 @@
                                 }
                             }
                             // 如果仍未找到，但已有 macroName，保留它
+                        }
+                    } else if (c.ruleRef) {
+                        // 断语引用：尝试将本地ID替换为cloudId
+                        const refRule = (cache.rules || []).find(r => String(r.id) === String(c.ruleRef) || String(r.cloudId) === String(c.ruleRef));
+                        if (refRule) {
+                            if (refRule.cloudId && String(refRule.cloudId) !== String(c.ruleRef)) {
+                                c.ruleRef = refRule.cloudId;
+                                changed = true;
+                            }
+                            if (c.ruleName !== refRule.duanyu) {
+                                c.ruleName = refRule.duanyu;
+                                changed = true;
+                            }
                         }
                     } else if (c.children) {
                         walk(c);
@@ -19518,13 +19570,158 @@ async function insertMacroRef(macroId) {
     target.appendChild(item);
 }
 
-// 初始化宏管理器事件
+// 断语引用选择器（插入父级断语引用到条件中）
+function openRuleSelector() {
+    const container = document.getElementById('rule-selector-list');
+    const catFilter = document.getElementById('rule-selector-category');
+    
+    // 填充分类过滤
+    if (catFilter) {
+        const cats = new Set();
+        (cache.rules || []).forEach(r => { if (r.category) cats.add(r.category); });
+        const currentVal = catFilter.value;
+        catFilter.innerHTML = '<option value="all">全部分类</option>' +
+            Array.from(cats).sort().map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        catFilter.value = currentVal;
+    }
+    
+    renderRuleSelectorList();
+    document.getElementById('rule-selector-modal').classList.remove('hidden');
+}
+
+function closeRuleSelector() {
+    document.getElementById('rule-selector-modal').classList.add('hidden');
+}
+
+function renderRuleSelectorList() {
+    const container = document.getElementById('rule-selector-list');
+    if (!container) return;
+    
+    let rules = cache.rules || [];
+    
+    // 分类过滤
+    const catFilter = document.getElementById('rule-selector-category')?.value || 'all';
+    if (catFilter !== 'all') {
+        rules = rules.filter(r => r.category === catFilter);
+    }
+    
+    // 搜索过滤
+    const searchQuery = document.getElementById('rule-selector-search')?.value?.toLowerCase().trim() || '';
+    if (searchQuery) {
+        rules = rules.filter(r => {
+            if ((r.duanyu || '').toLowerCase().includes(searchQuery)) return true;
+            if ((r.category || '').toLowerCase().includes(searchQuery)) return true;
+            if ((r.description || '').toLowerCase().includes(searchQuery)) return true;
+            return false;
+        });
+    }
+    
+    // 排除自身（当前编辑的规则）
+    const editingRuleId = window._editingRuleId;
+    if (editingRuleId) {
+        rules = rules.filter(r => String(r.id) !== String(editingRuleId));
+    }
+    
+    if (rules.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">没有匹配的断语</p>';
+        return;
+    }
+    
+    // 按分类分组显示
+    const grouped = {};
+    rules.forEach(r => {
+        const cat = r.category || '未分类';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(r);
+    });
+    
+    container.innerHTML = Object.keys(grouped).sort().map(cat => {
+        const items = grouped[cat].map(r => {
+            const condText = conditionsToText(r.conditions);
+            const safeDuanyu = escapeHtml(r.duanyu || '');
+            const safeDesc = r.description ? escapeHtml(r.description) : '';
+            const gkInfo = r.groupKey ? `<span class="text-xs text-teal-500">📦 ${escapeHtml(r.groupKey)}</span>` : '';
+            return `
+            <div class="border border-teal-200 rounded-lg p-3 mb-2 hover:bg-teal-50 cursor-pointer transition-colors" onclick="insertRuleRef('${r.id}')">
+                <div class="font-medium text-teal-800">🔗 ${safeDuanyu}</div>
+                <div class="text-xs text-gray-500 mt-1">条件：${escapeHtml(condText)}</div>
+                ${safeDesc ? `<div class="text-xs text-gray-400 mt-0.5">📝 ${safeDesc}</div>` : ''}
+                <div class="flex gap-2 mt-1">${gkInfo}</div>
+            </div>`;
+        }).join('');
+        return `<div class="mb-3"><div class="text-sm font-bold text-gray-600 mb-1">【${escapeHtml(cat)}】</div>${items}</div>`;
+    }).join('');
+}
+
+// 绑定断语选择器搜索/过滤事件
+document.addEventListener('input', function(e) {
+    if (e.target.id === 'rule-selector-search') renderRuleSelectorList();
+});
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'rule-selector-category') renderRuleSelectorList();
+});
+
+async function insertRuleRef(ruleId) {
+    const rule = (cache.rules || []).find(r => String(r.id) === String(ruleId));
+    if (!rule) return;
+    closeRuleSelector();
+    
+    const refId = rule.cloudId || rule.id;
+    const ruleName = rule.duanyu || '';
+    
+    // 找到目标容器
+    const root = document.querySelector('#rule-conditions .condition-group-root');
+    if (!root) return;
+    
+    const target = window._lastGroupChildren || root;
+    
+    const item = document.createElement('div');
+    item.className = 'condition-item rule-ref-item flex items-center gap-2 mb-2 p-2 bg-teal-100 border border-teal-300 rounded';
+    item.innerHTML = `
+        <span class="text-xs font-bold text-teal-700">🔗 引用：${escapeHtml(ruleName)}</span>
+        <input type="hidden" class="rule-ref-id" value="${refId}">
+        <input type="hidden" class="rule-ref-name" value="${escapeHtml(ruleName)}">
+        <button type="button" class="ml-auto text-red-500 hover:text-red-700 text-sm font-bold" onclick="this.closest('.condition-item').remove()">&times;</button>
+    `;
+    target.appendChild(item);
+}
+
+// 初始化断语引用按钮事件
+function initRuleRefEvents() {
+    const insertBtn = document.getElementById('insert-rule-ref-btn');
+    if (insertBtn) insertBtn.onclick = openRuleSelector;
+}
+
+// 检查断语规则是否包含引用断语
+function hasRuleRef(rule) {
+    if (!rule.conditions || !rule.conditions.children) return false;
+    return checkConditionsForRuleRef(rule.conditions.children, '__any__');
+}
+
+function checkConditionsForRuleRef(children, ruleId) {
+    for (const child of children) {
+        if (ruleId === '__any__' && child.ruleRef) return true;
+        if (String(child.ruleRef) === String(ruleId)) return true;
+        if (child.children && checkConditionsForRuleRef(child.children, ruleId)) return true;
+    }
+    return false;
+}
+
+// 获取引用了某条断语的所有断语
+function getRulesReferencingRule(ruleId) {
+    return (cache.rules || []).filter(r => checkConditionsForRuleRef(r.conditions?.children || [], ruleId));
+}
+
+// 初始化断语引用事件
 function initMacroEvents() {
     const manageBtn = document.getElementById('manage-macros-btn');
     if (manageBtn) manageBtn.onclick = openMacroManager;
     
     const insertBtn = document.getElementById('insert-macro-btn');
     if (insertBtn) insertBtn.onclick = openMacroSelector;
+
+    const ruleRefBtn = document.getElementById('insert-rule-ref-btn');
+    if (ruleRefBtn) ruleRefBtn.onclick = openRuleSelector;
     
     const saveBtn = document.getElementById('save-macro-btn');
     if (saveBtn) saveBtn.onclick = saveMacroFromEditor;
@@ -23969,6 +24166,41 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="p-4 flex-1 overflow-y-auto" id="macro-selector-list">
             <p class="text-gray-500 text-center py-8">暂无条件宏，请先在断语管理页面创建</p>
+        </div>
+    </div>
+</div>
+
+<!-- 选择断语引用弹窗 -->
+<div id="rule-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[600px] max-h-[75vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-lg font-bold text-teal-800">🔗 选择要引用的父级断语</h3>
+            <button onclick="closeRuleSelector()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="px-4 pt-3 pb-1 flex flex-wrap gap-2 items-center border-b">
+            <input type="text" id="rule-selector-search" class="flex-1 min-w-[140px] p-2 border rounded text-sm" placeholder="搜索断语内容、分类、描述...">
+            <select id="rule-selector-category" class="p-2 border rounded text-sm min-w-[100px]">
+                <option value="all">全部分类</option>
+            </select>
+        </div>
+        <div class="p-3 text-xs text-gray-500 border-b bg-gray-50">
+            提示：选择一条父级断语后，子级断语将自动继承其所有条件。引用链：父级条件 <span class="text-teal-600 font-bold">AND</span> 本断语新增条件
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto" id="rule-selector-list">
+            <p class="text-gray-500 text-center py-8">加载中...</p>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
+
+
+        <div class="p-3 text-xs text-gray-500 border-b bg-gray-50">
+            提示：选择一条父级断语后，子级断语将自动继承其所有条件。引用链：父级条件 <span class="text-teal-600 font-bold">AND</span> 本断语新增条件
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto" id="rule-selector-list">
+            <p class="text-gray-500 text-center py-8">加载中...</p>
         </div>
     </div>
 </div>
