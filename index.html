@@ -8287,9 +8287,16 @@
                 
                 // 设置值
                 if (!valCheckbox.classList.contains('hidden') && child.val) {
-                    const values = child.val.split(',').filter(v => v);
-                    valCheckbox.querySelectorAll('input').forEach(cb => {
-                        cb.checked = values.includes(cb.value);
+                    var values;
+                    if (typeof child.val === 'string') {
+                        values = child.val.split(',').filter(function(v) { return v; });
+                    } else if (Array.isArray(child.val)) {
+                        values = child.val.filter(function(v) { return v; });
+                    } else {
+                        values = [];
+                    }
+                    valCheckbox.querySelectorAll('input').forEach(function(cb) {
+                        cb.checked = values.indexOf(cb.value) !== -1;
                     });
                 } else if (!valSel.classList.contains('hidden')) {
                     valSel.value = child.val || '';
@@ -9540,9 +9547,16 @@
                             
                             // 设置值
                             if (!valCheckbox.classList.contains('hidden') && c.val) {
-                                const values = c.val.split(',').filter(v => v);
-                                valCheckbox.querySelectorAll('input').forEach(cb => {
-                                    cb.checked = values.includes(cb.value);
+                                var values;
+                                if (typeof c.val === 'string') {
+                                    values = c.val.split(',').filter(function(v) { return v; });
+                                } else if (Array.isArray(c.val)) {
+                                    values = c.val.filter(function(v) { return v; });
+                                } else {
+                                    values = [];
+                                }
+                                valCheckbox.querySelectorAll('input').forEach(function(cb) {
+                                    cb.checked = values.indexOf(cb.value) !== -1;
                                 });
                             } else if (!valSel.classList.contains('hidden')) {
                                 valSel.value = c.val || '';
@@ -9598,7 +9612,6 @@
                         rule.conditions.forEach((c, i) => {
                             const item = createConditionItemElement();
                             groupChildren.appendChild(item);
-                            bindItemEvents(item);
                             
                             const fieldSel = item.querySelector('.condition-field');
                             const opSel = item.querySelector('.condition-op');
@@ -9607,7 +9620,10 @@
                             const valInput = item.querySelector('.condition-val-input');
                             const valCheckbox = item.querySelector('.condition-val-checkbox');
                             
+                            // 先设置字段值（需在 bindItemEvents / initCustomFieldSelect 之前）
                             fieldSel.value = c.field || '';
+                            
+                            bindItemEvents(item);
                             
                             // 触发onchange初始化值控件
                             if (fieldSel.onchange) {
@@ -9620,9 +9636,16 @@
                             
                             // 设置值
                             if (!valCheckbox.classList.contains('hidden') && c.val) {
-                                const values = c.val.split(',').filter(v => v);
-                                valCheckbox.querySelectorAll('input').forEach(cb => {
-                                    cb.checked = values.includes(cb.value);
+                                var values;
+                                if (typeof c.val === 'string') {
+                                    values = c.val.split(',').filter(function(v) { return v; });
+                                } else if (Array.isArray(c.val)) {
+                                    values = c.val.filter(function(v) { return v; });
+                                } else {
+                                    values = [];
+                                }
+                                valCheckbox.querySelectorAll('input').forEach(function(cb) {
+                                    cb.checked = values.indexOf(cb.value) !== -1;
                                 });
                             } else if (!valSel.classList.contains('hidden')) {
                                 valSel.value = c.val || '';
