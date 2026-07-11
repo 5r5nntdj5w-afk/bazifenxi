@@ -6981,7 +6981,7 @@
 
     // 规则匹配（新增大运/流年 五行+十神匹配逻辑）
     function matchRules(data) {
-        const matchedByCategory = {};
+        let matchedByCategory = {};
 
         // 预计算统计数据，避免在循环中重复计算
         const stats = getStats(data);
