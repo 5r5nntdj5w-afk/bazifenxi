@@ -5028,6 +5028,30 @@
 
                 console.log('本地排盘:', birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
 
+                // 清空上一次排盘的大运/流年选中状态
+                document.querySelectorAll('.dayun-item').forEach(function(item) { item.classList.remove('active'); });
+                currentDaYun = null;
+                window.currentDaYun = null;
+                clearLiuNianSelection();
+                var liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
+                var liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
+                if (liuyueGanSelect) liuyueGanSelect.value = '';
+                if (liuyueZhiSelect) liuyueZhiSelect.value = '';
+                var dayunContainer = document.getElementById('dayun-container');
+                if (dayunContainer) dayunContainer.innerHTML = '';
+                var dayunListDiv = document.getElementById('dayun-list');
+                if (dayunListDiv) dayunListDiv.classList.add('hidden');
+                var liunianContainer = document.getElementById('liunian-container');
+                if (liunianContainer) liunianContainer.innerHTML = '';
+                var liunianListDiv = document.getElementById('liunian-list');
+                if (liunianListDiv) liunianListDiv.classList.add('hidden');
+                var liuyueListDiv = document.getElementById('liuyue-list');
+                if (liuyueListDiv) liuyueListDiv.classList.add('hidden');
+                var qiyunInfo = document.getElementById('qiyun-info');
+                if (qiyunInfo) qiyunInfo.classList.add('hidden');
+                var paipanResult = document.getElementById('paipan-result');
+                if (paipanResult) paipanResult.classList.add('hidden');
+
                 // === Phase 1: 本地排盘（毫秒级即时展示）===
                 var localData = localPaipan(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth);
                 var bd = localData.bazi;
