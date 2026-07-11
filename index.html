@@ -4859,46 +4859,6 @@
             if (liuyueListDiv) liuyueListDiv.classList.add('hidden');
         }
 
-        // 渲染大运列表（从 daYunData 构建）
-        function renderDayunList() {
-            var container = document.getElementById('dayun-container');
-            var listDiv = document.getElementById('dayun-list');
-            if (!container || !listDiv) return;
-            container.innerHTML = '';
-            if (!daYunData || daYunData.length === 0) return;
-            daYunData.forEach(function(dayun, index) {
-                var gz = dayun.ganZhi || '';
-                var g = gz.charAt(0);
-                var zh = gz.charAt(1);
-                var age = dayun.startAge;
-                var yr = dayun.startYear;
-                var div = document.createElement('div');
-                div.className = 'dayun-item';
-                div.innerHTML = '<div class="dayun-year">' + yr + '</div><div class="dayun-age">' + age + '岁起</div><div class="dayun-ganzhi">' + gz + '</div>';
-                (function(dy, gg, zzh) {
-                    div.onclick = function() {
-                        document.querySelectorAll('.dayun-item').forEach(function(item) { item.classList.remove('active'); });
-                        div.classList.add('active');
-                        currentDaYun = wrapDayunObject(dy);
-                        window.currentDaYun = wrapDayunObject(dy);
-                        var dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
-                        var dayunZhiSelect = document.querySelector('.dizhi[data-type="dayun"]');
-                        if (dayunGanSelect && dayunZhiSelect) {
-                            dayunGanSelect.value = gg;
-                            var vd = getValidDizhiByGan(gg);
-                            renderDizhiSelect(dayunZhiSelect, vd);
-                            dayunZhiSelect.value = zzh;
-                        }
-                        clearLiuNianSelection();
-                        updateLiuNianList(dy);
-                        calcAll();
-                    };
-                })(dayun, g, zh);
-                container.appendChild(div);
-            });
-            listDiv.classList.remove('hidden');
-        }
-
         function clearBirthData() {
             window.lastPaipanData = null;
             window.currentDaYun = null;
@@ -5072,6 +5032,14 @@
                 document.querySelectorAll('.dayun-item').forEach(function(item) { item.classList.remove('active'); });
                 currentDaYun = null;
                 window.currentDaYun = null;
+                // 清空八字输入区的大运干支下拉框
+                var dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
+                var dayunZhiSelect = document.querySelector('.dizhi[data-type="dayun"]');
+                if (dayunGanSelect) dayunGanSelect.value = '';
+                if (dayunZhiSelect) {
+                    dayunZhiSelect.value = '';
+                    dayunZhiSelect.innerHTML = '<option value="">支</option>';
+                }
                 clearLiuNianSelection();
                 var liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
                 var liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
@@ -5153,7 +5121,49 @@
                     qiyunInfo.classList.remove('hidden');
                 }
 
-                // dayun-list 保持 hidden，SCF 返回后再渲染大运列表
+                // 显示大运列表
+                var dayunContainer = document.getElementById('dayun-container');
+                var dayunListDiv = document.getElementById('dayun-list');
+                if (dayunContainer && dayunListDiv) {
+                    dayunContainer.innerHTML = '';
+                    if (daYunData && daYunData.length > 0) {
+                        daYunData.forEach(function(dayun, index) {
+                            var gz = dayun.ganZhi || '';
+                            var g = gz.charAt(0);
+                            var zh = gz.charAt(1);
+                            var age = dayun.startAge;
+                            var yr = dayun.startYear;
+
+                            var div = document.createElement('div');
+                            div.className = 'dayun-item';
+                            div.innerHTML = '<div class="dayun-year">' + yr + '</div><div class="dayun-age">' + age + '岁起</div><div class="dayun-ganzhi">' + gz + '</div>';
+                            
+                            (function(dy, gg, zzh) {
+                                div.onclick = function() {
+                                    document.querySelectorAll('.dayun-item').forEach(function(item) { item.classList.remove('active'); });
+                                    div.classList.add('active');
+                                    currentDaYun = wrapDayunObject(dy);
+                                    window.currentDaYun = wrapDayunObject(dy);
+                                    
+                                    var dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
+                                    var dayunZhiSelect = document.querySelector('.dizhi[data-type="dayun"]');
+                                    if (dayunGanSelect && dayunZhiSelect) {
+                                        dayunGanSelect.value = gg;
+                                        var vd = getValidDizhiByGan(gg);
+                                        renderDizhiSelect(dayunZhiSelect, vd);
+                                        dayunZhiSelect.value = zzh;
+                                    }
+                                    clearLiuNianSelection();
+                                    updateLiuNianList(dy);
+                                    calcAll();
+                                };
+                            })(dayun, g, zh);
+                            
+                            dayunContainer.appendChild(div);
+                        });
+                        dayunListDiv.classList.remove('hidden');
+                    }
+                }
 
                 // 显示排盘结果
                 var baziStr = yearGan + yearZhi + ' ' + monthGan + monthZhi + ' ' + dayGan + dayZhi + ' ' + hourGan + hourZhi;
@@ -5194,17 +5204,10 @@
                         return { year: d.year, ganZhi: d.ganZhi, dayunIndex: d.dayunIndex, duanyu: d.duanyu || [] };
                       })
                     };
+                    calcAll();
                   }
-                  // 渲染大运列表
-                  renderDayunList();
-                  // 更新断语和统计
-                  calcAll();
                 }).catch(function(e) {
                   console.warn('SCF 断语获取失败:', e.message);
-                  // SCF 失败时仍显示大运列表（本地数据）
-                  renderDayunList();
-                  window.apiDuanyuCache = null;
-                  calcAll();
                 });
             } catch (error) {
                 console.error('自动排盘出错:', error);
