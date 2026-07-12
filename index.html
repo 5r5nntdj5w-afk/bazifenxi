@@ -8336,6 +8336,19 @@
                     <button type="button" class="ml-auto text-red-500 hover:text-red-700 text-sm font-bold" onclick="this.closest('.condition-item').remove()">&times;</button>
                 `;
                 container.appendChild(item);
+            } else if (child.ruleRef) {
+                // 引用断语节点
+                const refRule = (cache.rules || []).find(r => String(r.id) === String(child.ruleRef) || String(r.cloudId) === String(child.ruleRef));
+                const refName = refRule ? (refRule.duanyu || '').replace(/<[^>]*>/g, '') : (child.ruleName || '(已删除)');
+                const item = document.createElement('div');
+                item.className = 'condition-item rule-ref-item flex items-center gap-2 mb-2 p-2 bg-teal-100 border border-teal-300 rounded';
+                item.innerHTML = `
+                    <span class="text-xs font-bold text-teal-700">🔗 引用：${escapeHtml(refName)}</span>
+                    <input type="hidden" class="rule-ref-id" value="${child.ruleRef}">
+                    <input type="hidden" class="rule-ref-name" value="${escapeHtml(refName)}">
+                    <button type="button" class="ml-auto text-red-500 hover:text-red-700 text-sm font-bold" onclick="this.closest('.condition-item').remove()">&times;</button>
+                `;
+                container.appendChild(item);
             } else {
                 // 这是一个条件项
                 const item = createConditionItemElement();
@@ -19829,10 +19842,26 @@ function renderGroupManager() {
         return;
     }
     
+    var isAdminUser = currentUser && isAdmin(currentUser.email);
+    var uid = currentUser ? currentUser.id : null;
+    
     var html = '<div class="space-y-3">';
     keys.forEach(function(k) {
         var members = (cache.rules || []).filter(function(r) { return (r.groupKey || r.group_key || '') === k; });
         var count = members.length;
+        
+        // 非管理员只看自己参与的分组
+        if (!isAdminUser && uid) {
+            var userHasRule = members.some(function(r) { return r.ownerId === uid || r.userId === uid; });
+            if (!userHasRule) return;
+        }
+        
+        // 判断用户是否拥有组内所有断语（才有权管理）
+        var ownsAll = true;
+        if (!isAdminUser && uid) {
+            ownsAll = members.every(function(r) { return r.ownerId === uid || r.userId === uid || !r.ownerId; });
+        }
+        
         var prios = members.map(function(m) { return m.priority !== undefined ? m.priority : 0; });
         var minP = Math.min.apply(null, prios);
         var maxP = Math.max.apply(null, prios);
@@ -19846,8 +19875,10 @@ function renderGroupManager() {
         html += '</div>';
         html += '<div class="flex gap-2">';
         html += '<button class="px-3 py-1 bg-blue-500 text-white rounded text-xs" onclick="filterByGroupKey(\'' + k.replace(/'/g, "\\'") + '\')">查看</button>';
-        html += '<button class="px-3 py-1 bg-amber-500 text-white rounded text-xs" onclick="renameGroup(\'' + k.replace(/'/g, "\\'") + '\')">重命名</button>';
-        html += '<button class="px-3 py-1 bg-red-500 text-white rounded text-xs" onclick="deleteGroup(\'' + k.replace(/'/g, "\\'") + '\', ' + count + ')">删除</button>';
+        if (isAdminUser || ownsAll) {
+            html += '<button class="px-3 py-1 bg-amber-500 text-white rounded text-xs" onclick="renameGroup(\'' + k.replace(/'/g, "\\'") + '\')">重命名</button>';
+            html += '<button class="px-3 py-1 bg-red-500 text-white rounded text-xs" onclick="deleteGroup(\'' + k.replace(/'/g, "\\'") + '\', ' + count + ')">删除</button>';
+        }
         html += '</div>';
         html += '</div>';
         html += '</div>';
