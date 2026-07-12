@@ -1568,7 +1568,10 @@
             </div>
             <div class="flex items-center gap-2 mb-4">
                 <span class="text-xs text-gray-500">分组标识（可选）：</span>
-                <input type="text" id="rule-group-key" class="p-1 border rounded text-xs flex-1 max-w-[180px]" placeholder="如：A类、财运-细分（同组只留最高优先级）" title="同group_key的断语，匹配时只显示优先级最高的一条">
+                <div class="relative" style="flex:1;max-width:200px">
+                    <input type="text" id="rule-group-key" class="p-1 border rounded text-xs w-full" placeholder="选择或新建分组..." autocomplete="off">
+                    <div id="group-key-dropdown" class="hidden absolute z-50 top-full left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-auto mt-0.5 text-xs"></div>
+                </div>
                 <span class="text-xs text-gray-500">优先级：</span>
                 <input type="number" id="rule-priority" class="p-1 border rounded text-xs w-16" value="0" min="0" title="数字越大越优先，子级填更高值（如10），父级默认0">
             </div>
@@ -2128,9 +2131,13 @@
                     <option value="性格">性格</option>
                     <option value="灾祸">灾祸</option>
                 </select>
+                <select id="filter-group" class="p-2 border rounded rule-btn-sm">
+                    <option value="all">全部分组</option>
+                </select>
                 <input type="text" id="rule-search" class="flex-1 p-2 border rounded" placeholder="🔍 搜索断语内容、描述、引用的宏名称..." autocomplete="off">
                 <button id="clear-filter" class="px-3 py-2 bg-gray-200 rounded rule-btn-sm">清空筛选</button>
                 <button id="manage-categories-btn" class="px-3 py-2 bg-amber-600 text-white rounded text-sm rule-btn-sm" onclick="openCategoryManager()">📂 分类管理</button>
+                <button id="manage-groups-btn" class="px-3 py-2 bg-teal-600 text-white rounded text-sm rule-btn-sm" onclick="openGroupManager()">📦 分组管理</button>
                 <button id="manage-macros-btn" class="px-3 py-2 bg-indigo-600 text-white rounded text-sm rule-btn-sm" onclick="openMacroManager()">🧩 条件宏管理</button>
             </div>
             <div class="flex gap-3 mb-3 flex-wrap items-center">
@@ -2197,6 +2204,9 @@
                         <option value="createTime-asc">创建时间（最早在前）</option>
                         <option value="updateTime-desc">修改时间（最新在前）</option>
                         <option value="updateTime-asc">修改时间（最早在前）</option>
+                        <option value="priority-desc">优先级（最高在前）</option>
+                        <option value="priority-asc">优先级（最低在前）</option>
+                        <option value="groupKey-asc">分组标识（A-Z）</option>
                     </select>
                 </div>
                 <div class="flex gap-2 items-center">
@@ -3826,6 +3836,7 @@
     };
     let editIndex = -1;
     let currentFilterCategory = 'all';
+    let currentFilterGroup = 'all';
     let currentSearchKeyword = '';
     
     // 年龄配置面板搜索分页状态
@@ -4117,6 +4128,9 @@
         initMacroEvents();
         initDataManagement();
         initStatsAdjust();
+        initGroupKeyCombo();
+        refreshGroupFilter();
+        refreshGroupKeyDropdown();
 
     }
 
@@ -6033,6 +6047,11 @@
             currentFilterCategory = DOM.filterCategory.value;
             reloadAll();
         };
+
+        document.getElementById('filter-group')?.addEventListener('change', function() {
+            currentFilterGroup = this.value;
+            reloadAll();
+        });
 
         // 实时搜索断语内容
         if (DOM.ruleSearch) {
@@ -9381,6 +9400,9 @@
     
     // 刷新规则列表
     function reloadAll() {
+        // 刷新分组下拉列表和筛选器
+        refreshGroupKeyDropdown();
+        refreshGroupFilter();
         // 获取用户有权限的分类
         const allowedCats = getCurrentUserAllowedCategories();
         // 合并用户自己创建的分类（自己的分类始终可见）
@@ -9388,6 +9410,10 @@
         // 先按分类筛选，再按权限过滤
         let filtered = currentFilterCategory === 'all' ? cache.rules : cache.rules.filter(r => r.category === currentFilterCategory);
         filtered = filtered.filter(r => effectiveCats.includes(r.category));
+        // 按分组筛选
+        if (currentFilterGroup && currentFilterGroup !== 'all') {
+            filtered = filtered.filter(r => (r.groupKey || r.group_key || '') === currentFilterGroup);
+        }
         // 按关键词搜索断语内容、描述、引用的宏名称
         if (currentSearchKeyword) {
             const kw = currentSearchKeyword.toLowerCase();
@@ -9440,6 +9466,16 @@
         
         // 排序（使用时间戳数值比较，避免 localeCompare 的不确定性）
         const sorted = [...filtered].sort((a, b) => {
+            if (sortField === 'priority') {
+                const pa = parseInt(a.priority || 0);
+                const pb = parseInt(b.priority || 0);
+                return sortOrder === 'desc' ? pb - pa : pa - pb;
+            }
+            if (sortField === 'groupKey') {
+                const ga = (a.groupKey || a.group_key || '');
+                const gb = (b.groupKey || b.group_key || '');
+                return ga.localeCompare(gb);
+            }
             const tA = Date.parse(a[sortField] || a.createTime || '');
             const tB = Date.parse(b[sortField] || b.createTime || '');
             const na = isNaN(tA) ? 0 : tA;
@@ -19670,6 +19706,207 @@ document.addEventListener('change', function(e) {
     if (e.target.id === 'rule-selector-category') renderRuleSelectorList();
 });
 
+// ============ 分组组合框功能 ============
+function getAllGroupKeys() {
+    var keys = [];
+    (cache.rules || []).forEach(function(r) {
+        var gk = r.groupKey || r.group_key || '';
+        if (gk && keys.indexOf(gk) === -1) keys.push(gk);
+    });
+    return keys.sort();
+}
+
+function refreshGroupKeyDropdown() {
+    var input = document.getElementById('rule-group-key');
+    var dropdown = document.getElementById('group-key-dropdown');
+    if (!input || !dropdown) return;
+    
+    var keys = getAllGroupKeys();
+    var kw = input.value.trim().toLowerCase();
+    
+    var html = '';
+    var matched = 0;
+    keys.forEach(function(k) {
+        if (!kw || k.toLowerCase().includes(kw)) {
+            html += '<div class="px-3 py-1.5 hover:bg-teal-50 cursor-pointer border-b border-gray-100" onmousedown="selectGroupKey(\'' + k.replace(/'/g, "\\'") + '\')">' + k.replace(/</g, '&lt;') + '</div>';
+            matched++;
+        }
+    });
+    if (kw) {
+        html += '<div class="px-3 py-1.5 text-teal-600 hover:bg-teal-50 cursor-pointer border-t border-teal-200 font-medium" onmousedown="createNewGroupKey(\'' + kw.replace(/'/g, "\\'") + '\')">+ 新建分组「' + kw.replace(/</g, '&lt;') + '」</div>';
+    } else {
+        html += '<div class="px-3 py-1.5 text-teal-600 hover:bg-teal-50 cursor-pointer border-t border-gray-200" onmousedown="createNewGroupKeyPrompt()">+ 新建分组...</div>';
+    }
+    
+    if (matched === 0 && !kw) {
+        html = '<div class="px-3 py-2 text-gray-400">暂无分组，输入名称新建</div>';
+        html += '<div class="px-3 py-1.5 text-teal-600 hover:bg-teal-50 cursor-pointer border-t border-gray-200" onmousedown="createNewGroupKeyPrompt()">+ 新建分组...</div>';
+    }
+    
+    dropdown.innerHTML = html;
+}
+
+function selectGroupKey(val) {
+    var input = document.getElementById('rule-group-key');
+    var dropdown = document.getElementById('group-key-dropdown');
+    if (input) { input.value = val; }
+    if (dropdown) { dropdown.classList.add('hidden'); }
+}
+
+function createNewGroupKey(val) {
+    var input = document.getElementById('rule-group-key');
+    var dropdown = document.getElementById('group-key-dropdown');
+    if (input) { input.value = val; }
+    if (dropdown) { dropdown.classList.add('hidden'); }
+}
+
+function createNewGroupKeyPrompt() {
+    var name = prompt('请输入新分组名称：');
+    if (name && name.trim()) {
+        var input = document.getElementById('rule-group-key');
+        if (input) { input.value = name.trim(); }
+    }
+    var dropdown = document.getElementById('group-key-dropdown');
+    if (dropdown) { dropdown.classList.add('hidden'); }
+}
+
+function initGroupKeyCombo() {
+    var input = document.getElementById('rule-group-key');
+    var dropdown = document.getElementById('group-key-dropdown');
+    if (!input || !dropdown) return;
+    
+    input.addEventListener('focus', function() {
+        refreshGroupKeyDropdown();
+        dropdown.classList.remove('hidden');
+    });
+    
+    input.addEventListener('input', function() {
+        refreshGroupKeyDropdown();
+        dropdown.classList.remove('hidden');
+    });
+    
+    input.addEventListener('blur', function() {
+        setTimeout(function() { dropdown.classList.add('hidden'); }, 200);
+    });
+}
+
+// ============ 分组管理功能 ============
+function refreshGroupFilter() {
+    var sel = document.getElementById('filter-group');
+    if (!sel) return;
+    var currentVal = sel.value;
+    var keys = getAllGroupKeys();
+    sel.innerHTML = '<option value="all">全部分组</option>';
+    keys.forEach(function(k) {
+        sel.innerHTML += '<option value="' + k.replace(/"/g, '&quot;') + '">' + k + '</option>';
+    });
+    sel.value = currentVal;
+}
+
+function openGroupManager() {
+    var modal = document.getElementById('group-manager-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    renderGroupManager();
+}
+
+function closeGroupManager() {
+    var modal = document.getElementById('group-manager-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+}
+
+function renderGroupManager() {
+    var container = document.getElementById('group-manager-content');
+    if (!container) return;
+    
+    var keys = getAllGroupKeys();
+    if (keys.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">暂无分组</p>';
+        return;
+    }
+    
+    var html = '<div class="space-y-3">';
+    keys.forEach(function(k) {
+        var members = (cache.rules || []).filter(function(r) { return (r.groupKey || r.group_key || '') === k; });
+        var count = members.length;
+        var prios = members.map(function(m) { return m.priority !== undefined ? m.priority : 0; });
+        var minP = Math.min.apply(null, prios);
+        var maxP = Math.max.apply(null, prios);
+        var prioRange = minP === maxP ? String(minP) : minP + ' ~ ' + maxP;
+        
+        html += '<div class="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100">';
+        html += '<div class="flex justify-between items-center">';
+        html += '<div class="flex-1">';
+        html += '<div class="font-semibold text-gray-800">' + k.replace(/</g, '&lt;') + '</div>';
+        html += '<div class="text-xs text-gray-500 mt-1">' + count + '条断语 · 优先级: ' + prioRange + '</div>';
+        html += '</div>';
+        html += '<div class="flex gap-2">';
+        html += '<button class="px-3 py-1 bg-blue-500 text-white rounded text-xs" onclick="filterByGroupKey(\'' + k.replace(/'/g, "\\'") + '\')">查看</button>';
+        html += '<button class="px-3 py-1 bg-amber-500 text-white rounded text-xs" onclick="renameGroup(\'' + k.replace(/'/g, "\\'") + '\')">重命名</button>';
+        html += '<button class="px-3 py-1 bg-red-500 text-white rounded text-xs" onclick="deleteGroup(\'' + k.replace(/'/g, "\\'") + '\', ' + count + ')">删除</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function filterByGroupKey(gk) {
+    var filter = document.getElementById('filter-group');
+    if (filter) {
+        var opt = Array.from(filter.options).find(function(o) { return o.value === gk; });
+        if (opt) {
+            filter.value = gk;
+            currentFilterGroup = gk;
+            closeGroupManager();
+            reloadAll();
+            return;
+        }
+    }
+    closeGroupManager();
+    currentFilterGroup = gk;
+    var searchInput = document.getElementById('rule-search');
+    if (searchInput) searchInput.value = '';
+    reloadAll();
+}
+
+function renameGroup(oldName) {
+    var newName = prompt('重命名分组「' + oldName + '」为：', oldName);
+    if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+    newName = newName.trim();
+    
+    (cache.rules || []).forEach(function(r) {
+        if ((r.groupKey || r.group_key || '') === oldName) {
+            r.groupKey = newName;
+        }
+    });
+    localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+    reloadAll();
+    renderGroupManager();
+    refreshGroupKeyDropdown();
+    refreshGroupFilter();
+}
+
+function deleteGroup(name, count) {
+    if (!confirm('确认将 ' + count + ' 条断语移出分组「' + name + '」吗？断语本身不会被删除。')) return;
+    
+    (cache.rules || []).forEach(function(r) {
+        if ((r.groupKey || r.group_key || '') === name) {
+            r.groupKey = '';
+        }
+    });
+    localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+    reloadAll();
+    renderGroupManager();
+    refreshGroupKeyDropdown();
+    refreshGroupFilter();
+}
+
 async function insertRuleRef(ruleId) {
     const rule = (cache.rules || []).find(r => String(r.id) === String(ruleId));
     if (!rule) return;
@@ -24067,6 +24304,19 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 </script>    </div>
+
+<!-- 分组管理弹窗 -->
+<div id="group-manager-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" style="display:none;">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center p-4 border-b">
+            <h3 class="text-lg font-bold">📦 分组管理</h3>
+            <button onclick="closeGroupManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div id="group-manager-content" class="p-4 overflow-y-auto flex-1">
+            <p class="text-gray-500">加载中...</p>
+        </div>
+    </div>
+</div>
 
 <!-- 条件宏管理弹窗 -->
 <div id="macro-manager-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
