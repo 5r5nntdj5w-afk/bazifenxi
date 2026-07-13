@@ -832,7 +832,7 @@ var SUPABASE_CONFIG = {
 };
 
 function fetchRulesFromSupabase() {
-  var url = SUPABASE_CONFIG.url + '/rest/v1/' + SUPABASE_CONFIG.tableName + '?select=id,cloudId,category,duanyu_text,conditions,permission_level,user_id,owner_id,group_key,priority';
+  var url = SUPABASE_CONFIG.url + '/rest/v1/' + SUPABASE_CONFIG.tableName + '?select=id,category,duanyu_text,conditions,permission_level,user_id,owner_id,group_key,priority';
 
   return httpFetch(url, {
     headers: {
@@ -842,16 +842,29 @@ function fetchRulesFromSupabase() {
     },
     timeout: 10000
   }).then(function(response) {
-    if (!response || !response.body) return null;
+    if (!response || !response.body) {
+      console.error('Supabase 返回空响应, status:', response && response.status);
+      return null;
+    }
+
+    // 检查 HTTP 状态码
+    if (response.status >= 400) {
+      console.error('Supabase HTTP 错误:', response.status, response.body);
+      return null;
+    }
 
     var parsedBody;
     try {
       parsedBody = JSON.parse(response.body);
     } catch (parseErr) {
+      console.error('Supabase 返回非 JSON:', response.status, response.body);
       return null;
     }
 
-    if (!Array.isArray(parsedBody)) return null;
+    if (!Array.isArray(parsedBody)) {
+      console.error('Supabase 返回非数组, status:', response.status, 'body:', JSON.stringify(parsedBody));
+      return null;
+    }
 
     var validRules = parsedBody.filter(function(r) {
       return r && r.category && r.duanyu_text && r.conditions;
@@ -859,6 +872,7 @@ function fetchRulesFromSupabase() {
 
     return validRules.length > 0 ? validRules : null;
   }).catch(function(e) {
+    console.error('fetchRulesFromSupabase 异常:', e.message);
     return null;
   });
 }
@@ -984,13 +998,30 @@ module.exports = async (req, res) => {
     return res.status(204).end();
   }
 
+  if (req.method === 'GET') {
+    // 健康检查 / 调试端点
+    return res.json({
+      success: true,
+      name: '断语匹配 API',
+      version: '1.0',
+      config: {
+        hasSupabaseUrl: !!process.env.SUPABASE_URL,
+        hasSupabaseKey: !!process.env.SUPABASE_KEY,
+        hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
+        supabaseUrlPrefix: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 20) + '...' : '未设置',
+        keyLength: (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY || '').length + ' chars',
+        usedKey: process.env.SUPABASE_KEY ? 'SUPABASE_KEY' : (process.env.SUPABASE_SERVICE_KEY ? 'SUPABASE_SERVICE_KEY' : '未设置')
+      }
+    });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: '仅支持 POST 请求' });
   }
 
   // 初始化 Supabase 配置
   var supabaseUrl = process.env.SUPABASE_URL || '';
-  var supabaseKey = process.env.SUPABASE_KEY || '';
+  var supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
 
   if (!supabaseUrl || !supabaseKey) {
     return res.status(500).json({
@@ -999,7 +1030,7 @@ module.exports = async (req, res) => {
     });
   }
 
-  SUPABASE_CONFIG.url = supabaseUrl;
+  SUPABASE_CONFIG.url = supabaseUrl.replace(/\/+$/, ''); // 去掉末尾斜杠
   SUPABASE_CONFIG.anonKey = supabaseKey;
 
   try {
@@ -1034,6 +1065,8 @@ module.exports = async (req, res) => {
         success: false,
         error: '断语规则服务暂不可用，请稍后再试',
         detail: failReason,
+        supabaseUrl: process.env.SUPABASE_URL ? '已设置' : '未设置',
+        supabaseKey: process.env.SUPABASE_KEY ? '已设置' : '未设置',
         data: null
       });
     }
