@@ -9454,36 +9454,9 @@
         };
         cache.displaySpacing = ds;
         localStorage.setItem('display_spacing', JSON.stringify(ds));
-        // 云端同步
-        if (currentUser && supabaseClient) {
-            try {
-                const { error } = await supabaseClient.from('site_settings')
-                    .upsert({ setting_key: 'display_spacing', setting_value: JSON.stringify(ds), user_id: currentUser.id }, { onConflict: 'user_id,setting_key' });
-                if (error) throw error;
-            } catch (e) { console.error('同步显示设置失败:', e); }
-        }
         applyDisplaySpacing();
         const status = document.getElementById('display-spacing-status');
         if (status) { status.classList.remove('hidden'); setTimeout(() => status.classList.add('hidden'), 2000); }
-    }
-    // 从云端加载显示间距
-    async function loadDisplaySpacingFromCloud() {
-        if (!currentUser || !supabaseClient) return;
-        try {
-            const { data, error } = await supabaseClient.from('site_settings')
-                .select('setting_value')
-                .eq('setting_key', 'display_spacing')
-                .eq('user_id', currentUser.id)
-                .maybeSingle();
-            if (!error && data?.setting_value) {
-                const ds = JSON.parse(data.setting_value);
-                if (ds && (ds.fontSize || ds.lineHeight || ds.paraSpacing)) {
-                    cache.displaySpacing = { fontSize: ds.fontSize || 16, lineHeight: ds.lineHeight || 1.6, paraSpacing: ds.paraSpacing || 24 };
-                    localStorage.setItem('display_spacing', JSON.stringify(cache.displaySpacing));
-                    applyDisplaySpacing();
-                }
-            }
-        } catch (e) { console.error('加载显示设置失败:', e); }
     }
     // 绑定保存按钮
     document.getElementById('save-display-spacing')?.addEventListener('click', saveDisplaySpacing);
@@ -10237,32 +10210,6 @@
     }
     
     // 从云端加载年龄配置（登录时调用，云端优先覆盖本地）
-    async function loadAgeConfigFromCloud() {
-        try {
-            const { data, error } = await supabaseClient
-                .from('site_settings')
-                .select('setting_value')
-                .eq('setting_key', 'age_config');
-            
-            if (error) {
-                console.error('获取云端年龄配置失败:', error);
-                return;
-            }
-            
-            if (data && data.length > 0 && data[0].setting_value) {
-                const remote = JSON.parse(data[0].setting_value);
-                // 云端优先合并到本地
-                Object.keys(remote).forEach(key => {
-                    cache.categoryAgeConfig[key] = remote[key];
-                });
-                localStorage.setItem(AGE_CONFIG_KEY, JSON.stringify(cache.categoryAgeConfig));
-                console.log('已从云端加载年龄配置');
-            }
-        } catch (e) {
-            console.error('加载云端年龄配置异常:', e);
-        }
-    }
-    
     // 更新断语列表分页信息
     function updateRulePagination(totalItems, totalPages) {
         const pageInfo = document.getElementById('rule-page-info');
@@ -11582,19 +11529,7 @@
                     const result = normalizeRuleConditions(rule.conditions, rule.permissionLevel > 0 || rule.isPublic === true);
                     if (result.changed) {
                         migrationChanged = true;
-                        // 更新回 Supabase（确保云端数据也修复）
-                        try {
-                            await supabaseClient
-                                .from('duanyu')
-                                .update({ 
-                                    conditions: rule.conditions, 
-                                    updated_at: new Date().toISOString() 
-                                })
-                                .eq('id', rule.id);
-                            console.log('已迁移断语 macroRef:', rule.id, rule.duanyu?.substring(0, 20));
-                        } catch (updateErr) {
-                            console.warn('迁移断语 macroRef 时更新Supabase失败:', rule.id, updateErr);
-                        }
+                        // 本地缓存已更新，无需写回 Supabase（前端 anon 密钥无 PATCH 权限）
                     }
                 }
             }
@@ -20321,8 +20256,6 @@ async function initApp() {
         await loadDataFromSupabase();
         await syncRules();
         await syncLocalTagsToCloud();
-        await loadAgeConfigFromCloud(); // 登录后从云端同步年龄配置
-        await loadDisplaySpacingFromCloud(); // 登录后从云端同步显示间距
     }
 }
 
@@ -20360,7 +20293,6 @@ async function handleSignIn() {
         await loadDataFromSupabase();
         await syncRules();
         initAll();
-        loadDisplaySpacingFromCloud(); // 登录后从云端同步显示间距（异步，不阻塞）
     } catch (error) {
         showAuthMessage('登录失败：' + error.message, 'error');
     }
