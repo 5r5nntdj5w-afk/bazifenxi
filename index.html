@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lunar-javascript/1.2.35/lunar.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- GitHub Pages 部署时由 Actions 生成的配置（无此文件则静默忽略） -->
+    <script src="config.gh-pages.js"></script>
     <script src="config.local.js"></script>
     <style>
         .nav-btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.2s ease; margin: 0 6px; }
@@ -10967,11 +10969,13 @@
     // 使用环境变量或默认值（用于 GitHub Pages 部署）
     // 本地开发时优先使用 config.local.js 中的配置（不会提交到仓库）
     const LOCAL_CFG = window.__LOCAL_CONFIG || {};
+    // GitHub Pages 部署时由 Actions 生成的配置（从 secrets 注入）
+    const GH_CFG = window.__GH_PAGES_CONFIG || {};
     const FALLBACK_CONFIG = {
-        supabase_url: LOCAL_CFG.supabase_url || '',
-        supabase_key: LOCAL_CFG.supabase_key || '',
-        admin_email: LOCAL_CFG.admin_email || '',
-        api_bazi_url: LOCAL_CFG.api_bazi_url || '',
+        supabase_url: LOCAL_CFG.supabase_url || GH_CFG.supabase_url || '',
+        supabase_key: LOCAL_CFG.supabase_key || GH_CFG.supabase_key || '',
+        admin_email: LOCAL_CFG.admin_email || GH_CFG.admin_email || '',
+        api_bazi_url: LOCAL_CFG.api_bazi_url || GH_CFG.api_bazi_url || '',
         _configFromServer: false
     };
     
