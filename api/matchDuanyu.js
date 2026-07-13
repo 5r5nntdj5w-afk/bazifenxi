@@ -1142,13 +1142,6 @@ module.exports = async (req, res) => {
           dayun: dayunResults,
           liunian: liunianResults
         }
-      },
-      _debug: {
-        totalRules: rules ? rules.length : 0,
-        totalMacros: macros ? macros.length : 0,
-        baseMatchCount: baseResult.length,
-        dayunMatchCount: dayunResults.reduce(function(s, d) { return s + d.duanyu.length; }, 0),
-        liunianMatchCount: liunianResults.reduce(function(s, d) { return s + d.duanyu.length; }, 0)
       }
     });
 
