@@ -913,6 +913,9 @@ function fetchMacrosFromSupabase() {
 function filterRulesByAccess(rules, currentUserId, isAdmin) {
   if (!rules) return rules;
 
+  // 管理员查看所有规则（包括私有规则）
+  if (isAdmin) return rules;
+
   return rules.filter(function(r) {
     var level = r.permission_level;
 
@@ -1138,6 +1141,13 @@ module.exports = async (req, res) => {
           dayun: dayunResults,
           liunian: liunianResults
         }
+      },
+      _debug: {
+        totalRules: rules ? rules.length : 0,
+        totalMacros: macros ? macros.length : 0,
+        baseMatchCount: baseResult.length,
+        dayunMatchCount: dayunResults.reduce(function(s, d) { return s + d.duanyu.length; }, 0),
+        liunianMatchCount: liunianResults.reduce(function(s, d) { return s + d.duanyu.length; }, 0)
       }
     });
 

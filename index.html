@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3618,6 +3618,7 @@
             try {
               var result = JSON.parse(xhr.responseText);
               if (result && result.success && result.data && result.data.duanyu) {
+                if (result._debug) result.data.duanyu._debug = result._debug;
                 resolve(result.data.duanyu);
               } else {
                 reject(new Error(result && result.error ? result.error : '断语匹配 API 返回异常'));
@@ -5276,6 +5277,13 @@
                     liunianResults || []
                   ).then(function(duanyu) {
                     if (myReqId !== window._paipanReqId) return;
+                    if (duanyu && duanyu._debug) {
+                      console.log('断语匹配统计:', duanyu._debug);
+                      if (duanyu.base && duanyu.base.length === 0 && duanyu._debug.totalRules > 0) {
+                        console.warn('⚠️ 加载了 ' + duanyu._debug.totalRules + ' 条规则但原局匹配结果为 0');
+                      }
+                    }
+                    console.log('API 断语结果:', { base: duanyu.base ? duanyu.base.length : 0, dayun: duanyu.dayun ? duanyu.dayun.length : 0, liunian: duanyu.liunian ? duanyu.liunian.length : 0 });
                     window.apiDuanyuCache = {
                       base: (duanyu && duanyu.base) || [],
                       dayun: (duanyu.dayun || []).map(function(d) {
