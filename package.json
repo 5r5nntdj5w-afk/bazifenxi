@@ -1,0 +1,11 @@
+{
+  "name": "bazifenxi",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "vercel-build": "echo 'Static site - no build needed'"
+  },
+  "dependencies": {
+    "lunar-javascript": "1.2.35"
+  }
+}
