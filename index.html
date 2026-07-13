@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3486,7 +3486,7 @@
     /** 清空 SCF/Vercel 规则缓存，使断语修改后立即生效 */
     function clearScfRuleCache() {
       // Vercel 环境无缓存需要清除（Serverless 无状态）
-      if (window.location.hostname && window.location.hostname.endsWith('.vercel.app')) return;
+      if (FALLBACK_CONFIG._configFromServer) return;
       var apiUrl = getApiBaziUrl();
       if (!apiUrl) return;
       var xhr = new XMLHttpRequest();
@@ -3495,21 +3495,17 @@
       try { xhr.send('{}'); } catch(e) { console.error('清空 SCF 缓存失败:', e.message); }
     }
     
-    // 获取排盘 API 地址：优先使用数据库配置，其次使用 GitHub Secrets 注入的地址
+    // 获取排盘 API 地址：优先使用数据库配置，其次使用 /api/config 返回的地址
     function getApiBaziUrl() {
       if (typeof APP_CONFIG !== 'undefined' && APP_CONFIG && APP_CONFIG.api_bazi_url) {
         return APP_CONFIG.api_bazi_url;
       }
-      // 兜底：GitHub Actions 部署时从 Secrets 注入的地址
       if (typeof FALLBACK_CONFIG !== 'undefined' && FALLBACK_CONFIG.api_bazi_url) {
         var url = FALLBACK_CONFIG.api_bazi_url;
-        // 如果占位符未被替换（本地开发未配置 config.local.js），返回空
-        if (url && url.indexOf('%') === -1) return url;
+        if (url) return url;
       }
-      // Vercel 自动检测：API 与前端同域
-      if (window.location.hostname &&
-          (window.location.hostname.endsWith('.vercel.app') ||
-           window.location.hostname === 'localhost')) {
+      // 如果 /api/config 配置获取成功（说明部署在 Vercel 等有 API 的环境），API 与前端同域
+      if (typeof FALLBACK_CONFIG !== 'undefined' && FALLBACK_CONFIG._configFromServer) {
         return window.location.origin + '/api/bazi';
       }
       return '';
@@ -10946,16 +10942,15 @@
     // 本地开发时优先使用 config.local.js 中的配置（不会提交到仓库）
     const LOCAL_CFG = window.__LOCAL_CONFIG || {};
     const FALLBACK_CONFIG = {
-        supabase_url: LOCAL_CFG.supabase_url || 'https://ehwwolyofgzuwrmyklow.supabase.co',
-        supabase_key: LOCAL_CFG.supabase_key || 'sb_publishable_C4jCCwIuVc9YbqNGYS68aw_lWwl8r55',
-        admin_email: LOCAL_CFG.admin_email || 'jsqdzz@qq.com,matigang@163.com,893365913@qq.com',
-        api_bazi_url: LOCAL_CFG.api_bazi_url || 'https://1254456257-fkggh2mgvo.ap-shanghai.tencentscf.com/api/bazi'
+        supabase_url: LOCAL_CFG.supabase_url || '',
+        supabase_key: LOCAL_CFG.supabase_key || '',
+        admin_email: LOCAL_CFG.admin_email || '',
+        api_bazi_url: LOCAL_CFG.api_bazi_url || '',
+        _configFromServer: false
     };
     
-    // Vercel 部署时，尝试从 /api/config 获取运行时配置
-    (function loadVercelConfig() {
-        var host = window.location.hostname;
-        if (!host || (!host.endsWith('.vercel.app') && host !== 'localhost')) return;
+    // 尝试从 /api/config 获取运行时配置（对 Vercel 部署生效，本地无 API 则静默失败）
+    (function loadServerConfig() {
         var xhr = new XMLHttpRequest();
         try {
             xhr.open('GET', '/api/config', false);
@@ -10967,9 +10962,10 @@
                 if (cfg.supabase_key) FALLBACK_CONFIG.supabase_key = cfg.supabase_key;
                 if (cfg.admin_email) FALLBACK_CONFIG.admin_email = cfg.admin_email;
                 if (cfg.api_bazi_url) FALLBACK_CONFIG.api_bazi_url = cfg.api_bazi_url;
+                FALLBACK_CONFIG._configFromServer = true;
             }
         } catch(e) {
-            // 忽略 /api/config 获取失败（可能不在 Vercel 环境）
+            // 忽略，本地开发无 API 时正常
         }
     })();
     
@@ -10980,6 +10976,11 @@
     // 从数据库动态获取系统配置
     async function loadAppConfig() {
         try {
+            // 未配置 Supabase 时（如仅有 config.local.js 但无 /api/config），跳过
+            if (!FALLBACK_CONFIG.supabase_url) {
+                APP_CONFIG = { ...FALLBACK_CONFIG };
+                return true;
+            }
             // 创建临时客户端用于获取配置
             const tempClient = window.supabase.createClient(
                 FALLBACK_CONFIG.supabase_url,
