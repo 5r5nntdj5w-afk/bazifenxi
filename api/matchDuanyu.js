@@ -1012,8 +1012,8 @@ module.exports = async (req, res) => {
         hasSupabaseKey: !!process.env.SUPABASE_KEY,
         hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
         supabaseUrlPrefix: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 20) + '...' : '未设置',
-        keyLength: (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY || '').length + ' chars',
-        usedKey: process.env.SUPABASE_KEY ? 'SUPABASE_KEY' : (process.env.SUPABASE_SERVICE_KEY ? 'SUPABASE_SERVICE_KEY' : '未设置')
+        keyLength: (process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '').length + ' chars',
+        usedKey: process.env.SUPABASE_SERVICE_KEY ? 'SUPABASE_SERVICE_KEY' : (process.env.SUPABASE_KEY ? 'SUPABASE_KEY' : '未设置')
       }
     });
   }
@@ -1024,12 +1024,13 @@ module.exports = async (req, res) => {
 
   // 初始化 Supabase 配置
   var supabaseUrl = process.env.SUPABASE_URL || '';
-  var supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+  // 优先使用 SERVICE_KEY（绕过 RLS），兼容旧配置 SUPABASE_KEY
+  var supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
 
   if (!supabaseUrl || !supabaseKey) {
     return res.status(500).json({
       success: false,
-      error: '服务端配置缺失：SUPABASE_URL 或 SUPABASE_KEY 未设置'
+      error: '服务端配置缺失：SUPABASE_URL 或 SUPABASE_SERVICE_KEY 未设置'
     });
   }
 
