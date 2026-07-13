@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3606,6 +3606,42 @@
     }
 
     // 异步调 SCF API 获取断语
+    /** 调用 /api/matchDuanyu（Vercel 服务端匹配） */
+    function callDuanyuMatchApi(baziData, gender, birthYear, dayunList, liunianList) {
+      var matchUrl = window.location.origin + '/api/matchDuanyu';
+      return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', matchUrl, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            try {
+              var result = JSON.parse(xhr.responseText);
+              if (result && result.success && result.data && result.data.duanyu) {
+                resolve(result.data.duanyu);
+              } else {
+                reject(new Error(result && result.error ? result.error : '断语匹配 API 返回异常'));
+              }
+            } catch(e) {
+              reject(new Error('解析断语匹配响应失败: ' + e.message));
+            }
+          } else {
+            reject(new Error('断语匹配请求失败: HTTP ' + xhr.status));
+          }
+        };
+        xhr.onerror = function() { reject(new Error('断语匹配网络请求失败')); };
+        xhr.send(JSON.stringify({
+          bazi: baziData,
+          gender: gender,
+          birthYear: birthYear,
+          dayun: dayunList || [],
+          liunian: liunianList || [],
+          currentUserId: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null,
+          isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false
+        }));
+      });
+    }
+
     function callBaziApiAsync(birthDate, birthTime, gender, calendarType, isLeapMonth) {
       var apiUrl = getApiBaziUrl();
       if (!apiUrl) return Promise.reject(new Error('排盘 API 地址未配置'));
@@ -5214,27 +5250,70 @@
                 // 使用本地结果渲染（无断语，SCF 返回后自动更新）
                 calcAll();
 
-                // === Phase 2: 异步获取 SCF 断语 ===
+                // === Phase 2: 异步获取断语（Vercel 服务端匹配 或 SCF API） ===
                 // 用请求 ID 防止快速重复点击时旧响应覆盖新结果
                 window._paipanReqId = (window._paipanReqId || 0) + 1;
                 var myReqId = window._paipanReqId;
-                callBaziApiAsync(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth).then(function(apiData) {
-                  if (myReqId !== window._paipanReqId) return; // 忽略旧请求
-                  if (apiData && apiData.duanyu) {
+
+                // 构建基础八字数据（用于 Vercel /api/matchDuanyu）
+                var baziForMatch = {
+                  nian: { gan: yearGan, zhi: yearZhi },
+                  yue: { gan: monthGan, zhi: monthZhi },
+                  ri: { gan: dayGan, zhi: dayZhi },
+                  shi: { gan: hourGan, zhi: hourZhi }
+                };
+
+                // 判断是否在 Vercel 环境（有 /api 支持）
+                var isVercelEnv = !!(typeof FALLBACK_CONFIG !== 'undefined' && FALLBACK_CONFIG._configFromServer);
+
+                if (isVercelEnv) {
+                  // Vercel 环境：调用 /api/matchDuanyu（服务端匹配，保护条件规则）
+                  var genderStr = (String(gender) === '1' || String(gender) === '男') ? '男' : '女';
+                  callDuanyuMatchApi(baziForMatch, genderStr, year,
+                    daYunData.map(function(d) {
+                      return { index: d.index, ganZhi: d.ganZhi, gan: d.ganZhi ? d.ganZhi.charAt(0) : '', zhi: d.ganZhi ? d.ganZhi.charAt(1) : '', startAge: d.startAge, startYear: d.startYear, endYear: d.endYear };
+                    }),
+                    liunianResults || []
+                  ).then(function(duanyu) {
+                    if (myReqId !== window._paipanReqId) return;
                     window.apiDuanyuCache = {
-                      base: (apiData.duanyu && apiData.duanyu.base) || [],
-                      dayun: (apiData.dayun || []).map(function(d) {
+                      base: (duanyu && duanyu.base) || [],
+                      dayun: (duanyu.dayun || []).map(function(d) {
                         return { ganZhi: d.ganZhi, startAge: d.startAge, startYear: d.startYear, duanyu: d.duanyu || [] };
                       }),
-                      liunian: (apiData.liunian || []).map(function(d) {
+                      liunian: (duanyu.liunian || []).map(function(d) {
                         return { year: d.year, ganZhi: d.ganZhi, dayunIndex: d.dayunIndex, duanyu: d.duanyu || [] };
                       })
                     };
                     calcAll();
-                  }
-                }).catch(function(e) {
-                  console.warn('SCF 断语获取失败:', e.message);
-                });
+                  }).catch(function(e) {
+                    console.warn('Vercel 断语匹配失败，使用本地匹配:', e.message);
+                    // Vercel 匹配失败时降级为本地匹配
+                    if (myReqId === window._paipanReqId) {
+                      window.apiDuanyuCache = null;
+                      calcAll();
+                    }
+                  });
+                } else {
+                  // 非 Vercel 环境（如 GitHub Pages）：调用 SCF API
+                  callBaziApiAsync(birthDateStr, birthTimeStr, gender, calendarType, isLeapMonth).then(function(apiData) {
+                    if (myReqId !== window._paipanReqId) return;
+                    if (apiData && apiData.duanyu) {
+                      window.apiDuanyuCache = {
+                        base: (apiData.duanyu && apiData.duanyu.base) || [],
+                        dayun: (apiData.dayun || []).map(function(d) {
+                          return { ganZhi: d.ganZhi, startAge: d.startAge, startYear: d.startYear, duanyu: d.duanyu || [] };
+                        }),
+                        liunian: (apiData.liunian || []).map(function(d) {
+                          return { year: d.year, ganZhi: d.ganZhi, dayunIndex: d.dayunIndex, duanyu: d.duanyu || [] };
+                        })
+                      };
+                      calcAll();
+                    }
+                  }).catch(function(e) {
+                    console.warn('SCF 断语获取失败:', e.message);
+                  });
+                }
             } catch (error) {
                 console.error('自动排盘出错:', error);
                 alert('排盘出错：' + error.message);
