@@ -19391,6 +19391,7 @@ function renderMacroList() {
                 ${editable ? `<div class="flex gap-1 shrink-0 ml-2">
                     ${m.createdBy && m.createdBy === getCurrentUserId() ? 
                         `<button onclick="openMacroEditor('${m.id}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">✏️ 编辑</button>
+                         <button onclick="copyMacroToMine('${m.id}')" class="px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">📋 复制</button>
                          <button onclick="deleteMacroConfirm('${m.id}')" class="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600">🗑️ 删除</button>` :
                         `<button onclick="copyMacroToMine('${m.id}')" class="px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">📋 复制到我的宏</button>`}
                 </div>` : ''}
