@@ -9817,6 +9817,9 @@
                         rootContainer.appendChild(initialGroup);
                     }
                     
+                    // 滚动到创建/修改规则区域
+                    document.querySelector('#page-rule h3')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    
                     // 打开弹窗
                     const modal = document.getElementById('rule-modal');
                     if (modal) modal.classList.remove('hidden');
@@ -19573,7 +19576,75 @@ async function deleteMacroConfirm(macroId) {
 }
 
 // 条件宏选择器（插入宏到断语条件）
-function openMacroSelector() {
+// 存储宏选择器的目标容器和编辑中的宏ID（用于循环引用检测）
+let _macroSelectorTarget = null;
+let _macroSelectorEditingId = null;
+
+// 检查条件树中是否直接引用了指定宏ID
+function hasDirectMacroRef(conditions, targetId) {
+    if (!conditions || !conditions.children) return false;
+    const targetStr = String(targetId);
+    for (const child of conditions.children) {
+        if (child.macroRef && String(child.macroRef) === targetStr) return true;
+        if (child.children && hasDirectMacroRef(child, targetStr)) return true;
+    }
+    return false;
+}
+
+// 获取所有间接引用某个宏的宏ID集合（BFS 防止循环引用）
+function getCircularRefTargets(editingMacroId) {
+    const result = new Set();
+    if (!editingMacroId) return result;
+    
+    // 1. 自身引用
+    result.add(String(editingMacroId));
+    
+    // 2. BFS 查找所有直接或间接引用了 editingMacroId 的宏
+    //    如果宏 X 引用了 editingMacroId，则 editingMacroId 不能引用 X
+    const editingStr = String(editingMacroId);
+    const allMacros = cache.conditionMacros || [];
+    
+    function findReferencers(targetStr) {
+        const refs = [];
+        for (const m of allMacros) {
+            if (String(m.id) === targetStr || String(m.cloudId) === targetStr) continue;
+            if (hasDirectMacroRef(m.conditions, targetStr)) {
+                refs.push(m);
+            }
+        }
+        return refs;
+    }
+    
+    const queue = [editingStr];
+    const visited = new Set();
+    while (queue.length > 0) {
+        const current = queue.shift();
+        if (visited.has(current)) continue;
+        visited.add(current);
+        
+        const referencers = findReferencers(current);
+        for (const refMacro of referencers) {
+            const refStr = String(refMacro.id);
+            if (!visited.has(refStr) && !result.has(refStr)) {
+                result.add(refStr);
+                // cloudId 也需要加入禁止列表
+                if (refMacro.cloudId) result.add(String(refMacro.cloudId));
+                queue.push(refStr);
+            }
+        }
+    }
+    
+    return result;
+}
+
+function openMacroSelector(targetContainer, editingMacroId) {
+    // 存储目标容器和编辑中宏ID
+    _macroSelectorTarget = targetContainer || document.querySelector('#rule-conditions .condition-group-root');
+    _macroSelectorEditingId = editingMacroId || null;
+    
+    // 预先计算循环引用禁止列表
+    const circularRefSet = editingMacroId ? getCircularRefTargets(editingMacroId) : new Set();
+    
     const container = document.getElementById('macro-selector-list');
     let macros = getVisibleMacros();
     
@@ -19619,15 +19690,20 @@ function openMacroSelector() {
         });
         
         container.innerHTML = macros.map(m => {
+            // 循环引用检测：如果当前宏在禁止列表中，标记为不可选
+            const isCircularRef = circularRefSet.has(String(m.id)) || (m.cloudId && circularRefSet.has(String(m.cloudId)));
             const canView = canViewMacroConditions(m);
             const condText = canView ? macroConditionsToText(m.conditions) : '🔒 条件已隐藏';
             const isNonAdmin = !(currentUser && isAdmin(currentUser.email));
             const isOwnMacro = m.createdBy && m.createdBy === getCurrentUserId();
             const displayTags = isNonAdmin && !isOwnMacro ? ['系统标签'] : (m.tags || []);
             const tags = displayTags.map(t => `<span class="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-xs">${escapeHtml(t)}</span>`).join('');
+            const clickAttr = isCircularRef ? '' : `onclick="insertMacroRef('${m.id}')"`;
+            const cursorClass = isCircularRef ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-indigo-50';
+            const warnBadge = isCircularRef ? '<span class="text-xs text-red-500 ml-1">⛔ 不可引用（会导致循环）</span>' : '';
             return `
-            <div class="border border-indigo-200 rounded-lg p-3 mb-2 hover:bg-indigo-50 cursor-pointer transition-colors ${m.pinned ? 'border-l-4 border-l-indigo-500' : ''}" onclick="insertMacroRef('${m.id}')">
-                <div class="font-medium text-indigo-800">${m.pinned ? '📌 ' : ''}🧩 ${escapeHtml(m.name)}</div>
+            <div class="border border-indigo-200 rounded-lg p-3 mb-2 transition-colors ${cursorClass} ${m.pinned ? 'border-l-4 border-l-indigo-500' : ''}" ${clickAttr}>
+                <div class="font-medium text-indigo-800">${m.pinned ? '📌 ' : ''}🧩 ${escapeHtml(m.name)}${warnBadge}</div>
                 ${tags ? `<div class="flex flex-wrap gap-1 mt-1">${tags}</div>` : ''}
                 ${m.description && isOwnMacro ? `<div class="text-xs text-gray-500">${escapeHtml(m.description)}</div>` : ''}
                 <div class="text-xs text-gray-400 mt-1">${condText}</div>
@@ -19657,8 +19733,8 @@ async function insertMacroRef(macroId) {
     const refId = macro.cloudId || macroId;
     const macroName = macro.name || '';
     
-    // 找到目标容器：优先使用最近点击的条件组，否则使用根容器
-    const root = document.querySelector('#rule-conditions .condition-group-root');
+    // 找到目标容器：优先使用 _macroSelectorTarget（可指向规则或宏的条件容器）
+    const root = _macroSelectorTarget || document.querySelector('#rule-conditions .condition-group-root');
     if (!root) return;
     
     const target = window._lastGroupChildren || root;
@@ -20043,7 +20119,10 @@ function initMacroEvents() {
     if (manageBtn) manageBtn.onclick = openMacroManager;
     
     const insertBtn = document.getElementById('insert-macro-btn');
-    if (insertBtn) insertBtn.onclick = openMacroSelector;
+    if (insertBtn) insertBtn.onclick = () => {
+        const root = document.querySelector('#rule-conditions .condition-group-root');
+        openMacroSelector(root, null);
+    };
 
     const ruleRefBtn = document.getElementById('insert-rule-ref-btn');
     if (ruleRefBtn) ruleRefBtn.onclick = openRuleSelector;
@@ -20072,6 +20151,17 @@ function initMacroEvents() {
             const group = createConditionGroupElement('and', false);
             root.appendChild(group);
             bindGroupEvents(group);
+        };
+    }
+    
+    // 宏编辑器插入条件宏按钮
+    const macroInsertMacro = document.getElementById('macro-insert-macro-btn');
+    if (macroInsertMacro) {
+        macroInsertMacro.onclick = (e) => {
+            e.stopPropagation();
+            const root = document.getElementById('macro-condition-root');
+            if (!root) return;
+            openMacroSelector(root, editingMacroId);
         };
     }
     
@@ -20144,8 +20234,8 @@ function initMacroEvents() {
     ['macro-selector-search', 'macro-selector-tag-filter', 'macro-selector-sort'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener('input', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(); });
-            el.addEventListener('change', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(); });
+            el.addEventListener('input', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(_macroSelectorTarget, _macroSelectorEditingId); });
+            el.addEventListener('change', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(_macroSelectorTarget, _macroSelectorEditingId); });
         }
     });
     
@@ -24443,6 +24533,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="flex gap-2">
                         <button id="macro-add-group" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs">+ 添加条件组</button>
                         <button id="macro-add-condition" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs">+ 添加条件</button>
+                        <button id="macro-insert-macro-btn" class="px-3 py-1.5 bg-indigo-500 text-white rounded text-xs">🧩 插入条件宏</button>
                     </div>
                 </div>
             </div>
