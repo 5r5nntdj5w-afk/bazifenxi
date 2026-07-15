@@ -9830,7 +9830,7 @@
             const editBtn = div.querySelector('.edit-btn');
             if (editBtn) {
                 editBtn.onclick = () => {
-                    editIndex = cache.rules.findIndex(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
+                    editIndex = cache.rules.findIndex(r => r.id === rule.id || (r.cloudId && r.cloudId === rule.cloudId));
                     window._editingRuleId = rule.id || rule.cloudId || null;
                     DOM.ruleCategory.value = rule.category;
                     DOM.ruleDuanyu.innerHTML = rule.duanyu && rule.duanyu.includes('<') ? rule.duanyu : formatDuanyu(rule.duanyu || '');
