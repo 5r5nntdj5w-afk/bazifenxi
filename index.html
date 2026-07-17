@@ -5882,7 +5882,7 @@
         
         let count = 0;
         for (const rule of cache.rules) {
-            const ruleKey = `${rule.category}_${rule.duanyu}`;
+            const ruleKey = rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
             if (selectedRulesSet.has(ruleKey)) {
                 try {
                     if (rule.id) {
@@ -9235,8 +9235,7 @@
                 // 导出选中的断语（跨页选择）— 仅限自己的私有断语
                 let exportCount = 0;
                 selectedRulesSet.forEach(ruleKey => {
-                    const [category, duanyu] = ruleKey.split('_');
-                    const rule = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
+                    const rule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
                     if (rule && canExportRule(rule)) {
                         rulesToExport.push(rule);
                         exportCount++;
@@ -9636,7 +9635,7 @@
             div.innerHTML = `
                 <div class="flex justify-between items-start">
                     <div class="flex gap-3 flex-1 min-w-0">
-                        <input type="checkbox" class="rule-checkbox mt-1 flex-shrink-0" data-duanyu="${rule.duanyu}" data-category="${rule.category}">
+                        <input type="checkbox" class="rule-checkbox mt-1 flex-shrink-0" data-rule-id="${rule.id || rule.cloudId || ''}" data-duanyu="${rule.duanyu}" data-category="${rule.category}">
                         <div class="min-w-0">
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="font-bold">【${rule.category}】</span>
@@ -9659,17 +9658,18 @@
             
             // 恢复选中状态
             const checkbox = div.querySelector('.rule-checkbox');
-            const ruleKey = `${rule.category}_${rule.duanyu}`;
+            const ruleKey = rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
             if (selectedRulesSet.has(ruleKey)) {
                 checkbox.checked = true;
             }
             
             // 绑定复选框事件
             checkbox.onclick = function() {
+                const key = rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
                 if (this.checked) {
-                    selectedRulesSet.add(ruleKey);
+                    selectedRulesSet.add(key);
                 } else {
-                    selectedRulesSet.delete(ruleKey);
+                    selectedRulesSet.delete(key);
                 }
                 updateSelectionUI();
             };
@@ -10836,7 +10836,7 @@
             selectAll.onclick = function() {
                 const checkboxes = document.querySelectorAll('.rule-checkbox');
                 checkboxes.forEach(cb => {
-                    const ruleKey = `${cb.dataset.category}_${cb.dataset.duanyu}`;
+                    const ruleKey = cb.dataset.ruleId || (cb.dataset.category + '_' + cb.dataset.duanyu);
                     if (this.checked) {
                         selectedRulesSet.add(ruleKey);
                         cb.checked = true;
@@ -10857,7 +10857,7 @@
                     : cache.rules.filter(r => r.category === currentFilterCategory);
                 
                 filtered.forEach(rule => {
-                    const ruleKey = `${rule.category}_${rule.duanyu}`;
+                    const ruleKey = rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
                     selectedRulesSet.add(ruleKey);
                 });
                 
@@ -10888,16 +10888,17 @@
                 if (confirm(`确定删除选中的 ${count} 条断语？`)) {
                     try {
                         for (const ruleKey of selectedRulesSet) {
-                            const [category, duanyu] = ruleKey.split('_');
-                            const ruleToDelete = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
-                            if (ruleToDelete && ruleToDelete.id) {
-                                await deleteSupabaseDuanyu(ruleToDelete.id);
+                            const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                            if (targetRule && targetRule.id) {
+                                await deleteSupabaseDuanyu(targetRule.id);
                             }
                         }
                         
                         selectedRulesSet.forEach(ruleKey => {
-                            const [category, duanyu] = ruleKey.split('_');
-                            cache.rules = cache.rules.filter(r => !(r.duanyu === duanyu && r.category === category));
+                            cache.rules = cache.rules.filter(r => {
+                                const key = r.id || r.cloudId || (r.category + '_' + r.duanyu);
+                                return key !== ruleKey;
+                            });
                         });
                         
                         localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
@@ -10933,8 +10934,7 @@
                 
                 for (const ruleKey of selectedRulesSet) {
                     try {
-                        const [category, duanyu] = ruleKey.split('_');
-                        const sourceRule = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
+                        const sourceRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
                         if (!sourceRule) { failCount++; continue; }
                         
                         const isOwner = sourceRule.ownerId && sourceRule.ownerId === currentUserId;
