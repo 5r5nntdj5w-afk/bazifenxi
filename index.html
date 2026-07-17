@@ -8850,7 +8850,8 @@
         // 构建下拉选项
         function buildOptions(filter = '') {
             optionsContainer.innerHTML = '';
-            let groups = Array.from(hiddenSelect.querySelectorAll('optgroup'));
+            // 用 CSS :not() 选择器直接从 querySelectorAll 层面排除隐藏分组
+            let groups = Array.from(hiddenSelect.querySelectorAll('optgroup:not([data-group-hidden="true"])'));
             const pinnedLabels = JSON.parse(localStorage.getItem('pinnedFieldGroups') || '[]');
             
             // 置顶的分组排到前面（按置顶顺序）
@@ -8869,8 +8870,6 @@
                 // 跳过内部使用的 __custom__ 标记组（不显示在 UI 中）
                 if (group.label === '__custom__') return;
                 const label = group.label;
-                // 分组显隐过滤：检查 optgroup 是否已被标记隐藏
-                if (group.style.display === 'none' && !filter) return;
                 const opts = group.querySelectorAll('option');
                 const isPinned = pinnedLabels.includes(label);
                 let groupHtml = '';
@@ -21376,7 +21375,11 @@ function syncFieldDropdowns() {
         hiddenSelect.querySelectorAll('optgroup').forEach(group => {
             if (group.label === '__custom__') return;
             const isVisible = _fieldGroupConfig[group.label] !== false;
-            group.style.display = isVisible ? '' : 'none';
+            if (isVisible) {
+                group.removeAttribute('data-group-hidden');
+            } else {
+                group.setAttribute('data-group-hidden', 'true');
+            }
         });
     });
 }
