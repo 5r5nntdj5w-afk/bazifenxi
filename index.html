@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4175,8 +4175,8 @@
         initGroupKeyCombo();
         refreshGroupFilter();
         refreshGroupKeyDropdown();
-        // 非阻塞加载字段配置
-        loadFieldConfigs().then(() => {
+        // 非阻塞加载字段配置和分组显隐配置
+        Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]).then(() => {
             // 字段配置加载完成后，刷新所有条件项的下拉选项
             document.querySelectorAll('.condition-field-wrapper').forEach(w => {
                 const item = w.closest('.condition-item');
@@ -8867,6 +8867,9 @@
                 // 跳过内部使用的 __custom__ 标记组（不显示在 UI 中）
                 if (group.label === '__custom__') return;
                 const label = group.label;
+                // 分组显隐过滤：如果分组被隐藏且无搜索关键词，跳过整个分组
+                const groupVisible = _fieldGroupConfig[label] !== false;
+                if (!groupVisible && !filter) return;
                 const opts = group.querySelectorAll('option');
                 const isPinned = pinnedLabels.includes(label);
                 let groupHtml = '';
@@ -8876,6 +8879,11 @@
                     const val = opt.value;
                     const text = opt.textContent;
                     if (!val) return;
+                    // 检查字段是否已禁用（is_active = false）
+                    if (_fieldConfigCache) {
+                        const cfg = _fieldConfigCache.find(f => f.field_value === val);
+                        if (cfg && cfg.is_active === false) return;
+                    }
                     // 搜索过滤：匹配字段值或标签文字
                     const match = !filter || val.includes(filter) || text.includes(filter);
                     const displayClass = match ? '' : 'hidden-option';
@@ -8927,6 +8935,9 @@
                     hiddenSelect.appendChild(customOptgroup);
                     
                     Object.keys(groupMap).sort().forEach(groupLabel => {
+                        // 分组显隐过滤
+                        const groupVisible = _fieldGroupConfig[groupLabel] !== false;
+                        if (!groupVisible && !filter) return;
                         const items = groupMap[groupLabel];
                         const isPinned = pinnedLabels.includes(groupLabel);
                         let groupHtml = '';
@@ -9700,6 +9711,8 @@
     let _fieldConfigCache = null;
     // 自定义字段开关（管理员控制是否允许用户新增自定义字段，默认关闭）
     let _customFieldEnabled = false;
+    // 字段组显隐配置缓存（从 field_group_config 表动态加载）
+    let _fieldGroupConfig = {};
     
     // 刷新规则列表
     function reloadAll() {
@@ -11368,6 +11381,23 @@
             console.warn('加载字段配置失败，使用硬编码后备:', e);
             _fieldConfigCache = null;
             return [];
+        }
+    }
+    
+    // 加载字段组显隐配置
+    async function loadFieldGroupConfigs() {
+        if (!supabaseClient) return;
+        try {
+            const { data, error } = await supabaseClient
+                .from('field_group_config')
+                .select('*');
+            if (error) throw error;
+            const configs = data || [];
+            _fieldGroupConfig = {};
+            configs.forEach(c => { _fieldGroupConfig[c.group_name] = c.is_visible !== false; });
+        } catch (e) {
+            console.warn('加载字段组显隐配置失败:', e);
+            _fieldGroupConfig = {};
         }
     }
     
@@ -20844,10 +20874,12 @@ function getCaseContentHash(caseItem) {
 // ============ 字段管理 ============
 
 // 打开字段管理弹窗
-function openFieldManager() {
+async function openFieldManager() {
     const modal = document.getElementById('field-manager-modal');
     if (!modal) return;
     modal.classList.remove('hidden');
+    // 确保分组显隐配置已加载
+    await loadFieldGroupConfigs();
     renderFieldList();
     // 同步开关状态
     const toggle = document.getElementById('custom-field-toggle');
@@ -20906,6 +20938,8 @@ function renderFieldList() {
     const container = document.getElementById('field-list-container');
     if (!container) return;
     
+    // 同时更新分组显隐面板
+    renderGroupVisibilityPanel();
     const searchVal = (document.getElementById('field-search-input')?.value || '').toLowerCase();
     const typeFilter = document.getElementById('field-type-filter')?.value || 'all';
     
@@ -20939,7 +20973,8 @@ function renderFieldList() {
     let html = '';
     
     if (presets.length > 0) {
-        html += '<div class="mb-2"><h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">预设字段（不可编辑）</h4>';
+        const isAdminUser = currentUser && isAdmin(currentUser.email);
+        html += `<div class="mb-2"><h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">预设字段${isAdminUser ? '' : '（不可编辑）'}</h4>`;
         presets.forEach(f => {
             html += renderFieldItem(f);
         });
@@ -20960,8 +20995,11 @@ function renderFieldList() {
 // 渲染单个字段项
 function renderFieldItem(field) {
     const isPreset = field.is_preset;
-    const canEdit = !isPreset;
-    const canDelete = !isPreset;
+    const isAdminUser = currentUser && isAdmin(currentUser.email);
+    const isActive = field.is_active !== false;
+    // 管理员可编辑/删除预设字段；自定义字段所有人可编辑/删除（由 RLS 控制权限）
+    const canEdit = isAdminUser || !isPreset;
+    const canDelete = isAdminUser || !isPreset;
     const templateLabels = {
         tiangan: '天干', dizhi: '地支', wuxing: '五行',
         shishen: '十神(阴阳)', shishen_group: '十神(不区分)',
@@ -20974,19 +21012,25 @@ function renderFieldItem(field) {
     const templateLabel = templateLabels[field.template_type] || field.template_type || '未知';
     
     return `
-        <div class="flex items-center gap-2 p-2 rounded border ${isPreset ? 'bg-gray-50' : 'bg-sky-50'}">
+        <div class="flex items-center gap-2 p-2 rounded border ${isPreset ? 'bg-gray-50' : 'bg-sky-50'} ${!isActive ? 'opacity-60' : ''}">
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-medium truncate">${escapeHtml(field.field_name || '')}</span>
                     <span class="text-xs text-gray-400">${escapeHtml(field.field_value || '')}</span>
                     ${isPreset ? '<span class="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">预设</span>' : '<span class="text-xs bg-sky-200 text-sky-700 px-1.5 py-0.5 rounded">自定义</span>'}
+                    ${!isActive ? '<span class="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">已禁用</span>' : ''}
                 </div>
                 <div class="flex gap-2 mt-0.5">
                     <span class="text-xs text-gray-500">分组: ${escapeHtml(field.field_group || '-')}</span>
                     <span class="text-xs text-gray-500">模板: ${templateLabel}</span>
                 </div>
             </div>
-            ${canEdit ? `<button class="px-2 py-1 bg-sky-500 text-white rounded text-xs" onclick="editCustomField('${field.id}')">编辑</button>` : ''}
+            <!-- is_active 开关 -->
+            <label class="relative inline-flex items-center cursor-pointer shrink-0" title="${isActive ? '点击禁用此字段' : '点击启用此字段'}">
+                <input type="checkbox" class="sr-only peer" ${isActive ? 'checked' : ''} onchange="toggleFieldActive('${field.id}', ${isActive})">
+                <div class="w-8 h-4 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[0.5px] after:start-[0.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-sky-500"></div>
+            </label>
+            ${canEdit ? `<button class="px-2 py-1 bg-sky-500 text-white rounded text-xs ${!isPreset ? '' : '!bg-amber-500'}" onclick="editCustomField('${field.id}')">编辑</button>` : ''}
             ${canDelete ? `<button class="px-2 py-1 bg-red-500 text-white rounded text-xs" onclick="deleteCustomField('${field.id}')">删除</button>` : ''}
         </div>
     `;
@@ -21006,12 +21050,26 @@ function openCustomFieldEditor(fieldData) {
     
     if (fieldData) {
         // 编辑模式
-        title.textContent = '编辑自定义字段';
+        const isPresetField = fieldData.is_preset === true;
+        title.textContent = isPresetField ? '编辑预设字段' : '编辑自定义字段';
         nameInput.value = fieldData.field_name || '';
         valueInput.value = fieldData.field_value || '';
+        // 预设字段的 field_value 不可修改（避免破坏已有断语条件）
+        valueInput.disabled = isPresetField;
+        if (isPresetField) {
+            document.getElementById('field-editor-value-hint').textContent = '预设字段的唯一标识不可修改';
+        } else {
+            document.getElementById('field-editor-value-hint').textContent = '由系统自动生成，基于名称转换';
+        }
         templateSelect.value = fieldData.template_type || 'tiangan';
         groupSelect.value = fieldData.field_group || '自定义';
         saveBtn.dataset.editId = fieldData.id;
+        // 标记是否为预设字段
+        if (isPresetField) {
+            saveBtn.dataset.isPreset = 'true';
+        } else {
+            delete saveBtn.dataset.isPreset;
+        }
     } else {
         // 新增模式
         title.textContent = '新增自定义字段';
@@ -21027,6 +21085,9 @@ function openCustomFieldEditor(fieldData) {
 
 function closeCustomFieldEditor() {
     document.getElementById('custom-field-editor-modal').classList.add('hidden');
+    // 重置 valueInput 的 disabled 状态（预设字段编辑时会禁用）
+    const valueInput = document.getElementById('field-editor-value');
+    if (valueInput) valueInput.disabled = false;
 }
 
 // 自动生成字段值
@@ -21087,17 +21148,26 @@ function initFieldEditorEvents() {
         try {
             if (editId) {
                 // 编辑
-                const { error } = await supabaseClient
+                const isPresetEdit = saveBtn.dataset.isPreset === 'true';
+                const updateData = {
+                    field_name: name,
+                    template_type: templateType,
+                    field_group: fieldGroup,
+                    updated_at: new Date().toISOString()
+                };
+                // 非预设字段才能修改 field_value
+                if (!isPresetEdit) {
+                    updateData.field_value = value;
+                }
+                let query = supabaseClient
                     .from('field_config')
-                    .update({
-                        field_name: name,
-                        field_value: value,
-                        template_type: templateType,
-                        field_group: fieldGroup,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', editId)
-                    .eq('is_preset', false);
+                    .update(updateData)
+                    .eq('id', editId);
+                // 非管理员编辑预设字段时保持 is_preset 过滤（理论上不会发生，但保持安全）
+                if (!isPresetEdit || !(currentUser && isAdmin(currentUser.email))) {
+                    query = query.eq('is_preset', false);
+                }
+                const { error } = await query;
                 if (error) throw error;
             } else {
                 // 新增
@@ -21114,8 +21184,8 @@ function initFieldEditorEvents() {
                 if (error) throw error;
             }
             
-            // 重新加载字段配置
-            await loadFieldConfigs();
+            // 重新加载字段配置和分组显隐
+            await Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]);
             closeCustomFieldEditor();
             renderFieldList();
         } catch (e) {
@@ -21133,25 +21203,169 @@ async function editCustomField(fieldId) {
     openCustomFieldEditor(field);
 }
 
-// 删除自定义字段
+// 删除自定义字段（管理员可软删除预设字段）
 async function deleteCustomField(fieldId) {
-    if (!confirm('确定要删除此自定义字段吗？\n删除后使用该字段的断语条件可能无法正常匹配。')) return;
     if (!supabaseClient) return;
     
+    // 查找字段信息
+    const field = _fieldConfigCache ? _fieldConfigCache.find(f => String(f.id) === String(fieldId)) : null;
+    const isPresetField = field && field.is_preset === true;
+    const isAdminUser = currentUser && isAdmin(currentUser.email);
+    
+    if (isPresetField && !isAdminUser) return;
+    
+    if (isPresetField) {
+        // 预设字段采用软删除（标记 is_active = false），可恢复
+        if (!confirm('确定要隐藏此预设字段吗？\n隐藏后该字段不会出现在断语条件选择列表中。\n可在字段管理窗口中重新启用。')) return;
+        try {
+            const { error } = await supabaseClient
+                .from('field_config')
+                .update({ is_active: false, updated_at: new Date().toISOString() })
+                .eq('id', fieldId);
+            if (error) throw error;
+            await Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]);
+            renderFieldList();
+        } catch (e) {
+            console.error('隐藏预设字段失败:', e);
+            alert('操作失败：' + e.message);
+        }
+    } else {
+        // 自定义字段真实删除
+        if (!confirm('确定要删除此自定义字段吗？\n删除后使用该字段的断语条件可能无法正常匹配。')) return;
+        try {
+            const { error } = await supabaseClient
+                .from('field_config')
+                .delete()
+                .eq('id', fieldId)
+                .eq('is_preset', false);
+            if (error) throw error;
+            await Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]);
+            renderFieldList();
+        } catch (e) {
+            console.error('删除自定义字段失败:', e);
+            alert('删除失败：' + e.message);
+        }
+    }
+}
+
+// 切换字段的启用/禁用状态（is_active）
+async function toggleFieldActive(fieldId, currentlyActive) {
+    if (!supabaseClient) return;
+    const newActive = !currentlyActive;
     try {
         const { error } = await supabaseClient
             .from('field_config')
-            .delete()
-            .eq('id', fieldId)
-            .eq('is_preset', false);
+            .update({ is_active: newActive, updated_at: new Date().toISOString() })
+            .eq('id', fieldId);
         if (error) throw error;
-        
-        await loadFieldConfigs();
+        await Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]);
         renderFieldList();
     } catch (e) {
-        console.error('删除自定义字段失败:', e);
-        alert('删除失败：' + e.message);
+        console.error('切换字段状态失败:', e);
+        alert('切换失败：' + e.message);
     }
+}
+
+// 切换字段组显隐
+async function toggleFieldGroup(groupName, currentlyVisible) {
+    if (!supabaseClient) return;
+    const newVisible = !currentlyVisible;
+    try {
+        // 检查是否存在该分组配置
+        const { data: existing } = await supabaseClient
+            .from('field_group_config')
+            .select('group_name')
+            .eq('group_name', groupName)
+            .single();
+        if (existing) {
+            await supabaseClient
+                .from('field_group_config')
+                .update({ is_visible: newVisible, updated_at: new Date().toISOString() })
+                .eq('group_name', groupName);
+        } else {
+            await supabaseClient
+                .from('field_group_config')
+                .insert({ group_name: groupName, is_visible: newVisible });
+        }
+        _fieldGroupConfig[groupName] = newVisible;
+        renderFieldList();
+    } catch (e) {
+        console.error('切换字段组显隐失败:', e);
+        alert('切换失败：' + e.message);
+    }
+}
+
+// 全部显示/全部隐藏
+async function toggleAllFieldGroups() {
+    if (!_fieldConfigCache || _fieldConfigCache.length === 0) return;
+    // 从 field_config 获取所有分组
+    const groupSet = new Set();
+    _fieldConfigCache.forEach(f => {
+        const g = f.field_group || '';
+        if (g) groupSet.add(g);
+    });
+    const allGroups = Array.from(groupSet);
+    if (allGroups.length === 0) return;
+    
+    // 检查是否所有分组都已可见
+    const allVisible = allGroups.every(g => _fieldGroupConfig[g] !== false);
+    const newVal = !allVisible;
+    
+    const btn = document.getElementById('toggle-all-groups-btn');
+    if (btn) btn.textContent = allVisible ? '全部显示' : '全部隐藏';
+    
+    for (const name of allGroups) {
+        _fieldGroupConfig[name] = newVal;
+    }
+    try {
+        for (const name of allGroups) {
+            await supabaseClient
+                .from('field_group_config')
+                .upsert({ group_name: name, is_visible: newVal, updated_at: new Date().toISOString() });
+        }
+        renderFieldList();
+    } catch (e) {
+        console.error('批量切换分组显隐失败:', e);
+    }
+}
+
+// 渲染字段组显隐面板
+function renderGroupVisibilityPanel() {
+    const container = document.getElementById('group-visibility-list');
+    if (!container) return;
+    if (!_fieldConfigCache || _fieldConfigCache.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-400">暂无字段组</span>';
+        return;
+    }
+    // 从 field_config 中提取所有不重复的 field_group
+    const groupSet = new Set();
+    _fieldConfigCache.forEach(f => {
+        const g = f.field_group || '';
+        if (g) groupSet.add(g);
+    });
+    const sortedGroups = Array.from(groupSet).sort();
+    
+    let html = '';
+    let allVisibleCount = 0;
+    let totalCount = 0;
+    sortedGroups.forEach(g => {
+        const visible = _fieldGroupConfig[g] !== false; // 默认可见
+        if (visible) allVisibleCount++;
+        totalCount++;
+        html += `
+            <label class="inline-flex items-center gap-1 px-2 py-0.5 rounded ${visible ? 'bg-amber-100' : 'bg-gray-100'} cursor-pointer text-xs" title="${escapeHtml(g)}">
+                <input type="checkbox" class="sr-only peer" ${visible ? 'checked' : ''} onchange="toggleFieldGroup('${g.replace(/'/g, "\\'")}', ${visible})">
+                <span class="w-3.5 h-3.5 rounded border ${visible ? 'bg-amber-500 border-amber-500' : 'bg-white border-gray-300'} flex items-center justify-center text-white text-[8px]">${visible ? '✓' : ''}</span>
+                <span class="${visible ? 'text-amber-800' : 'text-gray-500'} truncate max-w-[180px]">${escapeHtml(g)}</span>
+            </label>
+        `;
+    });
+    container.innerHTML = html || '<span class="text-xs text-gray-400">暂无字段组</span>';
+    
+    // 更新全部显示/隐藏按钮文字
+    const allVisible = allVisibleCount === totalCount && totalCount > 0;
+    const btn = document.getElementById('toggle-all-groups-btn');
+    if (btn) btn.textContent = allVisible ? '全部隐藏' : '全部显示';
 }
 
 // ============ 条件宏管理 ============
@@ -25274,6 +25488,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     <input type="checkbox" id="custom-field-toggle" class="sr-only peer" onchange="onCustomFieldToggle(this.checked)">
                     <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
                 </label>
+            </div>
+
+            <!-- 字段组显示控制 -->
+            <div id="group-visibility-section" class="mb-4 p-3 bg-amber-50 rounded border">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700">📂 字段组显示控制</span>
+                    <button id="toggle-all-groups-btn" class="text-xs text-amber-600 hover:text-amber-800 underline" onclick="toggleAllFieldGroups()">全部隐藏</button>
+                </div>
+                <p class="text-xs text-gray-500 mb-2">关闭某个字段组后，该组所有字段不会出现在断语条件选择下拉列表中</p>
+                <div id="group-visibility-list" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    <span class="text-xs text-gray-400">加载中...</span>
+                </div>
             </div>
 
             <!-- 预设字段和自定义字段合并列表 -->
