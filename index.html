@@ -8850,8 +8850,8 @@
         // 构建下拉选项
         function buildOptions(filter = '') {
             optionsContainer.innerHTML = '';
-            // 用 CSS :not() 选择器直接从 querySelectorAll 层面排除隐藏分组
-            let groups = Array.from(hiddenSelect.querySelectorAll('optgroup:not([data-group-hidden="true"])'));
+            // 获取所有 optgroup（包括隐藏的）
+            let groups = Array.from(hiddenSelect.querySelectorAll('optgroup'));
             const pinnedLabels = JSON.parse(localStorage.getItem('pinnedFieldGroups') || '[]');
             
             // 置顶的分组排到前面（按置顶顺序）
@@ -8870,6 +8870,9 @@
                 // 跳过内部使用的 __custom__ 标记组（不显示在 UI 中）
                 if (group.label === '__custom__') return;
                 const label = group.label;
+                // ========== 分组显隐过滤（即时读取 _fieldGroupConfig） ==========
+                if (_fieldGroupConfig[label] === false && !filter) return;
+                // =================================================================
                 const opts = group.querySelectorAll('option');
                 const isPinned = pinnedLabels.includes(label);
                 let groupHtml = '';
@@ -21269,10 +21272,13 @@ async function toggleFieldActive(fieldId, currentlyActive) {
 
 // 切换字段组显隐
 async function toggleFieldGroup(groupName, currentlyVisible) {
-    if (!supabaseClient) return;
     const newVisible = !currentlyVisible;
+    // 先更新内存（立即生效，不依赖 DB）
+    _fieldGroupConfig[groupName] = newVisible;
+    renderFieldList();
+    // 再异步保存到 DB（best-effort）
     try {
-        // 检查是否存在该分组配置
+        if (!supabaseClient) return;
         const { data: existing } = await supabaseClient
             .from('field_group_config')
             .select('group_name')
@@ -21288,11 +21294,8 @@ async function toggleFieldGroup(groupName, currentlyVisible) {
                 .from('field_group_config')
                 .insert({ group_name: groupName, is_visible: newVisible });
         }
-        _fieldGroupConfig[groupName] = newVisible;
-        renderFieldList();
     } catch (e) {
-        console.error('切换字段组显隐失败:', e);
-        alert('切换失败：' + e.message);
+        console.error('保存字段组显隐配置到 DB 失败:', e);
     }
 }
 
@@ -21318,15 +21321,17 @@ async function toggleAllFieldGroups() {
     for (const name of allGroups) {
         _fieldGroupConfig[name] = newVal;
     }
+    // 先更新 UI（立即生效）
+    renderFieldList();
+    // 再异步保存到 DB
     try {
         for (const name of allGroups) {
             await supabaseClient
                 .from('field_group_config')
                 .upsert({ group_name: name, is_visible: newVal, updated_at: new Date().toISOString() });
         }
-        renderFieldList();
     } catch (e) {
-        console.error('批量切换分组显隐失败:', e);
+        console.error('批量保存分组显隐配置到 DB 失败:', e);
     }
 }
 
