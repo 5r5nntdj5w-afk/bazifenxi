@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7742,6 +7742,72 @@
                 }
                 else if(c.op === 'nin'){
                     res = targetValues.every(tv => !sourceValues.includes(normalizeGroupVal(tv)));
+                }
+            }
+            
+            // === 通用 indexOf 匹配（后续补充服务端 API 的灵活匹配，用于本地回退） ===
+            // 五行数量-（统一处理各种前缀：原局、大运、流年等）
+            else if(c.field.indexOf('五行数量-') >= 0){
+                const name = c.field.substring(c.field.lastIndexOf('-') + 1);
+                const hasDayun = c.field.indexOf('大运') >= 0;
+                const hasLiunian = c.field.indexOf('流年') >= 0;
+                const onlyTiangan = c.field.indexOf('天干') >= 0;
+                const onlyDizhi = c.field.indexOf('地支') >= 0;
+                let cnt = 0;
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                if (!onlyDizhi) {
+                    pillars.forEach(p => { if(p?.t && WU_XING[p.t] === name) cnt++; });
+                }
+                if (!onlyTiangan) {
+                    pillars.forEach(p => { if(p?.d && WU_XING[p.d] === name) cnt++; });
+                }
+                if (hasDayun) {
+                    if (!onlyDizhi && data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
+                    if (!onlyTiangan && data.dayun?.d && WU_XING[data.dayun.d] === name) cnt++;
+                }
+                if (hasLiunian) {
+                    if (!onlyDizhi && data.liunian?.t && WU_XING[data.liunian.t] === name) cnt++;
+                    if (!onlyTiangan && data.liunian?.d && WU_XING[data.liunian.d] === name) cnt++;
+                }
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+                actual = String(cnt);
+            }
+            // 十神数量-（统一处理各种前缀：原局、大运、流年等）
+            else if(c.field.indexOf('十神数量-') >= 0){
+                const name = c.field.substring(c.field.lastIndexOf('-') + 1);
+                const hasDayun = c.field.indexOf('大运') >= 0;
+                const hasLiunian = c.field.indexOf('流年') >= 0;
+                const onlyTiangan = c.field.indexOf('天干') >= 0;
+                const onlyDizhi = c.field.indexOf('地支') >= 0;
+                const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
+                if (!data.ri?.t) { res = false; } else {
+                    let cnt = 0;
+                    const rg = data.ri.t;
+                    const pillars = [data.nian, data.yue, data.ri, data.shi];
+                    if (!onlyDizhi) {
+                        pillars.forEach(p => { if(p?.t) { const s = getExactShen(p.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; } });
+                    }
+                    if (!onlyTiangan) {
+                        pillars.forEach(p => { if(p?.d) { const s = getDiShen(p.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; } });
+                    }
+                    if (hasDayun) {
+                        if (!onlyDizhi && data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+                        if (!onlyTiangan && data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+                    }
+                    if (hasLiunian) {
+                        if (!onlyDizhi && data.liunian?.t) { const s = getExactShen(data.liunian.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+                        if (!onlyTiangan && data.liunian?.d) { const s = getDiShen(data.liunian.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+                    }
+                    if(c.op === 'eq') res = cnt == Number(c.val);
+                    else if(c.op === 'ge') res = cnt >= Number(c.val);
+                    else if(c.op === 'gt') res = cnt > Number(c.val);
+                    else if(c.op === 'le') res = cnt <= Number(c.val);
+                    else if(c.op === 'lt') res = cnt < Number(c.val);
+                    actual = String(cnt);
                 }
             }
             
