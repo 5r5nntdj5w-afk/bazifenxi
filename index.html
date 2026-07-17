@@ -9021,8 +9021,14 @@
                 });
             });
         }
-        // 存储 buildOptions 引用，用于在字段组显隐切换后刷新所有下拉列表
-        wrapper._buildDropdown = buildOptions;
+        
+        // 监听字段组显隐变化事件，如果下拉已打开则即时刷新
+        const _visibilityHandler = function(e) {
+            if (dropdown.classList.contains('show')) {
+                buildOptions(searchInput.value || '');
+            }
+        };
+        document.addEventListener('field-group-visibility-changed', _visibilityHandler);
         
         // 选择选项
         function selectOption(val, text) {
@@ -21278,7 +21284,8 @@ async function toggleFieldGroup(groupName, currentlyVisible) {
     // 先更新内存（立即生效，不依赖 DB）
     _fieldGroupConfig[groupName] = newVisible;
     renderFieldList();
-    rebuildAllDropdowns();
+    // 派发自定义事件，通知所有已打开的下拉列表刷新
+    dispatchGroupVisibilityChange();
     // 再异步保存到 DB（best-effort）
     try {
         if (!supabaseClient) return;
@@ -21326,7 +21333,7 @@ async function toggleAllFieldGroups() {
     }
     // 先更新 UI（立即生效）
     renderFieldList();
-    rebuildAllDropdowns();
+    dispatchGroupVisibilityChange();
     // 再异步保存到 DB
     try {
         for (const name of allGroups) {
@@ -21393,13 +21400,9 @@ function syncFieldDropdowns() {
     });
 }
 
-// 重建所有断语条件下拉列表（在字段组显隐切换后调用）
-function rebuildAllDropdowns() {
-    document.querySelectorAll('.condition-field-wrapper').forEach(wrapper => {
-        if (typeof wrapper._buildDropdown === 'function') {
-            wrapper._buildDropdown();
-        }
-    });
+// 派发字段组显隐变化事件，通知所有已打开的下拉列表刷新
+function dispatchGroupVisibilityChange() {
+    document.dispatchEvent(new CustomEvent('field-group-visibility-changed'));
 }
 
 // ============ 条件宏管理 ============
