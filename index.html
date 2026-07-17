@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -20955,9 +20955,8 @@ function closeCustomFieldEditor() {
 
 // 自动生成字段值
 function autoGenerateFieldValue(name, templateType) {
-    // 将名称转为拼音或slug格式
-    const slug = name.replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fff_]/g, '');
-    // 根据模板类型添加后缀逻辑，但保留用户输入的名称含义
+    // 保留中文、字母、数字、下划线、连字符（服务端模式匹配依赖 - 作为分隔符）
+    const slug = name.replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fff_-]/g, '');
     return slug || 'custom_field';
 }
 
@@ -20980,6 +20979,15 @@ function initFieldEditorEvents() {
         const name = nameInput.value;
         if (name) {
             valueInput.value = autoGenerateFieldValue(name, this.value);
+        }
+        // 更新提示文字
+        const hint = document.getElementById('field-editor-value-hint');
+        if (hint) {
+            if (this.value === 'count') {
+                hint.innerHTML = '提示：名称中使用连字符指定统计目标，如"大运十神数量-<strong>比肩</strong>"表示统计大运+原局中的比肩数量';
+            } else {
+                hint.textContent = '由系统自动生成，基于名称转换';
+            }
         }
     });
     
@@ -25226,7 +25234,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="mb-3">
                 <label class="block text-sm font-medium text-gray-700 mb-1">字段值（唯一标识） <span class="text-red-500">*</span></label>
                 <input type="text" id="field-editor-value" class="w-full p-2 border rounded" placeholder="例如：年干藏干五行_木" disabled>
-                <p class="text-xs text-gray-400 mt-0.5">由系统自动生成，基于名称转换</p>
+                <p class="text-xs text-gray-400 mt-0.5" id="field-editor-value-hint">由系统自动生成，基于名称转换</p>
             </div>
             <div class="mb-3" id="field-editor-template-row">
                 <label class="block text-sm font-medium text-gray-700 mb-1">模板类型 <span class="text-red-500">*</span></label>
