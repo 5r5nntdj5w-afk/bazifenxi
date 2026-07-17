@@ -7751,15 +7751,19 @@
                 const name = c.field.substring(c.field.lastIndexOf('-') + 1);
                 const hasDayun = c.field.indexOf('大运') >= 0;
                 const hasLiunian = c.field.indexOf('流年') >= 0;
+                const hasYuanJu = c.field.indexOf('原局') >= 0;
                 const onlyTiangan = c.field.indexOf('天干') >= 0;
                 const onlyDizhi = c.field.indexOf('地支') >= 0;
                 let cnt = 0;
-                const pillars = [data.nian, data.yue, data.ri, data.shi];
-                if (!onlyDizhi) {
-                    pillars.forEach(p => { if(p?.t && WU_XING[p.t] === name) cnt++; });
-                }
-                if (!onlyTiangan) {
-                    pillars.forEach(p => { if(p?.d && WU_XING[p.d] === name) cnt++; });
+                // 仅当字段名含"原局"、或不含"大运流年"时，才统计原局四柱
+                if (hasYuanJu || (!hasDayun && !hasLiunian)) {
+                    const pillars = [data.nian, data.yue, data.ri, data.shi];
+                    if (!onlyDizhi) {
+                        pillars.forEach(p => { if(p?.t && WU_XING[p.t] === name) cnt++; });
+                    }
+                    if (!onlyTiangan) {
+                        pillars.forEach(p => { if(p?.d && WU_XING[p.d] === name) cnt++; });
+                    }
                 }
                 if (hasDayun) {
                     if (!onlyDizhi && data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
@@ -7781,18 +7785,22 @@
                 const name = c.field.substring(c.field.lastIndexOf('-') + 1);
                 const hasDayun = c.field.indexOf('大运') >= 0;
                 const hasLiunian = c.field.indexOf('流年') >= 0;
+                const hasYuanJu = c.field.indexOf('原局') >= 0;
                 const onlyTiangan = c.field.indexOf('天干') >= 0;
                 const onlyDizhi = c.field.indexOf('地支') >= 0;
                 const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
                 if (!data.ri?.t) { res = false; } else {
                     let cnt = 0;
                     const rg = data.ri.t;
-                    const pillars = [data.nian, data.yue, data.ri, data.shi];
-                    if (!onlyDizhi) {
-                        pillars.forEach(p => { if(p?.t) { const s = getExactShen(p.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; } });
-                    }
-                    if (!onlyTiangan) {
-                        pillars.forEach(p => { if(p?.d) { const s = getDiShen(p.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; } });
+                    // 仅当字段名含"原局"、或不含"大运流年"时，才统计原局四柱
+                    if (hasYuanJu || (!hasDayun && !hasLiunian)) {
+                        const pillars = [data.nian, data.yue, data.ri, data.shi];
+                        if (!onlyDizhi) {
+                            pillars.forEach(p => { if(p?.t) { const s = getExactShen(p.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; } });
+                        }
+                        if (!onlyTiangan) {
+                            pillars.forEach(p => { if(p?.d) { const s = getDiShen(p.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; } });
+                        }
                     }
                     if (hasDayun) {
                         if (!onlyDizhi && data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }

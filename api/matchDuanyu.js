@@ -319,20 +319,24 @@ function evaluateLeafCondition(data, cond) {
     var name = field.substring(field.lastIndexOf('-') + 1);
     var hasDayun = field.indexOf('大运') >= 0;
     var hasLiunian = field.indexOf('流年') >= 0;
+    var hasYuanJu = field.indexOf('原局') >= 0;
     var onlyTiangan = field.indexOf('天干') >= 0;
     var onlyDizhi = field.indexOf('地支') >= 0;
     var cnt = 0;
-    if (!onlyDizhi) {
-      if (data.nian && data.nian.t && WU_XING[data.nian.t] === name) cnt++;
-      if (data.yue && data.yue.t && WU_XING[data.yue.t] === name) cnt++;
-      if (data.ri && data.ri.t && WU_XING[data.ri.t] === name) cnt++;
-      if (data.shi && data.shi.t && WU_XING[data.shi.t] === name) cnt++;
-    }
-    if (!onlyTiangan) {
-      if (data.nian && data.nian.d && WU_XING[data.nian.d] === name) cnt++;
-      if (data.yue && data.yue.d && WU_XING[data.yue.d] === name) cnt++;
-      if (data.ri && data.ri.d && WU_XING[data.ri.d] === name) cnt++;
-      if (data.shi && data.shi.d && WU_XING[data.shi.d] === name) cnt++;
+    // 仅当字段名含"原局"、或不含"大运流年"时，才统计原局四柱
+    if (hasYuanJu || (!hasDayun && !hasLiunian)) {
+      if (!onlyDizhi) {
+        if (data.nian && data.nian.t && WU_XING[data.nian.t] === name) cnt++;
+        if (data.yue && data.yue.t && WU_XING[data.yue.t] === name) cnt++;
+        if (data.ri && data.ri.t && WU_XING[data.ri.t] === name) cnt++;
+        if (data.shi && data.shi.t && WU_XING[data.shi.t] === name) cnt++;
+      }
+      if (!onlyTiangan) {
+        if (data.nian && data.nian.d && WU_XING[data.nian.d] === name) cnt++;
+        if (data.yue && data.yue.d && WU_XING[data.yue.d] === name) cnt++;
+        if (data.ri && data.ri.d && WU_XING[data.ri.d] === name) cnt++;
+        if (data.shi && data.shi.d && WU_XING[data.shi.d] === name) cnt++;
+      }
     }
     if (hasDayun) {
       if (!onlyDizhi && data.dayun && data.dayun.t && WU_XING[data.dayun.t] === name) cnt++;
@@ -355,6 +359,7 @@ function evaluateLeafCondition(data, cond) {
     var name = field.substring(field.lastIndexOf('-') + 1);
     var hasDayun = field.indexOf('大运') >= 0;
     var hasLiunian = field.indexOf('流年') >= 0;
+    var hasYuanJu = field.indexOf('原局') >= 0;
     var onlyTiangan = field.indexOf('天干') >= 0;
     var onlyDizhi = field.indexOf('地支') >= 0;
     var isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
@@ -362,17 +367,20 @@ function evaluateLeafCondition(data, cond) {
     if (!data.ri || !data.ri.t) { res = false; } else {
       var cnt = 0;
       var rg = data.ri.t;
-      if (!onlyDizhi) {
-        if (data.nian && data.nian.t) { var s = getExactShen(data.nian.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
-        if (data.yue && data.yue.t) { var s = getExactShen(data.yue.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
-        if (data.ri && data.ri.t) { var s = getExactShen(data.ri.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
-        if (data.shi && data.shi.t) { var s = getExactShen(data.shi.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
-      }
-      if (!onlyTiangan) {
-        if (data.nian && data.nian.d) { var s = getDiShen(data.nian.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
-        if (data.yue && data.yue.d) { var s = getDiShen(data.yue.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
-        if (data.ri && data.ri.d) { var s = getDiShen(data.ri.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
-        if (data.shi && data.shi.d) { var s = getDiShen(data.shi.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+      // 仅当字段名含"原局"、或不含"大运流年"时，才统计原局四柱
+      if (hasYuanJu || (!hasDayun && !hasLiunian)) {
+        if (!onlyDizhi) {
+          if (data.nian && data.nian.t) { var s = getExactShen(data.nian.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+          if (data.yue && data.yue.t) { var s = getExactShen(data.yue.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+          if (data.ri && data.ri.t) { var s = getExactShen(data.ri.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+          if (data.shi && data.shi.t) { var s = getExactShen(data.shi.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+        }
+        if (!onlyTiangan) {
+          if (data.nian && data.nian.d) { var s = getDiShen(data.nian.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+          if (data.yue && data.yue.d) { var s = getDiShen(data.yue.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+          if (data.ri && data.ri.d) { var s = getDiShen(data.ri.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+          if (data.shi && data.shi.d) { var s = getDiShen(data.shi.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+        }
       }
       if (hasDayun) {
         if (!onlyDizhi && data.dayun && data.dayun.t) { var s = getExactShen(data.dayun.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
