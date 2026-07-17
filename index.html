@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4177,6 +4177,8 @@
         refreshGroupKeyDropdown();
         // 非阻塞加载字段配置和分组显隐配置
         Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]).then(() => {
+            // 同步所有隐藏 select 的分组显隐状态
+            syncFieldDropdowns();
             // 字段配置加载完成后，刷新所有条件项的下拉选项
             document.querySelectorAll('.condition-field-wrapper').forEach(w => {
                 const item = w.closest('.condition-item');
@@ -8867,9 +8869,8 @@
                 // 跳过内部使用的 __custom__ 标记组（不显示在 UI 中）
                 if (group.label === '__custom__') return;
                 const label = group.label;
-                // 分组显隐过滤：如果分组被隐藏且无搜索关键词，跳过整个分组
-                const groupVisible = _fieldGroupConfig[label] !== false;
-                if (!groupVisible && !filter) return;
+                // 分组显隐过滤：检查 optgroup 是否已被标记隐藏
+                if (group.style.display === 'none' && !filter) return;
                 const opts = group.querySelectorAll('option');
                 const isPinned = pinnedLabels.includes(label);
                 let groupHtml = '';
@@ -20938,8 +20939,9 @@ function renderFieldList() {
     const container = document.getElementById('field-list-container');
     if (!container) return;
     
-    // 同时更新分组显隐面板
+    // 同时更新分组显隐面板和所有断语条件下拉列表
     renderGroupVisibilityPanel();
+    syncFieldDropdowns();
     const searchVal = (document.getElementById('field-search-input')?.value || '').toLowerCase();
     const typeFilter = document.getElementById('field-type-filter')?.value || 'all';
     
@@ -21366,6 +21368,17 @@ function renderGroupVisibilityPanel() {
     const allVisible = allVisibleCount === totalCount && totalCount > 0;
     const btn = document.getElementById('toggle-all-groups-btn');
     if (btn) btn.textContent = allVisible ? '全部隐藏' : '全部显示';
+}
+
+// 同步所有断语条件下拉列表中隐藏 select 的 optgroup 显隐状态
+function syncFieldDropdowns() {
+    document.querySelectorAll('.condition-field').forEach(hiddenSelect => {
+        hiddenSelect.querySelectorAll('optgroup').forEach(group => {
+            if (group.label === '__custom__') return;
+            const isVisible = _fieldGroupConfig[group.label] !== false;
+            group.style.display = isVisible ? '' : 'none';
+        });
+    });
 }
 
 // ============ 条件宏管理 ============
