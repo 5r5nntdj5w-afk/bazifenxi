@@ -2162,6 +2162,7 @@
                 <label id="import-label" class="px-3 py-1 bg-orange-600 text-white rounded text-sm cursor-pointer">
                     导入断语<input type="file" id="import-rule" class="hidden" accept=".json">
                 </label>
+                <button id="batch-copy" class="px-3 py-1 bg-yellow-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量复制</button>
                 <button id="batch-delete" class="px-3 py-1 bg-red-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量删除</button>
             </div>
             
@@ -10796,6 +10797,11 @@
             batchDelete.disabled = count === 0;
         }
         
+        const batchCopy = document.getElementById('batch-copy');
+        if (batchCopy) {
+            batchCopy.disabled = count === 0;
+        }
+        
         if (batchExport) {
             batchExport.disabled = cache.rules.length === 0;
         }
@@ -10904,6 +10910,64 @@
                         alert('批量删除失败：' + error.message);
                     }
                 }
+            };
+        }
+        
+        // 批量复制
+        const batchCopy = document.getElementById('batch-copy');
+        if (batchCopy) {
+            batchCopy.onclick = async function() {
+                const count = selectedRulesSet.size;
+                if (count === 0) return;
+                
+                if (!currentUser || !supabaseClient) {
+                    alert('请先登录后再进行批量复制操作');
+                    return;
+                }
+                
+                if (!confirm(`确定复制选中的 ${count} 条断语？将创建为私有断语。`)) return;
+                
+                let successCount = 0;
+                let failCount = 0;
+                const currentUserId = getCurrentUserId();
+                
+                for (const ruleKey of selectedRulesSet) {
+                    try {
+                        const [category, duanyu] = ruleKey.split('_');
+                        const sourceRule = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
+                        if (!sourceRule) { failCount++; continue; }
+                        
+                        const isOwner = sourceRule.ownerId && sourceRule.ownerId === currentUserId;
+                        const newDuanyuData = {
+                            category: sourceRule.category,
+                            duanyu: '（复制）' + sourceRule.duanyu,
+                            conditions: JSON.parse(JSON.stringify(sourceRule.conditions)),
+                            description: isOwner ? (sourceRule.description || '') : '',
+                            permissionLevel: 0,
+                            groupKey: '',
+                            priority: 0
+                        };
+                        
+                        const newDuanyu = await addSupabaseDuanyu(newDuanyuData);
+                        cache.rules.push({
+                            ...newDuanyuData,
+                            id: newDuanyu.id,
+                            isPublic: false,
+                            createTime: newDuanyu.create_time || new Date().toISOString()
+                        });
+                        successCount++;
+                    } catch (e) {
+                        console.error('批量复制失败:', ruleKey, e);
+                        failCount++;
+                    }
+                }
+                
+                localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+                selectedRulesSet.clear();
+                reloadAll();
+                clearScfRuleCache();
+                clearClientApiCache();
+                alert(`批量复制完成：成功 ${successCount} 条${failCount > 0 ? '，失败 ' + failCount + ' 条' : ''}`);
             };
         }
         
