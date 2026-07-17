@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8856,6 +8856,8 @@
             let hasVisible = false;
             
             groups.forEach(group => {
+                // 跳过内部使用的 __custom__ 标记组（不显示在 UI 中）
+                if (group.label === '__custom__') return;
                 const label = group.label;
                 const opts = group.querySelectorAll('option');
                 const isPinned = pinnedLabels.includes(label);
