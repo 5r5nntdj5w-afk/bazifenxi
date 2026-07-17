@@ -9728,7 +9728,11 @@
                     window._editingRuleId = null;
                     DOM.ruleCategory.value = rule.category;
                     DOM.ruleDuanyu.innerHTML = '（复制）' + rule.duanyu;
-                    if (DOM.ruleDescription) DOM.ruleDescription.value = '';
+                    // 复制描述（仅创建者自己复制时携带描述）
+                    if (DOM.ruleDescription) {
+                        const isOwner = rule.ownerId && rule.ownerId === getCurrentUserId();
+                        DOM.ruleDescription.value = isOwner ? (rule.description || '') : '';
+                    }
                     
                     // 设置权限等级为私有
                     const permLevelSel = document.getElementById('rule-permission-level');
@@ -9922,6 +9926,8 @@
                             }
                         });
                     }
+                    // 滚动到创建/修改规则区域
+                    document.querySelector('#page-rule h3')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 };
             }
             const delBtn = div.querySelector('.del-btn');
