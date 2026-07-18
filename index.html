@@ -11290,7 +11290,9 @@
                             description: isOwner ? (sourceRule.description || '') : '',
                             permissionLevel: 0,
                             groupKey: '',
-                            priority: 0
+                            priority: 0,
+                            userId: currentUserId,
+                            ownerId: currentUserId
                         };
                         
                         const newDuanyu = await addSupabaseDuanyu(newDuanyuData);
@@ -12170,11 +12172,13 @@
 
     async function addSupabaseDuanyu(duanyuData) {
         if (!currentUser || !supabaseClient) throw new Error('未登录');
+        const userId = duanyuData.userId || duanyuData.ownerId || currentUser.id;
+        if (!userId) throw new Error('用户ID无效');
         const { data, error } = await supabaseClient
             .from('duanyu')
             .insert([{
-                user_id: currentUser.id,
-                owner_id: currentUser.id,
+                user_id: userId,
+                owner_id: userId,
                 category: duanyuData.category,
                 conditions: duanyuData.conditions,
                 duanyu_text: duanyuData.duanyu,
