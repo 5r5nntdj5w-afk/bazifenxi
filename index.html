@@ -9419,6 +9419,16 @@
                     valSel.classList.remove('hidden');
                     valSel.innerHTML = '<option value="">请选择值</option>';
                     WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
+                    // 添加其他五行数量对比字段作为选项
+                    if (_fieldConfigCache) {
+                        const compareFields = _fieldConfigCache.filter(f => 
+                            f.field_value && f.field_value.startsWith('五行数量对比-') && f.field_value !== field
+                        );
+                        compareFields.forEach(f => {
+                            const name = f.field_value.replace('五行数量对比-', '');
+                            valSel.innerHTML += `<option value="${name}">${name}</option>`;
+                        });
+                    }
                 }
                 else if(field.startsWith('十神数量对比-')){
                     opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -9427,6 +9437,16 @@
                     // 所有十神类型（区分阴阳+不区分阴阳）
                     const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
                     allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
+                    // 添加其他十神数量对比字段作为选项
+                    if (_fieldConfigCache) {
+                        const compareFields = _fieldConfigCache.filter(f => 
+                            f.field_value && f.field_value.startsWith('十神数量对比-') && f.field_value !== field
+                        );
+                        compareFields.forEach(f => {
+                            const name = f.field_value.replace('十神数量对比-', '');
+                            valSel.innerHTML += `<option value="${name}">${name}</option>`;
+                        });
+                    }
                 }
                 else if(field.includes('数量')){
                     opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
