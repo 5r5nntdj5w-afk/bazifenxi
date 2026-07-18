@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8924,6 +8924,16 @@
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择值</option>';
                 WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
+                // 添加其他五行数量对比字段作为选项
+                if (_fieldConfigCache) {
+                    const compareFields = _fieldConfigCache.filter(f => 
+                        f.field_value && f.field_value.startsWith('五行数量对比-') && f.field_value !== field
+                    );
+                    compareFields.forEach(f => {
+                        const name = f.field_value.replace('五行数量对比-', '');
+                        valSel.innerHTML += `<option value="${name}">${name}</option>`;
+                    });
+                }
             }
             else if(field.startsWith('十神数量对比-')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -8932,6 +8942,19 @@
                 // 所有十神类型（区分阴阳+不区分阴阳）
                 const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
                 allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
+                // 添加其他十神数量对比字段作为选项
+                console.log('[DBG] 十神数量对比字段:', field);
+                console.log('[DBG] _fieldConfigCache:', _fieldConfigCache ? _fieldConfigCache.length + ' items' : 'null');
+                if (_fieldConfigCache) {
+                    const compareFields = _fieldConfigCache.filter(f => 
+                        f.field_value && f.field_value.startsWith('十神数量对比-') && f.field_value !== field
+                    );
+                    console.log('[DBG] 找到的对比字段:', compareFields.map(f => f.field_value));
+                    compareFields.forEach(f => {
+                        const name = f.field_value.replace('十神数量对比-', '');
+                        valSel.innerHTML += `<option value="${name}">${name}</option>`;
+                    });
+                }
             }
             else if(field.includes('数量')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -9356,7 +9379,8 @@
 
     // 绑定值控件（通用所有五行/十神字段）
     function bindValControl() {
-        const conditionItems = DOM.ruleConditions.querySelectorAll('.condition-item');
+        const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
+        const conditionItems = rootContainer ? rootContainer.querySelectorAll('.condition-item') : [];
         
         conditionItems.forEach((item) => {
             initCustomFieldSelect(item);
@@ -9496,7 +9520,8 @@
         // 监听字段配置更新事件，重新渲染值下拉列表
         document.addEventListener('field-config-updated', function() {
             console.log('[DBG] field-config-updated 事件触发');
-            const conditionItems = DOM.ruleConditions.querySelectorAll('.condition-item');
+            const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
+            const conditionItems = rootContainer ? rootContainer.querySelectorAll('.condition-item') : [];
             console.log('[DBG] 条件项数量:', conditionItems.length);
             conditionItems.forEach((item) => {
                 const fieldSel = item.querySelector('.condition-field');
@@ -21366,10 +21391,16 @@ function autoGenerateFieldValue(name, templateType) {
     const slug = name.replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fff_-]/g, '');
     const baseValue = slug || 'custom_field';
     
-    // 根据模板类型添加前缀
+    // 根据模板类型添加前缀（避免重复添加）
     if (templateType === 'count_compare_wuxing') {
+        if (baseValue.startsWith('五行数量对比-')) {
+            return baseValue;
+        }
         return '五行数量对比-' + baseValue;
     } else if (templateType === 'count_compare_shishen') {
+        if (baseValue.startsWith('十神数量对比-')) {
+            return baseValue;
+        }
         return '十神数量对比-' + baseValue;
     }
     
