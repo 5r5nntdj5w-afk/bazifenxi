@@ -1,4 +1,4 @@
-﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3611,7 +3611,7 @@
 
     // 异步调 SCF API 获取断语
     /** 调用 /api/matchDuanyu（Vercel 服务端匹配） */
-    function callDuanyuMatchApi(baziData, gender, birthYear, dayunList, liunianList) {
+    function callDuanyuMatchApi(baziData, gender, birthYear, dayunList, liunianList, currentDayun, currentLiunian, currentLiuyue) {
       var matchUrl = window.location.origin + '/api/matchDuanyu';
       return new Promise(function(resolve, reject) {
         var xhr = new XMLHttpRequest();
@@ -3640,9 +3640,87 @@
           birthYear: birthYear,
           dayun: dayunList || [],
           liunian: liunianList || [],
+          currentDayun: currentDayun || null,
+          currentLiunian: currentLiunian || null,
+          currentLiuyue: currentLiuyue || null,
           currentUserId: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null,
           isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false
         }));
+      });
+    }
+
+    /** 刷新 API 断语匹配（用户选择大运/流年/流月后调用） */
+    function refreshApiDuanyu() {
+      var isVercelEnv = !!(typeof FALLBACK_CONFIG !== 'undefined' && FALLBACK_CONFIG._configFromServer);
+      if (!isVercelEnv) {
+        calcAll();
+        return;
+      }
+
+      var lastPaipan = window.lastPaipanData;
+      if (!lastPaipan || !lastPaipan.bazi) {
+        calcAll();
+        return;
+      }
+
+      var baziForMatch = {
+        nian: { gan: lastPaipan.bazi.nian.t, zhi: lastPaipan.bazi.nian.d },
+        yue: { gan: lastPaipan.bazi.yue.t, zhi: lastPaipan.bazi.yue.d },
+        ri: { gan: lastPaipan.bazi.ri.t, zhi: lastPaipan.bazi.ri.d },
+        shi: { gan: lastPaipan.bazi.shi.t, zhi: lastPaipan.bazi.shi.d }
+      };
+
+      var genderStr = (String(lastPaipan.gender) === '1' || String(lastPaipan.gender) === '男') ? '男' : '女';
+
+      var currentDayunItem = null;
+      if (window.currentDaYun) {
+        var dyGanZhi = window.currentDaYun.getGanZhi();
+        currentDayunItem = {
+          gan: dyGanZhi ? dyGanZhi.charAt(0) : '',
+          zhi: dyGanZhi ? dyGanZhi.charAt(1) : '',
+          ganZhi: dyGanZhi,
+          startAge: window.currentDaYun.getStartAge(),
+          startYear: window.currentDaYun.getStartYear(),
+          endYear: window.currentDaYun.getEndYear()
+        };
+      }
+
+      var currentLiunianItem = null;
+      var activeLiunian = document.querySelector('.liunian-item.active');
+      if (activeLiunian) {
+        var lnYear = parseInt(activeLiunian.querySelector('.liunian-year')?.textContent);
+        var lnGanZhi = activeLiunian.querySelector('.liunian-ganzhi')?.textContent;
+        if (!isNaN(lnYear) && lnGanZhi) {
+          currentLiunianItem = {
+            year: lnYear,
+            gan: lnGanZhi.charAt(0),
+            zhi: lnGanZhi.charAt(1),
+            ganZhi: lnGanZhi
+          };
+        }
+      }
+
+      var currentLiuyueItem = null;
+      var liuyueGan = document.querySelector('.tiangan[data-type="liuyue"]')?.value;
+      var liuyueZhi = document.querySelector('.dizhi[data-type="liuyue"]')?.value;
+      if (liuyueGan && liuyueZhi) {
+        currentLiuyueItem = {
+          gan: liuyueGan,
+          zhi: liuyueZhi
+        };
+      }
+
+      callDuanyuMatchApi(baziForMatch, genderStr, lastPaipan.birthYear, null, null,
+        currentDayunItem, currentLiunianItem, currentLiuyueItem
+      ).then(function(duanyu) {
+        window.apiDuanyuCache = {
+          duanyu: duanyu || []
+        };
+        calcAll();
+      }).catch(function(e) {
+        console.warn('刷新断语匹配失败:', e.message);
+        window.apiDuanyuCache = null;
+        calcAll();
       });
     }
 
@@ -4996,7 +5074,7 @@
                                 var validDizhi = getValidDizhiByGan(g);
                                 renderDizhiSelect(liunianZhiSelect, validDizhi);
                                 liunianZhiSelect.value = zh;
-                                calcAll();
+                                refreshApiDuanyu();
                                 updateLiuYueList(g, yr2);
                             }
                         };
@@ -5061,7 +5139,7 @@
                             var validDizhi = getValidDizhiByGan(g);
                             renderDizhiSelect(liuyueZhiSelect, validDizhi);
                             liuyueZhiSelect.value = zh;
-                            calcAll();
+                            refreshApiDuanyu();
                         }
                     };
                 })(gan, zhi);
@@ -5240,7 +5318,7 @@
                                     }
                                     clearLiuNianSelection();
                                     updateLiuNianList(dy);
-                                    calcAll();
+                                    refreshApiDuanyu();
                                 };
                             })(dayun, g, zh);
                             
@@ -5292,21 +5370,58 @@
                 if (isVercelEnv) {
                   // Vercel 环境：调用 /api/matchDuanyu（服务端匹配，保护条件规则）
                   var genderStr = (String(gender) === '1' || String(gender) === '男') ? '男' : '女';
+                  
+                  // 获取当前选中的大运、流年、流月
+                  var currentDayunItem = null;
+                  if (window.currentDaYun) {
+                    var dyGanZhi = window.currentDaYun.getGanZhi();
+                    currentDayunItem = {
+                      gan: dyGanZhi ? dyGanZhi.charAt(0) : '',
+                      zhi: dyGanZhi ? dyGanZhi.charAt(1) : '',
+                      ganZhi: dyGanZhi,
+                      startAge: window.currentDaYun.getStartAge(),
+                      startYear: window.currentDaYun.getStartYear(),
+                      endYear: window.currentDaYun.getEndYear()
+                    };
+                  }
+                  
+                  var currentLiunianItem = null;
+                  var activeLiunian = document.querySelector('.liunian-item.active');
+                  if (activeLiunian) {
+                    var lnYear = parseInt(activeLiunian.querySelector('.liunian-year')?.textContent);
+                    var lnGanZhi = activeLiunian.querySelector('.liunian-ganzhi')?.textContent;
+                    if (!isNaN(lnYear) && lnGanZhi) {
+                      currentLiunianItem = {
+                        year: lnYear,
+                        gan: lnGanZhi.charAt(0),
+                        zhi: lnGanZhi.charAt(1),
+                        ganZhi: lnGanZhi
+                      };
+                    }
+                  }
+                  
+                  var currentLiuyueItem = null;
+                  var liuyueGan = document.querySelector('.tiangan[data-type="liuyue"]')?.value;
+                  var liuyueZhi = document.querySelector('.dizhi[data-type="liuyue"]')?.value;
+                  if (liuyueGan && liuyueZhi) {
+                    currentLiuyueItem = {
+                      gan: liuyueGan,
+                      zhi: liuyueZhi
+                    };
+                  }
+                  
                   callDuanyuMatchApi(baziForMatch, genderStr, year,
                     daYunData.map(function(d) {
                       return { index: d.index, ganZhi: d.ganZhi, gan: d.ganZhi ? d.ganZhi.charAt(0) : '', zhi: d.ganZhi ? d.ganZhi.charAt(1) : '', startAge: d.startAge, startYear: d.startYear, endYear: d.endYear };
                     }),
-                    liunianResults || []
+                    liunianResults || [],
+                    currentDayunItem,
+                    currentLiunianItem,
+                    currentLiuyueItem
                   ).then(function(duanyu) {
                     if (myReqId !== window._paipanReqId) return;
                     window.apiDuanyuCache = {
-                      base: (duanyu && duanyu.base) || [],
-                      dayun: (duanyu.dayun || []).map(function(d) {
-                        return { ganZhi: d.ganZhi, startAge: d.startAge, startYear: d.startYear, duanyu: d.duanyu || [] };
-                      }),
-                      liunian: (duanyu.liunian || []).map(function(d) {
-                        return { year: d.year, ganZhi: d.ganZhi, dayunIndex: d.dayunIndex, duanyu: d.duanyu || [] };
-                      })
+                      duanyu: duanyu || []
                     };
                     calcAll();
                   }).catch(function(e) {
@@ -8023,65 +8138,18 @@
     function renderApiDuanyu() {
       var apiCache = window.apiDuanyuCache;
       if (!apiCache) {
-        // 没有缓存（手动编辑模式）
         cache.matchedByCategory = {};
         displayDuanyuResult();
         return;
       }
 
-      // 读取当前选择器的大运流年
-      var dayunGan = document.querySelector('.tiangan[data-type="dayun"]')?.value || '';
-      var dayunZhi = document.querySelector('.dizhi[data-type="dayun"]')?.value || '';
-      var dayunGanZhi = dayunGan + dayunZhi;
+      var allDuanyu = apiCache.duanyu || [];
 
-      // 找到当前大运的断语
-      var dayunDuanyu = [];
-      if (dayunGanZhi && apiCache.dayun) {
-        // 查找大运列表中的匹配项（通过 ganZhi 匹配）
-        for (var di = 0; di < apiCache.dayun.length; di++) {
-          if (apiCache.dayun[di].ganZhi === dayunGanZhi) {
-            dayunDuanyu = apiCache.dayun[di].duanyu || [];
-            break;
-          }
-        }
-      }
-
-      // 找到当前流年的断语
-      var liunianDuanyu = [];
-      var activeLiunianItem = document.querySelector('.liunian-item.active');
-      if (activeLiunianItem && apiCache.liunian) {
-        var yearSpan = activeLiunianItem.querySelector('.liunian-year');
-        if (yearSpan) {
-          var lnYear = parseInt(yearSpan.textContent);
-          if (!isNaN(lnYear)) {
-            for (var li = 0; li < apiCache.liunian.length; li++) {
-              if (apiCache.liunian[li].year === lnYear) {
-                liunianDuanyu = apiCache.liunian[li].duanyu || [];
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      // 检查当前是否选中了大运或流月
-      var hasDayun = !!dayunGanZhi;
-      var hasLiuyue = !!document.querySelector('.tiangan[data-type="liuyue"]')?.value;
-      
-      // 合并断语：如果选中了大运或流月，则不显示原局断语（原局断语仅在仅八字模式下显示）
-      var allDuanyu = [];
-      if (!hasDayun && !hasLiuyue) {
-        allDuanyu = allDuanyu.concat(apiCache.base || []);
-      }
-      allDuanyu = allDuanyu.concat(dayunDuanyu).concat(liunianDuanyu);
-
-      // 按 category 分组（与 displayDuanyuResult 兼容的格式）
       var matchedByCategory = {};
       for (var idx = 0; idx < allDuanyu.length; idx++) {
         var item = allDuanyu[idx];
         var cat = item.category || '未分类';
         if (!matchedByCategory[cat]) matchedByCategory[cat] = [];
-        // 检查是否已存在相同断语（去重）
         var text = item.duanyu || '';
         var exists = false;
         for (var ci = 0; ci < matchedByCategory[cat].length; ci++) {

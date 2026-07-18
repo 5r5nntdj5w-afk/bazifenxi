@@ -939,19 +939,20 @@ function filterRulesByAccess(rules, currentUserId, isAdmin) {
 
 // ===================== 主匹配函数 =====================
 
-function matchDuanyu(baziData, dayunItem, liunianItem, gender, rules, birthYear, macros) {
+function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules, birthYear, macros) {
   var md = {
     nian: { t: baziData.bazi.nian.gan, d: baziData.bazi.nian.zhi },
     yue:  { t: baziData.bazi.yue.gan, d: baziData.bazi.yue.zhi },
     ri:   { t: baziData.bazi.ri.gan,   d: baziData.bazi.ri.zhi },
     shi:  { t: baziData.bazi.shi.gan,  d: baziData.bazi.shi.zhi },
-    dayun: null, liunian: null, gender: gender,
+    dayun: null, liunian: null, liuyue: null, gender: gender,
     birthYear: birthYear || null,
     macros: macros || [],
     rules: rules || []
   };
   if (dayunItem) md.dayun = { t: dayunItem.gan, d: dayunItem.zhi, ganZhi: dayunItem.ganZhi };
   if (liunianItem) md.liunian = { t: liunianItem.gan, d: liunianItem.zhi, ganZhi: liunianItem.ganZhi };
+  if (liuyueItem) md.liuyue = { t: liuyueItem.gan, d: liuyueItem.zhi };
 
   // 计算有效年龄
   if (liunianItem && birthYear) {
@@ -1083,9 +1084,13 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 1. 原局断语
-    var baseMatched = matchDuanyu(baziData, null, null, baziData.gender, rules, birthYear, macros);
-    var baseResult = baseMatched.map(function(r) {
+    // 单次匹配：前端发送当前选中的完整状态，API 只调用一次 matchDuanyu()，条件自动过滤
+    var currentDayun = body.currentDayun || null;
+    var currentLiunian = body.currentLiunian || null;
+    var currentLiuyue = body.currentLiuyue || null;
+    
+    var matched = matchDuanyu(baziData, currentDayun, currentLiunian, currentLiuyue, baziData.gender, rules, birthYear, macros);
+    var result = matched.map(function(r) {
       return {
         duanyu: r.duanyu_text,
         category: r.category,
@@ -1095,61 +1100,10 @@ module.exports = async (req, res) => {
       };
     });
 
-    // 2. 大运断语
-    var dayunResults = [];
-    if (baziData.dayun && baziData.dayun.length > 0) {
-      for (var d = 0; d < baziData.dayun.length; d++) {
-        var dy = baziData.dayun[d];
-        if (!dy.ganZhi) continue;
-        var dyMatched = matchDuanyu(baziData, dy, null, baziData.gender, rules, birthYear, macros);
-        dayunResults.push({
-          index: dy.index,
-          ganZhi: dy.ganZhi,
-          startAge: dy.startAge,
-          startYear: dy.startYear,
-          endYear: dy.endYear,
-          duanyu: dyMatched.map(function(r) {
-            return { duanyu: r.duanyu_text, category: r.category, group_key: r.group_key || '', priority: r.priority || 0, rule: { category: r.category, duanyu: r.duanyu_text, group_key: r.group_key || '', priority: r.priority || 0 } };
-          })
-        });
-      }
-    }
-
-    // 3. 流年断语
-    var liunianResults = [];
-    if (baziData.liunian && baziData.liunian.length > 0) {
-      for (var li = 0; li < baziData.liunian.length; li++) {
-        var ln = baziData.liunian[li];
-        var dyForLn = null;
-        if (baziData.dayun && baziData.dayun.length > 0) {
-          for (var di = 0; di < baziData.dayun.length; di++) {
-            if (baziData.dayun[di].index === ln.dayunIndex) {
-              dyForLn = baziData.dayun[di];
-              break;
-            }
-          }
-        }
-        var lnMatched = matchDuanyu(baziData, dyForLn, ln, baziData.gender, rules, birthYear, macros);
-        liunianResults.push({
-          year: ln.year,
-          ganZhi: ln.ganZhi,
-          dayunIndex: ln.dayunIndex,
-          isCurrentYear: ln.isCurrentYear,
-          duanyu: lnMatched.map(function(r) {
-            return { duanyu: r.duanyu_text, category: r.category, group_key: r.group_key || '', priority: r.priority || 0, rule: { category: r.category, duanyu: r.duanyu_text, group_key: r.group_key || '', priority: r.priority || 0 } };
-          })
-        });
-      }
-    }
-
     return res.json({
       success: true,
       data: {
-        duanyu: {
-          base: baseResult,
-          dayun: dayunResults,
-          liunian: liunianResults
-        }
+        duanyu: result
       }
     });
 
