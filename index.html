@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9438,10 +9438,13 @@
                     const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
                     allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
                     // 添加其他十神数量对比字段作为选项
+                    console.log('[DBG] 十神数量对比字段:', field);
+                    console.log('[DBG] _fieldConfigCache:', _fieldConfigCache ? _fieldConfigCache.length + ' items' : 'null');
                     if (_fieldConfigCache) {
                         const compareFields = _fieldConfigCache.filter(f => 
                             f.field_value && f.field_value.startsWith('十神数量对比-') && f.field_value !== field
                         );
+                        console.log('[DBG] 找到的对比字段:', compareFields.map(f => f.field_value));
                         compareFields.forEach(f => {
                             const name = f.field_value.replace('十神数量对比-', '');
                             valSel.innerHTML += `<option value="${name}">${name}</option>`;
@@ -9492,10 +9495,13 @@
         
         // 监听字段配置更新事件，重新渲染值下拉列表
         document.addEventListener('field-config-updated', function() {
+            console.log('[DBG] field-config-updated 事件触发');
             const conditionItems = DOM.ruleConditions.querySelectorAll('.condition-item');
+            console.log('[DBG] 条件项数量:', conditionItems.length);
             conditionItems.forEach((item) => {
                 const fieldSel = item.querySelector('.condition-field');
                 if (fieldSel && fieldSel.value) {
+                    console.log('[DBG] 触发字段变化:', fieldSel.value);
                     // 触发字段选择变化，重新生成值下拉列表
                     const evt = new Event('change', { bubbles: true });
                     fieldSel.dispatchEvent(evt);
@@ -21463,6 +21469,11 @@ function initFieldEditorEvents() {
             
             // 重新加载字段配置和分组显隐
             await Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]);
+            console.log('[DBG] 字段保存后 _fieldConfigCache:', _fieldConfigCache ? _fieldConfigCache.length + ' items' : 'null');
+            if (_fieldConfigCache) {
+                const compareFields = _fieldConfigCache.filter(f => f.field_value && f.field_value.startsWith('十神数量对比-'));
+                console.log('[DBG] 十神数量对比字段:', compareFields.map(f => f.field_value));
+            }
             // 触发字段配置更新事件，通知条件编辑器刷新值下拉列表
             document.dispatchEvent(new CustomEvent('field-config-updated'));
             closeCustomFieldEditor();
