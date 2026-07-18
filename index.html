@@ -6906,6 +6906,131 @@
     }
     function getDiShen(d, rg){ return d?getExactShen(DI_ZHU_MAIN[d],rg):'-'; }
 
+    // 根据范围前缀获取五行数量
+    function getScopeWuxingCount(name, data, stats) {
+        // 检查是否包含范围前缀
+        if (name.includes('五行数量-')) {
+            const parts = name.split('五行数量-');
+            const scopePrefix = parts[0];
+            const wuxingName = parts[1];
+            
+            // 根据范围前缀计算数量
+            let count = 0;
+            const rg = data.ri.t;
+            
+            // 确定需要统计的字段
+            const fields = [];
+            if (scopePrefix.includes('原局') || scopePrefix === '') {
+                fields.push('nian', 'yue', 'ri', 'shi');
+            }
+            if (scopePrefix.includes('大运')) {
+                fields.push('dayun');
+            }
+            if (scopePrefix.includes('流年')) {
+                fields.push('liunian');
+            }
+            if (scopePrefix.includes('流月')) {
+                fields.push('liuyue');
+            }
+            
+            // 统计指定五行的数量
+            for (const field of fields) {
+                const item = data[field];
+                if (item && item.t && WU_XING[item.t] === wuxingName) {
+                    count++;
+                }
+                if (item && item.d && WU_XING[item.d] === wuxingName) {
+                    count++;
+                }
+            }
+            
+            return count;
+        }
+        
+        // 没有范围前缀，使用全局统计
+        return stats.wuCount[name] || 0;
+    }
+    
+    // 根据范围前缀获取十神数量
+    function getScopeShishenCount(name, data, stats) {
+        // 检查是否包含范围前缀
+        if (name.includes('十神数量-')) {
+            const parts = name.split('十神数量-');
+            const scopePrefix = parts[0];
+            const shishenName = parts[1];
+            
+            // 根据范围前缀计算数量
+            let count = 0;
+            const rg = data.ri.t;
+            
+            // 确定需要统计的字段
+            const fields = [];
+            if (scopePrefix.includes('原局') || scopePrefix === '') {
+                fields.push('nian', 'yue', 'ri', 'shi');
+            }
+            if (scopePrefix.includes('大运')) {
+                fields.push('dayun');
+            }
+            if (scopePrefix.includes('流年')) {
+                fields.push('liunian');
+            }
+            if (scopePrefix.includes('流月')) {
+                fields.push('liuyue');
+            }
+            
+            // 统计指定十神的数量
+            for (const field of fields) {
+                const item = data[field];
+                if (item && item.t) {
+                    const s = getExactShen(item.t, rg);
+                    if (s === shishenName) {
+                        count++;
+                    }
+                }
+                if (item && item.d) {
+                    const s = getDiShen(item.d, rg);
+                    if (s === shishenName) {
+                        count++;
+                    }
+                }
+            }
+            
+            // 如果是分组名称（比劫、食伤、财星、官杀、印星），需要计算分组数量
+            const groupMembers = {
+                '比劫': ['比肩', '劫财'],
+                '食伤': ['食神', '伤官'],
+                '财星': ['正财', '偏财'],
+                '官杀': ['正官', '七杀'],
+                '印星': ['正印', '偏印']
+            };
+            
+            if (groupMembers[shishenName]) {
+                let groupCount = 0;
+                for (const field of fields) {
+                    const item = data[field];
+                    if (item && item.t) {
+                        const s = getExactShen(item.t, rg);
+                        if (groupMembers[shishenName].includes(s)) {
+                            groupCount++;
+                        }
+                    }
+                    if (item && item.d) {
+                        const s = getDiShen(item.d, rg);
+                        if (groupMembers[shishenName].includes(s)) {
+                            groupCount++;
+                        }
+                    }
+                }
+                return groupCount;
+            }
+            
+            return count;
+        }
+        
+        // 没有范围前缀，使用全局统计
+        return stats.shenCount[name] || stats.groupCount[name] || 0;
+    }
+
     // 统计数据
     function getStats(data){
         // 清除缓存，确保每次都重新计算（包含大运和流年）
@@ -7796,8 +7921,8 @@
             }
             else if(c.field.startsWith('五行数量对比-')){
                 const name = c.field.replace('五行数量对比-', '');
-                const cnt1 = stats.wuCount[name] || 0;
-                const cnt2 = stats.wuCount[c.val] || 0;
+                const cnt1 = getScopeWuxingCount(name, data, stats);
+                const cnt2 = getScopeWuxingCount(c.val, data, stats);
                 if(c.op === 'eq') res = cnt1 == cnt2;
                 else if(c.op === 'ge') res = cnt1 >= cnt2;
                 else if(c.op === 'gt') res = cnt1 > cnt2;
@@ -7806,8 +7931,8 @@
             }
             else if(c.field.startsWith('十神数量对比-')){
                 const name = c.field.replace('十神数量对比-', '');
-                const cnt1 = stats.shenCount[name] || stats.groupCount[name] || 0;
-                const cnt2 = stats.shenCount[c.val] || stats.groupCount[c.val] || 0;
+                const cnt1 = getScopeShishenCount(name, data, stats);
+                const cnt2 = getScopeShishenCount(c.val, data, stats);
                 if(c.op === 'eq') res = cnt1 == cnt2;
                 else if(c.op === 'ge') res = cnt1 >= cnt2;
                 else if(c.op === 'gt') res = cnt1 > cnt2;
@@ -21108,7 +21233,8 @@ function renderFieldItem(field) {
     const templateLabels = {
         tiangan: '天干', dizhi: '地支', wuxing: '五行',
         shishen: '十神(阴阳)', shishen_group: '十神(不区分)',
-        count: '数量', gender: '性别', age: '年龄',
+        count: '数量', count_compare_wuxing: '数量对比-五行', count_compare_shishen: '数量对比-十神',
+        gender: '性别', age: '年龄',
         contain_tiangan: '包含-天干', contain_dizhi: '包含-地支',
         contain_wuxing: '包含-五行', contain_shishen: '包含-十神(阴阳)',
         contain_shishen_group: '包含-十神(不区分)',
@@ -21199,7 +21325,16 @@ function closeCustomFieldEditor() {
 function autoGenerateFieldValue(name, templateType) {
     // 保留中文、字母、数字、下划线、连字符（服务端模式匹配依赖 - 作为分隔符）
     const slug = name.replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fff_-]/g, '');
-    return slug || 'custom_field';
+    const baseValue = slug || 'custom_field';
+    
+    // 根据模板类型添加前缀
+    if (templateType === 'count_compare_wuxing') {
+        return '五行数量对比-' + baseValue;
+    } else if (templateType === 'count_compare_shishen') {
+        return '十神数量对比-' + baseValue;
+    }
+    
+    return baseValue;
 }
 
 // 绑定保存自定义字段按钮
@@ -21227,6 +21362,10 @@ function initFieldEditorEvents() {
         if (hint) {
             if (this.value === 'count') {
                 hint.innerHTML = '提示：名称中使用连字符指定统计目标，如"大运十神数量-<strong>比肩</strong>"表示统计大运+原局中的比肩数量';
+            } else if (this.value === 'count_compare_wuxing') {
+                hint.innerHTML = '提示：名称为对比的五行名称，如"木"表示比较木与另一个五行的数量';
+            } else if (this.value === 'count_compare_shishen') {
+                hint.innerHTML = '提示：名称为对比的十神名称，如"比肩"表示比较比肩与另一个十神的数量';
             } else {
                 hint.textContent = '由系统自动生成，基于名称转换';
             }
@@ -25677,6 +25816,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="shishen">十神判断（区分阴阳）</option>
                     <option value="shishen_group">十神判断（不区分阴阳）</option>
                     <option value="count">数量判断</option>
+                    <option value="count_compare_wuxing">数量对比-五行</option>
+                    <option value="count_compare_shishen">数量对比-十神</option>
                     <option value="gender">性别判断</option>
                     <option value="age">年龄判断</option>
                     <option value="contain_tiangan">包含匹配-天干</option>
