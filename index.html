@@ -8567,6 +8567,20 @@
         return template.content.cloneNode(true).querySelector('.condition-item');
     }
     
+    // 同步自定义字段选择器的显示文本
+    function syncFieldSelectDisplay(item, fieldValue) {
+        const wrapper = item.querySelector('.condition-field-wrapper');
+        if (!wrapper) return;
+        const hiddenSelect = wrapper.querySelector('.condition-field');
+        const textSpan = wrapper.querySelector('.custom-field-text');
+        hiddenSelect.value = fieldValue;
+        const selectedOpt = hiddenSelect.options[hiddenSelect.selectedIndex];
+        if (selectedOpt && selectedOpt.text && selectedOpt.text !== '选择字段') {
+            textSpan.textContent = selectedOpt.text;
+            textSpan.classList.add('selected');
+        }
+    }
+    
     // 递归渲染条件组到DOM
     function renderConditionGroup(groupData, container) {
         if (!groupData.children || groupData.children.length === 0) return;
@@ -8619,8 +8633,8 @@
                 
                 bindItemEvents(item);
                 
-                // 设置字段值（在 initCustomFieldSelect 之后，确保自定义选项已添加）
-                fieldSel.value = child.field || '';
+                // 设置字段值并同步显示（在 initCustomFieldSelect 之后，确保自定义选项已添加）
+                syncFieldSelectDisplay(item, child.field || '');
                 
                 // 触发onchange初始化值控件（这会重置opSel的选项）
                 if (fieldSel.onchange) {
@@ -10104,8 +10118,8 @@
                             
                             bindItemEvents(item);
                             
-                            // 设置字段值（在 initCustomFieldSelect 之后，确保自定义选项已添加）
-                            fieldSel.value = c.field || '';
+                            // 设置字段值并同步显示（在 initCustomFieldSelect 之后，确保自定义选项已添加）
+                            syncFieldSelectDisplay(item, c.field || '');
                             
                             // 触发onchange初始化值控件
                             if (fieldSel.onchange) {
@@ -10216,8 +10230,8 @@
                             
                             bindItemEvents(item);
                             
-                            // 设置字段值（在 initCustomFieldSelect 之后，确保自定义选项已添加）
-                            fieldSel.value = c.field || '';
+                            // 设置字段值并同步显示（在 initCustomFieldSelect 之后，确保自定义选项已添加）
+                            syncFieldSelectDisplay(item, c.field || '');
                             
                             // 触发onchange初始化值控件
                             if (fieldSel.onchange) {
