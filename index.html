@@ -9489,6 +9489,19 @@
                 }
             };
         });
+        
+        // 监听字段配置更新事件，重新渲染值下拉列表
+        document.addEventListener('field-config-updated', function() {
+            const conditionItems = DOM.ruleConditions.querySelectorAll('.condition-item');
+            conditionItems.forEach((item) => {
+                const fieldSel = item.querySelector('.condition-field');
+                if (fieldSel && fieldSel.value) {
+                    // 触发字段选择变化，重新生成值下拉列表
+                    const evt = new Event('change', { bubbles: true });
+                    fieldSel.dispatchEvent(evt);
+                }
+            });
+        });
     }
 
     // 重置规则
@@ -21450,6 +21463,8 @@ function initFieldEditorEvents() {
             
             // 重新加载字段配置和分组显隐
             await Promise.all([loadFieldConfigs(), loadFieldGroupConfigs()]);
+            // 触发字段配置更新事件，通知条件编辑器刷新值下拉列表
+            document.dispatchEvent(new CustomEvent('field-config-updated'));
             closeCustomFieldEditor();
             renderFieldList();
         } catch (e) {
