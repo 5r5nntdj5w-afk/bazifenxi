@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8064,8 +8064,16 @@
         }
       }
 
-      // 合并原局 + 大运 + 流年断语
-      var allDuanyu = (apiCache.base || []).concat(dayunDuanyu).concat(liunianDuanyu);
+      // 检查当前是否选中了大运或流月
+      var hasDayun = !!dayunGanZhi;
+      var hasLiuyue = !!document.querySelector('.tiangan[data-type="liuyue"]')?.value;
+      
+      // 合并断语：如果选中了大运或流月，则不显示原局断语（原局断语仅在仅八字模式下显示）
+      var allDuanyu = [];
+      if (!hasDayun && !hasLiuyue) {
+        allDuanyu = allDuanyu.concat(apiCache.base || []);
+      }
+      allDuanyu = allDuanyu.concat(dayunDuanyu).concat(liunianDuanyu);
 
       // 按 category 分组（与 displayDuanyuResult 兼容的格式）
       var matchedByCategory = {};
