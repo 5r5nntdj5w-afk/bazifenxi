@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -21372,14 +21372,9 @@ function closeCustomFieldEditor() {
 
 // 自动生成字段值
 function autoGenerateFieldValue(name, templateType) {
-    // 保留中文、字母、数字、下划线、连字符（服务端模式匹配依赖 - 作为分隔符）
-    const slug = name.replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fff_-]/g, '');
+    // 保留中文、字母、数字、下划线、连字符、加号（服务端模式匹配依赖 - 作为分隔符，+ 用于范围连接）
+    const slug = name.replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fff_+-]/g, '');
     const baseValue = slug || 'custom_field';
-    
-    // 数量对比模板不添加前缀，使用用户输入的名称
-    if (templateType === 'count_compare_wuxing' || templateType === 'count_compare_shishen') {
-        return baseValue;
-    }
     
     return baseValue;
 }

@@ -314,6 +314,44 @@ function evaluateLeafCondition(data, cond) {
     }
   }
 
+  // ---- 五行数量对比（field 和 val 都是五行数量字段） ----
+  else if (field.indexOf('五行数量-') >= 0 && val && val.indexOf('五行数量-') >= 0) {
+    function _countWuxingByScope(fieldName) {
+      var fName = fieldName.substring(fieldName.lastIndexOf('-') + 1);
+      var fHasDayun = fieldName.indexOf('大运') >= 0;
+      var fHasLiunian = fieldName.indexOf('流年') >= 0;
+      var fHasYuanJu = fieldName.indexOf('原局') >= 0;
+      var fCnt = 0;
+      if (fHasYuanJu || (!fHasDayun && !fHasLiunian)) {
+        if (data.nian && data.nian.t && WU_XING[data.nian.t] === fName) fCnt++;
+        if (data.yue && data.yue.t && WU_XING[data.yue.t] === fName) fCnt++;
+        if (data.ri && data.ri.t && WU_XING[data.ri.t] === fName) fCnt++;
+        if (data.shi && data.shi.t && WU_XING[data.shi.t] === fName) fCnt++;
+        if (data.nian && data.nian.d && WU_XING[data.nian.d] === fName) fCnt++;
+        if (data.yue && data.yue.d && WU_XING[data.yue.d] === fName) fCnt++;
+        if (data.ri && data.ri.d && WU_XING[data.ri.d] === fName) fCnt++;
+        if (data.shi && data.shi.d && WU_XING[data.shi.d] === fName) fCnt++;
+      }
+      if (fHasDayun) {
+        if (data.dayun && data.dayun.t && WU_XING[data.dayun.t] === fName) fCnt++;
+        if (data.dayun && data.dayun.d && WU_XING[data.dayun.d] === fName) fCnt++;
+      }
+      if (fHasLiunian) {
+        if (data.liunian && data.liunian.t && WU_XING[data.liunian.t] === fName) fCnt++;
+        if (data.liunian && data.liunian.d && WU_XING[data.liunian.d] === fName) fCnt++;
+      }
+      return fCnt;
+    }
+    var _cntC = _countWuxingByScope(field);
+    var _cntD = _countWuxingByScope(val);
+    if (op === 'eq') res = _cntC == _cntD;
+    else if (op === 'ge') res = _cntC >= _cntD;
+    else if (op === 'gt') res = _cntC > _cntD;
+    else if (op === 'le') res = _cntC <= _cntD;
+    else if (op === 'lt') res = _cntC < _cntD;
+    actual = field + '=' + _cntC + ', ' + val + '=' + _cntD;
+  }
+
   // ---- 五行数量（统一处理所有前缀变体） ----
   else if (field.indexOf('五行数量-') >= 0) {
     var name = field.substring(field.lastIndexOf('-') + 1);
@@ -352,6 +390,54 @@ function evaluateLeafCondition(data, cond) {
     else if (op === 'le') res = cnt <= Number(val);
     else if (op === 'lt') res = cnt < Number(val);
     actual = String(cnt);
+  }
+
+  // ---- 十神数量对比（field 和 val 都是十神数量字段） ----
+  else if (field.indexOf('十神数量-') >= 0 && val && val.indexOf('十神数量-') >= 0) {
+    function _countShishenByScope(fieldName) {
+      var fName = fieldName.substring(fieldName.lastIndexOf('-') + 1);
+      var fHasDayun = fieldName.indexOf('大运') >= 0;
+      var fHasLiunian = fieldName.indexOf('流年') >= 0;
+      var fHasYuanJu = fieldName.indexOf('原局') >= 0;
+      var fOnlyTiangan = fieldName.indexOf('天干') >= 0;
+      var fOnlyDizhi = fieldName.indexOf('地支') >= 0;
+      var fIsGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(fName) >= 0;
+      var fCnt = 0;
+      if (data.ri && data.ri.t) {
+        var fRg = data.ri.t;
+        if (fHasYuanJu || (!fHasDayun && !fHasLiunian)) {
+          if (!fOnlyDizhi) {
+            if (data.nian && data.nian.t) { var s = getExactShen(data.nian.t, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+            if (data.yue && data.yue.t) { var s = getExactShen(data.yue.t, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+            if (data.ri && data.ri.t) { var s = getExactShen(data.ri.t, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+            if (data.shi && data.shi.t) { var s = getExactShen(data.shi.t, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+          }
+          if (!fOnlyTiangan) {
+            if (data.nian && data.nian.d) { var s = getDiShen(data.nian.d, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+            if (data.yue && data.yue.d) { var s = getDiShen(data.yue.d, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+            if (data.ri && data.ri.d) { var s = getDiShen(data.ri.d, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+            if (data.shi && data.shi.d) { var s = getDiShen(data.shi.d, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+          }
+        }
+        if (fHasDayun) {
+          if (!fOnlyDizhi && data.dayun && data.dayun.t) { var s = getExactShen(data.dayun.t, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+          if (!fOnlyTiangan && data.dayun && data.dayun.d) { var s = getDiShen(data.dayun.d, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+        }
+        if (fHasLiunian) {
+          if (!fOnlyDizhi && data.liunian && data.liunian.t) { var s = getExactShen(data.liunian.t, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+          if (!fOnlyTiangan && data.liunian && data.liunian.d) { var s = getDiShen(data.liunian.d, fRg); if (fIsGroup ? (SHEN_TO_GROUP[s] === fName) : (s === fName)) fCnt++; }
+        }
+      }
+      return fCnt;
+    }
+    var _cntA = _countShishenByScope(field);
+    var _cntB = _countShishenByScope(val);
+    if (op === 'eq') res = _cntA == _cntB;
+    else if (op === 'ge') res = _cntA >= _cntB;
+    else if (op === 'gt') res = _cntA > _cntB;
+    else if (op === 'le') res = _cntA <= _cntB;
+    else if (op === 'lt') res = _cntA < _cntB;
+    actual = field + '=' + _cntA + ', ' + val + '=' + _cntB;
   }
 
   // ---- 十神数量（统一处理所有前缀变体） ----
