@@ -9079,46 +9079,6 @@
                 const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
                 allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
             }
-            else if(field.includes('数量')){
-                opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
-                valSel.classList.remove('hidden');
-                valSel.innerHTML = '<option value="">请选择数量</option>';
-                for(let n = 0; n <= 12; n++){
-                    valSel.innerHTML += `<option value="${n}">${n}</option>`;
-                }
-            }
-            else if(field.startsWith('包含-')){
-                opSel.innerHTML = '<option value="in">包含</option><option value="nin">不包含</option>';
-                valCheckbox.classList.remove('hidden');
-                const fieldType = field.replace('包含-', '');
-                
-                if(['八字天干五行','八字地支五行','八字大运天干五行','八字大运地支五行','八字大运流年天干五行','八字大运流年地支五行','八字大运流年流月天干五行','八字大运流年流月地支五行'].includes(fieldType)){
-                    WU_LIST.forEach(w => {
-                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${w}">${w}</label>`;
-                    });
-                }
-                else if(['八字天干十神','八字地支十神','八字大运天干十神','八字大运地支十神','八字大运流年天干十神','八字大运流年地支十神','八字大运流年流月天干十神','八字大运流年流月地支十神'].includes(fieldType)){
-                    FULL_SHEN.forEach(s => {
-                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${s}">${s}</label>`;
-                    });
-                }
-                else if(['八字天干十神组','八字地支十神组','八字大运天干十神组','八字大运地支十神组','八字大运流年天干十神组','八字大运流年地支十神组','八字大运流年流月天干十神组','八字大运流年流月地支十神组'].includes(fieldType)){
-                    GROUPED_SHEN.forEach(s => {
-                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${s}">${s}</label>`;
-                    });
-                }
-                else if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(fieldType)){
-                    TIANGAN.forEach(g => {
-                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${g}">${g}</label>`;
-                    });
-                }
-                else if(['年支','月支','日支','时支','大运支','流年支','流月支'].includes(fieldType)){
-                    DIZHI.forEach(d => {
-                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${d}">${d}</label>`;
-                    });
-                }
-            }
-            // 如果以上所有模式都不匹配，则从 field_config 查找 template_type
             else if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) {
                 const config = _fieldConfigCache.find(f => f.field_value === field);
                 if (config && config.template_type) {
@@ -9195,7 +9155,48 @@
                         } else if (subType === 'shishen_group') {
                             GROUPED_SHEN.forEach(s => { valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${s}">${s}</label>`; });
                         }
+                    } else {
+                        // 没有匹配到具体模板类型，继续往下走
                     }
+                }
+            }
+            else if(field.includes('数量')){
+                opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                valSel.classList.remove('hidden');
+                valSel.innerHTML = '<option value="">请选择数量</option>';
+                for(let n = 0; n <= 12; n++){
+                    valSel.innerHTML += `<option value="${n}">${n}</option>`;
+                }
+            }
+            else if(field.startsWith('包含-')){
+                opSel.innerHTML = '<option value="in">包含</option><option value="nin">不包含</option>';
+                valCheckbox.classList.remove('hidden');
+                const fieldType = field.replace('包含-', '');
+                
+                if(['八字天干五行','八字地支五行','八字大运天干五行','八字大运地支五行','八字大运流年天干五行','八字大运流年地支五行','八字大运流年流月天干五行','八字大运流年流月地支五行'].includes(fieldType)){
+                    WU_LIST.forEach(w => {
+                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${w}">${w}</label>`;
+                    });
+                }
+                else if(['八字天干十神','八字地支十神','八字大运天干十神','八字大运地支十神','八字大运流年天干十神','八字大运流年地支十神','八字大运流年流月天干十神','八字大运流年流月地支十神'].includes(fieldType)){
+                    FULL_SHEN.forEach(s => {
+                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${s}">${s}</label>`;
+                    });
+                }
+                else if(['八字天干十神组','八字地支十神组','八字大运天干十神组','八字大运地支十神组','八字大运流年天干十神组','八字大运流年地支十神组','八字大运流年流月天干十神组','八字大运流年流月地支十神组'].includes(fieldType)){
+                    GROUPED_SHEN.forEach(s => {
+                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${s}">${s}</label>`;
+                    });
+                }
+                else if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(fieldType)){
+                    TIANGAN.forEach(g => {
+                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${g}">${g}</label>`;
+                    });
+                }
+                else if(['年支','月支','日支','时支','大运支','流年支','流月支'].includes(fieldType)){
+                    DIZHI.forEach(d => {
+                        valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${d}">${d}</label>`;
+                    });
                 }
             }
         };
