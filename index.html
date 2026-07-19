@@ -3951,7 +3951,24 @@
         statsCache: null,
         verifications: JSON.parse(localStorage.getItem(VERIFICATION_KEY) || '[]'),
         categoryAgeConfig: JSON.parse(localStorage.getItem(AGE_CONFIG_KEY) || '{}'),
-        conditionMacros: JSON.parse(localStorage.getItem(MACRO_KEY) || '[]'),
+        conditionMacros: (function() {
+            const macros = JSON.parse(localStorage.getItem(MACRO_KEY) || '[]');
+            // 宏数据迁移：从 idMapping 中补全 cloudId
+            const _idMapping = (function() { try { return JSON.parse(localStorage.getItem('bazi_id_mapping') || '{}'); } catch(e) { return {}; } })();
+            if (_idMapping && _idMapping.macros) {
+                let _changed = false;
+                macros.forEach(m => {
+                    if (!m.cloudId && _idMapping.macros[m.id]) {
+                        m.cloudId = _idMapping.macros[m.id];
+                        _changed = true;
+                    }
+                });
+                if (_changed) {
+                    localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+                }
+            }
+            return macros;
+        })(),
         statsOffset: {
             比劫: {tian: 0, di: 0},
             食伤: {tian: 0, di: 0},
