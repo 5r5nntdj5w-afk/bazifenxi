@@ -3648,7 +3648,8 @@
           currentLiunian: currentLiunian || null,
           currentLiuyue: currentLiuyue || null,
           currentUserId: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null,
-          isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false
+          isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false,
+          macroIdMapping: (function() { try { return (getIdMapping() || {}).macros || {}; } catch(e) { return {}; } })()
         }));
       });
     }
@@ -12470,9 +12471,12 @@
                         // 尝试解析 macroRef
                         const macro = getMacroById(c.macroRef);
                         if (macro) {
-                            // 宏找到了，检查是否该用 cloudId
-                            if (macro.cloudId && String(macro.cloudId) !== refIdStr) {
-                                c.macroRef = macro.cloudId; // 替换为 cloudId
+                            // 宏找到了，优先从 idMapping 获取 cloudId
+                            const idMapping = getIdMapping();
+                            const cloudIdFromMap = idMapping?.macros?.[macro.id];
+                            const effectiveCloudId = cloudIdFromMap || macro.cloudId;
+                            if (effectiveCloudId && String(effectiveCloudId) !== refIdStr) {
+                                c.macroRef = String(effectiveCloudId); // 替换为 cloudId
                                 changed = true;
                             }
                             // 确保 macroName 字段存在
@@ -12480,7 +12484,7 @@
                                 c.macroName = macro.name;
                                 changed = true;
                             }
-                            const key = macro.cloudId || macro.id;
+                            const key = effectiveCloudId || macro.id;
                             if (!seenMacros.has(key)) {
                                 seenMacros.set(key, macro);
                             }
@@ -21054,8 +21058,10 @@ async function insertMacroRef(macroId) {
     // 记录宏的使用
     await recordMacroUsage(macroId);
     
-    // 使用 cloudId 存储引用（跨设备共享），没有 cloudId 则用本地 ID
-    const refId = macro.cloudId || macroId;
+    // 使用 cloudId 存储引用（跨设备共享），优先从 idMapping 解析 cloudId
+    const idMapping = getIdMapping();
+    const resolvedCloudId = idMapping?.macros?.[macroId] || idMapping?.macros?.[macro.id];
+    const refId = resolvedCloudId || macro.cloudId || macroId;
     const macroName = macro.name || '';
     
     // 找到目标容器：优先使用 _macroSelectorTarget（可指向规则或宏的条件容器）
