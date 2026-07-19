@@ -8941,6 +8941,38 @@
             valCheckbox.classList.add('hidden');
             valSel.innerHTML = '<option value="">请选择值</option>';
             valCheckbox.innerHTML = '';
+            // 移除可能存在的定位批量容器（避免字段切换后残留）
+            const oldBatchContainer = item.querySelector('.position-batch-container');
+            if(oldBatchContainer && !field.startsWith('定位批量-')){
+                oldBatchContainer.remove();
+            }
+
+            // 定位批量判断字段：优先处理（避免被"十神"/"五行"分支捕获）
+            if(field.startsWith('定位批量-')){
+                opSel.innerHTML = '<option value="eq">等于</option>';
+                opSel.value = 'eq';
+                opSel.classList.add('hidden');
+                valSel.classList.add('hidden');
+                valInput.classList.add('hidden');
+                valCheckbox.classList.add('hidden');
+                // 显示批量设置按钮和摘要
+                let batchContainer = item.querySelector('.position-batch-container');
+                if(!batchContainer){
+                    batchContainer = document.createElement('div');
+                    batchContainer.className = 'position-batch-container flex items-center gap-2';
+                    batchContainer.innerHTML = `
+                        <button type="button" class="position-batch-btn px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded text-sm hover:bg-purple-200">⚙ 批量定位设置</button>
+                        <span class="position-batch-summary text-sm text-gray-600"></span>
+                    `;
+                    valCheckbox.parentNode.appendChild(batchContainer);
+                    batchContainer.querySelector('.position-batch-btn').onclick = () => {
+                        openPositionBatchEditor(item, field);
+                    };
+                }
+                valSel.value = '';
+                valInput.value = '';
+                return; // 提前返回，不执行后续判断
+            }
 
             if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(field)){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
@@ -9130,35 +9162,8 @@
                     }
                 }
             }
-            // 定位批量判断字段：显示按钮 + 摘要
-            else if(field.startsWith('定位批量-')){
-                opSel.innerHTML = '<option value="eq">等于</option>';
-                opSel.value = 'eq';
-                opSel.classList.add('hidden');
-                valSel.classList.add('hidden');
-                valInput.classList.add('hidden');
-                valCheckbox.classList.add('hidden');
-                // 显示批量设置按钮和摘要
-                let batchContainer = item.querySelector('.position-batch-container');
-                if(!batchContainer){
-                    batchContainer = document.createElement('div');
-                    batchContainer.className = 'position-batch-container flex items-center gap-2';
-                    batchContainer.innerHTML = `
-                        <button type="button" class="position-batch-btn px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded text-sm hover:bg-purple-200">⚙ 批量定位设置</button>
-                        <span class="position-batch-summary text-sm text-gray-600"></span>
-                    `;
-                    // 插入到 valCheckbox 之后
-                    valCheckbox.parentNode.appendChild(batchContainer);
-                    batchContainer.querySelector('.position-batch-btn').onclick = () => {
-                        openPositionBatchEditor(item, field);
-                    };
-                }
-                // 清空已有值
-                valSel.value = '';
-                valInput.value = '';
-            }
         };
-        
+
         // 删除条件按钮
         const delBtn = item.querySelector('.del-condition');
         delBtn.onclick = () => {
@@ -9490,6 +9495,37 @@
                 valCheckbox.classList.add('hidden');
                 valSel.innerHTML = '<option value="">请选择值</option>';
                 valCheckbox.innerHTML = '';
+                // 移除可能存在的定位批量容器（避免字段切换后残留）
+                const oldBatchContainer = item.querySelector('.position-batch-container');
+                if(oldBatchContainer && !field.startsWith('定位批量-')){
+                    oldBatchContainer.remove();
+                }
+
+                // 定位批量判断字段：优先处理（避免被"十神"/"五行"分支捕获）
+                if(field.startsWith('定位批量-')){
+                    opSel.innerHTML = '<option value="eq">等于</option>';
+                    opSel.value = 'eq';
+                    opSel.classList.add('hidden');
+                    valSel.classList.add('hidden');
+                    valInput.classList.add('hidden');
+                    valCheckbox.classList.add('hidden');
+                    let batchContainer = item.querySelector('.position-batch-container');
+                    if(!batchContainer){
+                        batchContainer = document.createElement('div');
+                        batchContainer.className = 'position-batch-container flex items-center gap-2';
+                        batchContainer.innerHTML = `
+                            <button type="button" class="position-batch-btn px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded text-sm hover:bg-purple-200">⚙ 批量定位设置</button>
+                            <span class="position-batch-summary text-sm text-gray-600"></span>
+                        `;
+                        valCheckbox.parentNode.appendChild(batchContainer);
+                        batchContainer.querySelector('.position-batch-btn').onclick = () => {
+                            openPositionBatchEditor(item, field);
+                        };
+                    }
+                    valSel.value = '';
+                    valInput.value = '';
+                    return;
+                }
 
                 if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(field)){
                     opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
@@ -9601,30 +9637,6 @@
                             valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${d}">${d}</label>`;
                         });
                     }
-                }
-                // 定位批量判断字段：显示按钮 + 摘要
-                else if(field.startsWith('定位批量-')){
-                    opSel.innerHTML = '<option value="eq">等于</option>';
-                    opSel.value = 'eq';
-                    opSel.classList.add('hidden');
-                    valSel.classList.add('hidden');
-                    valInput.classList.add('hidden');
-                    valCheckbox.classList.add('hidden');
-                    let batchContainer = item.querySelector('.position-batch-container');
-                    if(!batchContainer){
-                        batchContainer = document.createElement('div');
-                        batchContainer.className = 'position-batch-container flex items-center gap-2';
-                        batchContainer.innerHTML = `
-                            <button type="button" class="position-batch-btn px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded text-sm hover:bg-purple-200">⚙ 批量定位设置</button>
-                            <span class="position-batch-summary text-sm text-gray-600"></span>
-                        `;
-                        valCheckbox.parentNode.appendChild(batchContainer);
-                        batchContainer.querySelector('.position-batch-btn').onclick = () => {
-                            openPositionBatchEditor(item, field);
-                        };
-                    }
-                    valSel.value = '';
-                    valInput.value = '';
                 }
             };
         });
