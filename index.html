@@ -20470,13 +20470,14 @@ function closeBatchTagsModal() {
     _batchRemoveTags.clear();
 }
 
-function applyBatchTags() {
+async function applyBatchTags() {
     if (_batchAddTags.size === 0 && _batchRemoveTags.size === 0) {
         closeBatchTagsModal();
         return;
     }
     
-    _selectedMacroIds.forEach(id => {
+    const idMapping = getIdMapping();
+    _selectedMacroIds.forEach(async id => {
         const macro = getMacroById(id);
         if (!macro) return;
         
@@ -20491,9 +20492,16 @@ function applyBatchTags() {
         });
         
         macro.tags = tags;
+        
+        if (currentUser && supabaseClient && macro.createdBy === getCurrentUserId()) {
+            const cloudId = getCloudId(idMapping, 'macros', macro.id);
+            if (cloudId) {
+                try { await updateSupabaseMacro(cloudId, macro); } catch(e) { console.warn('同步标签失败:', e); }
+            }
+        }
     });
     
-    saveMacros();
+    localStorage.setItem(MACRO_KEY, JSON.stringify(cache.conditionMacros));
     clearMacroSelection();
     closeBatchTagsModal();
     renderMacroList();
@@ -20558,11 +20566,12 @@ function addMacroTag() {
     }
     
     input.value = '';
+    localStorage.setItem(MACRO_KEY, JSON.stringify(cache.conditionMacros));
     renderMacroTagList();
     updateMacroTagFilters();
 }
 
-function renameMacroTag(oldTag) {
+async function renameMacroTag(oldTag) {
     const newTag = prompt(`请输入新标签名称（原标签：${oldTag}）：`);
     if (!newTag || newTag.trim() === '') return;
     
@@ -20576,29 +20585,43 @@ function renameMacroTag(oldTag) {
     }
     
     const macros = cache.conditionMacros || [];
-    macros.forEach(m => {
+    const idMapping = getIdMapping();
+    macros.forEach(async m => {
         if (m.tags && m.tags.includes(oldTag)) {
             m.tags = m.tags.map(t => t === oldTag ? trimmedNewTag : t);
+            if (currentUser && supabaseClient && m.createdBy === getCurrentUserId()) {
+                const cloudId = getCloudId(idMapping, 'macros', m.id);
+                if (cloudId) {
+                    try { await updateSupabaseMacro(cloudId, m); } catch(e) { console.warn('同步标签失败:', e); }
+                }
+            }
         }
     });
     
-    saveMacros();
+    localStorage.setItem(MACRO_KEY, JSON.stringify(cache.conditionMacros));
     renderMacroTagList();
     updateMacroTagFilters();
 }
 
-function deleteMacroTag(tag) {
+async function deleteMacroTag(tag) {
     const count = [...cache.conditionMacros].filter(m => (m.tags || []).includes(tag)).length;
     if (!confirm(`确定要删除标签「${tag}」吗？\n\n该标签被 ${count} 个条件宏使用，删除后这些宏将不再包含该标签。`)) return;
     
     const macros = cache.conditionMacros || [];
-    macros.forEach(m => {
-        if (m.tags) {
+    const idMapping = getIdMapping();
+    macros.forEach(async m => {
+        if (m.tags && m.tags.includes(tag)) {
             m.tags = m.tags.filter(t => t !== tag);
+            if (currentUser && supabaseClient && m.createdBy === getCurrentUserId()) {
+                const cloudId = getCloudId(idMapping, 'macros', m.id);
+                if (cloudId) {
+                    try { await updateSupabaseMacro(cloudId, m); } catch(e) { console.warn('同步标签失败:', e); }
+                }
+            }
         }
     });
     
-    saveMacros();
+    localStorage.setItem(MACRO_KEY, JSON.stringify(cache.conditionMacros));
     renderMacroTagList();
     updateMacroTagFilters();
 }
