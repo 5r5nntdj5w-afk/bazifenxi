@@ -26108,17 +26108,16 @@ document.addEventListener('DOMContentLoaded', function() {
         return posKey;
     }
 
-    // 根据判断类型和位置获取值选项
-    function getValueOptions(judgeType, posKey){
+    function getValueOptions(judgeType, posKey, ganzhi){
         if(judgeType === '五行'){
             return WU_LIST.map(w => `<option value="${w}">${w}</option>`).join('');
         } else if(judgeType === '十神'){
-            if(posKey === '日干'){
+            if(ganzhi === '天干' && posKey === '日干'){
                 return `<option value="比肩">比肩</option>`;
             }
             return FULL_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
         } else if(judgeType === '十神组'){
-            if(posKey === '日干'){
+            if(ganzhi === '天干' && posKey === '日干'){
                 return `<option value="比劫">比劫</option>`;
             }
             return GROUPED_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -26126,8 +26125,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return '';
     }
 
-    // 获取日干的默认值
-    function getDefaultDayValue(judgeType){
+    function getDefaultDayValue(judgeType, ganzhi){
+        if(ganzhi !== '天干') return '';
         if(judgeType === '十神') return '比肩';
         if(judgeType === '十神组') return '比劫';
         return '';
@@ -26146,12 +26145,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if(!cached){
                 cached = { checked: true, op: 'eq', val: '' };
                 if(posKey === '日干'){
-                    cached.val = getDefaultDayValue(judgeType);
+                    cached.val = getDefaultDayValue(judgeType, ganzhi);
                 }
                 // 保存到缓存
                 _positionCache[posKey] = cached;
             }
-            const valueOptions = getValueOptions(judgeType, posKey);
+            const valueOptions = getValueOptions(judgeType, posKey, ganzhi);
             
             const row = document.createElement('div');
             row.className = 'flex items-center gap-2 p-2 border rounded hover:bg-purple-50';
@@ -26197,7 +26196,7 @@ document.addEventListener('DOMContentLoaded', function() {
             select.disabled = true;
         } else if(field === '定位批量-十神'){
             select.innerHTML = '<option value="十神">十神</option><option value="十神组">十神组</option>';
-            select.value = '十神';
+            select.value = '十神组';
             select.disabled = false;
         }
     }
@@ -26212,7 +26211,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 从 item 中读取已有值
         const valSel = item.querySelector('.condition-val-select');
         const existingVal = valSel.value || '';
-        let judgeType = field === '定位批量-五行' ? '五行' : '十神';
+        let judgeType = field === '定位批量-五行' ? '五行' : '十神组';
         let ganzhi = '天干';
         let scope = '原局';
         if(existingVal.startsWith('定位批量|')){
