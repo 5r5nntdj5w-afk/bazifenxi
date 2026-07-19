@@ -20159,9 +20159,12 @@ function renderMacroList() {
         return `
         <div class="border border-indigo-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow ${m.pinned ? 'border-l-4 border-l-indigo-500' : ''}">
             <div class="flex justify-between items-start mb-2">
-                <div class="flex-1 min-w-0">
-                    <span class="font-bold text-indigo-800">${m.pinned ? '📌 ' : ''}🧩 ${escapeHtml(m.name)}</span>
-                    <span class="ml-2 px-1.5 py-0.5 rounded text-xs ${permBg}">${permLabel}</span>
+                <div class="flex items-start gap-2 flex-1 min-w-0">
+                    ${editable && m.createdBy && m.createdBy === getCurrentUserId() ? `<input type="checkbox" class="macro-item-checkbox mt-1" data-macro-id="${m.id}" onchange="toggleMacroSelection('${m.id}', this.checked)">` : ''}
+                    <div>
+                        <span class="font-bold text-indigo-800">${m.pinned ? '📌 ' : ''}🧩 ${escapeHtml(m.name)}</span>
+                        <span class="ml-2 px-1.5 py-0.5 rounded text-xs ${permBg}">${permLabel}</span>
+                    </div>
                 </div>
                 ${editable ? `<div class="flex gap-1 shrink-0 ml-2">
                     ${m.createdBy && m.createdBy === getCurrentUserId() ? 
@@ -20347,7 +20350,260 @@ async function deleteMacroConfirm(macroId) {
     updateMacroTagFilters();
 }
 
-// 条件宏选择器（插入宏到断语条件）
+// ============ 批量操作功能 ============
+let _selectedMacroIds = new Set();
+
+function toggleMacroSelection(macroId, checked) {
+    if (checked) {
+        _selectedMacroIds.add(macroId);
+    } else {
+        _selectedMacroIds.delete(macroId);
+    }
+    updateMacroBatchBar();
+}
+
+function updateMacroBatchBar() {
+    const bar = document.getElementById('macro-batch-bar');
+    const count = document.getElementById('macro-selected-count');
+    if (_selectedMacroIds.size > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = _selectedMacroIds.size;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearMacroSelection() {
+    _selectedMacroIds.clear();
+    document.querySelectorAll('.macro-item-checkbox').forEach(cb => cb.checked = false);
+    updateMacroBatchBar();
+}
+
+function batchCopyMacros() {
+    if (_selectedMacroIds.size === 0) return;
+    let copiedCount = 0;
+    _selectedMacroIds.forEach(id => {
+        const macro = getMacroById(id);
+        if (macro && macro.createdBy === getCurrentUserId()) {
+            copyMacroToMine(id);
+            copiedCount++;
+        }
+    });
+    clearMacroSelection();
+    renderMacroList();
+    if (copiedCount > 0) {
+        alert(`已成功复制 ${copiedCount} 个条件宏！`);
+    } else {
+        alert('没有可复制的条件宏（只能复制自己创建的宏）');
+    }
+}
+
+function batchEditTags() {
+    if (_selectedMacroIds.size === 0) return;
+    renderBatchTagsModal();
+    document.getElementById('macro-batch-tags-modal').classList.remove('hidden');
+}
+
+let _batchAddTags = new Set();
+let _batchRemoveTags = new Set();
+
+function renderBatchTagsModal() {
+    _batchAddTags.clear();
+    _batchRemoveTags.clear();
+    
+    const allTags = getAllMacroTags();
+    const addContainer = document.getElementById('macro-batch-add-tags');
+    const removeContainer = document.getElementById('macro-batch-remove-tags');
+    
+    addContainer.innerHTML = '';
+    removeContainer.innerHTML = '';
+    
+    allTags.forEach(tag => {
+        const isSelected = [..._selectedMacroIds].every(id => {
+            const m = getMacroById(id);
+            return m && (m.tags || []).includes(tag);
+        });
+        
+        const addBtn = document.createElement('button');
+        addBtn.className = 'px-2 py-1 border rounded text-xs hover:bg-purple-100';
+        addBtn.textContent = tag;
+        addBtn.onclick = () => toggleBatchAddTag(tag, addBtn);
+        addContainer.appendChild(addBtn);
+        
+        if (isSelected) {
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'px-2 py-1 border rounded text-xs hover:bg-red-100';
+            removeBtn.textContent = tag;
+            removeBtn.onclick = () => toggleBatchRemoveTag(tag, removeBtn);
+            removeContainer.appendChild(removeBtn);
+        }
+    });
+    
+    if (allTags.length === 0) {
+        addContainer.innerHTML = '<span class="text-xs text-gray-400">暂无标签</span>';
+    }
+}
+
+function toggleBatchAddTag(tag, btn) {
+    if (_batchAddTags.has(tag)) {
+        _batchAddTags.delete(tag);
+        btn.classList.remove('bg-purple-600', 'text-white');
+    } else {
+        _batchAddTags.add(tag);
+        btn.classList.add('bg-purple-600', 'text-white');
+    }
+}
+
+function toggleBatchRemoveTag(tag, btn) {
+    if (_batchRemoveTags.has(tag)) {
+        _batchRemoveTags.delete(tag);
+        btn.classList.remove('bg-red-600', 'text-white');
+    } else {
+        _batchRemoveTags.add(tag);
+        btn.classList.add('bg-red-600', 'text-white');
+    }
+}
+
+function closeBatchTagsModal() {
+    document.getElementById('macro-batch-tags-modal').classList.add('hidden');
+    _batchAddTags.clear();
+    _batchRemoveTags.clear();
+}
+
+function applyBatchTags() {
+    if (_batchAddTags.size === 0 && _batchRemoveTags.size === 0) {
+        closeBatchTagsModal();
+        return;
+    }
+    
+    _selectedMacroIds.forEach(id => {
+        const macro = getMacroById(id);
+        if (!macro) return;
+        
+        let tags = [...(macro.tags || [])];
+        
+        _batchAddTags.forEach(tag => {
+            if (!tags.includes(tag)) tags.push(tag);
+        });
+        
+        _batchRemoveTags.forEach(tag => {
+            tags = tags.filter(t => t !== tag);
+        });
+        
+        macro.tags = tags;
+    });
+    
+    saveMacros();
+    clearMacroSelection();
+    closeBatchTagsModal();
+    renderMacroList();
+    updateMacroTagFilters();
+    alert('标签批量调整完成！');
+}
+
+// ============ 标签管理功能 ============
+function openMacroTagManager() {
+    renderMacroTagList();
+    document.getElementById('macro-tag-manager-modal').classList.remove('hidden');
+}
+
+function closeMacroTagManager() {
+    document.getElementById('macro-tag-manager-modal').classList.add('hidden');
+}
+
+function getAllMacroTags() {
+    const tags = new Set();
+    const macros = cache.conditionMacros || [];
+    macros.forEach(m => {
+        (m.tags || []).forEach(t => tags.add(t));
+    });
+    return [...tags].sort();
+}
+
+function renderMacroTagList() {
+    const container = document.getElementById('macro-all-tags-list');
+    const tags = getAllMacroTags();
+    
+    if (tags.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">暂无标签</p>';
+        return;
+    }
+    
+    container.innerHTML = tags.map(tag => {
+        const count = [...cache.conditionMacros].filter(m => (m.tags || []).includes(tag)).length;
+        return `
+            <div class="flex justify-between items-center p-2 border rounded hover:bg-gray-50">
+                <div class="flex items-center gap-2">
+                    <span class="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-xs">${escapeHtml(tag)}</span>
+                    <span class="text-xs text-gray-500">(${count} 个宏)</span>
+                </div>
+                <div class="flex gap-1">
+                    <button onclick="renameMacroTag('${tag}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">✏️ 重命名</button>
+                    <button onclick="deleteMacroTag('${tag}')" class="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600">🗑️ 删除</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function addMacroTag() {
+    const input = document.getElementById('macro-new-tag-input');
+    const tag = input.value.trim();
+    if (!tag) return;
+    
+    const existingTags = getAllMacroTags();
+    if (existingTags.includes(tag)) {
+        alert('标签已存在！');
+        return;
+    }
+    
+    input.value = '';
+    renderMacroTagList();
+    updateMacroTagFilters();
+}
+
+function renameMacroTag(oldTag) {
+    const newTag = prompt(`请输入新标签名称（原标签：${oldTag}）：`);
+    if (!newTag || newTag.trim() === '') return;
+    
+    const trimmedNewTag = newTag.trim();
+    if (trimmedNewTag === oldTag) return;
+    
+    const existingTags = getAllMacroTags();
+    if (existingTags.includes(trimmedNewTag)) {
+        alert('新标签名称已存在！');
+        return;
+    }
+    
+    const macros = cache.conditionMacros || [];
+    macros.forEach(m => {
+        if (m.tags && m.tags.includes(oldTag)) {
+            m.tags = m.tags.map(t => t === oldTag ? trimmedNewTag : t);
+        }
+    });
+    
+    saveMacros();
+    renderMacroTagList();
+    updateMacroTagFilters();
+}
+
+function deleteMacroTag(tag) {
+    const count = [...cache.conditionMacros].filter(m => (m.tags || []).includes(tag)).length;
+    if (!confirm(`确定要删除标签「${tag}」吗？\n\n该标签被 ${count} 个条件宏使用，删除后这些宏将不再包含该标签。`)) return;
+    
+    const macros = cache.conditionMacros || [];
+    macros.forEach(m => {
+        if (m.tags) {
+            m.tags = m.tags.filter(t => t !== tag);
+        }
+    });
+    
+    saveMacros();
+    renderMacroTagList();
+    updateMacroTagFilters();
+}
+
+// ============ 条件宏选择器（插入宏到断语条件）
 // 存储宏选择器的目标容器和编辑中的宏ID（用于循环引用检测）
 let _macroSelectorTarget = null;
 let _macroSelectorEditingId = null;
@@ -25796,7 +26052,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <button onclick="closeMacroManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
         </div>
         <div class="p-4 flex-1 overflow-y-auto">
-            <!-- 搜索/筛选/排序栏 -->
             <div class="flex flex-wrap gap-2 mb-4 items-center">
                 <input type="text" id="macro-search-input" class="flex-1 min-w-[160px] p-2 border rounded text-sm" placeholder="搜索宏名称、描述、条件...">
                 <select id="macro-tag-filter" class="p-2 border rounded text-sm min-w-[100px]">
@@ -25808,10 +26063,70 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="freq">使用频率</option>
                 </select>
                 <button onclick="openMacroEditor()" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm shrink-0">➕ 新建条件宏</button>
+                <button onclick="openMacroTagManager()" class="px-3 py-2 bg-purple-600 text-white rounded text-sm shrink-0">🏷️ 标签管理</button>
+            </div>
+            <div id="macro-batch-bar" class="hidden flex flex-wrap gap-2 mb-4 items-center p-3 bg-indigo-50 border border-indigo-200 rounded">
+                <span class="text-sm text-indigo-700">已选择 <span id="macro-selected-count" class="font-bold">0</span> 个条件宏</span>
+                <button onclick="batchCopyMacros()" class="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs">📋 批量复制</button>
+                <button onclick="batchEditTags()" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs">🏷️ 批量调整标签</button>
+                <button onclick="clearMacroSelection()" class="px-3 py-1.5 bg-gray-400 text-white rounded text-xs">✖️ 取消选择</button>
             </div>
             <div id="macro-list" class="space-y-3">
                 <p class="text-gray-500 text-center py-8">暂无条件宏，点击上方按钮创建</p>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- 条件宏标签管理弹窗 -->
+<div id="macro-tag-manager-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[500px] max-h-[70vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-lg font-bold text-indigo-800">🏷️ 条件宏标签管理</h3>
+            <button onclick="closeMacroTagManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto">
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-2">所有标签</label>
+                <div id="macro-all-tags-list" class="space-y-2"></div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">新建标签</label>
+                <div class="flex gap-2">
+                    <input type="text" id="macro-new-tag-input" class="flex-1 p-2 border rounded text-sm" placeholder="输入新标签名称...">
+                    <button onclick="addMacroTag()" class="px-3 py-2 bg-purple-600 text-white rounded text-sm">添加</button>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 border-t shrink-0">
+            <button onclick="closeMacroTagManager()" class="px-4 py-2 bg-gray-300 rounded">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 批量调整标签弹窗 -->
+<div id="macro-batch-tags-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[500px] max-h-[70vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-lg font-bold text-indigo-800">🏷️ 批量调整标签</h3>
+            <button onclick="closeBatchTagsModal()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto">
+            <div class="mb-2">
+                <span class="text-sm text-gray-600">为已选择的条件宏批量添加或移除标签</span>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">添加标签</label>
+                <div id="macro-batch-add-tags" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">移除标签</label>
+                <div id="macro-batch-remove-tags" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+        <div class="p-4 border-t shrink-0 flex gap-2 justify-end">
+            <button onclick="closeBatchTagsModal()" class="px-4 py-2 bg-gray-300 rounded">取消</button>
+            <button onclick="applyBatchTags()" class="px-4 py-2 bg-indigo-600 text-white rounded">应用</button>
         </div>
     </div>
 </div>
