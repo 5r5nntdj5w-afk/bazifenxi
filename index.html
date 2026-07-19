@@ -20599,6 +20599,8 @@ let _dragStartY = 0;
 let _dragBox = null;
 
 function initDragSelection() {
+    if (initDragSelection._done) return;
+    initDragSelection._done = true;
     const container = document.getElementById('macro-list');
     if (!container) return;
     let _dragStarted = false;
@@ -20630,6 +20632,11 @@ function initDragSelection() {
             _dragBox.style.width = '0px';
             _dragBox.style.height = '0px';
             document.body.appendChild(_dragBox);
+        } else if (!_dragBox) {
+            // 安全保护：_dragStarted=true 但 _dragBox 被外部清理了
+            _dragSelecting = false;
+            _dragStarted = false;
+            return;
         }
         
         const rect = document.getElementById('macro-manager-modal').getBoundingClientRect();
@@ -20642,10 +20649,20 @@ function initDragSelection() {
         _dragBox.style.height = Math.abs(y - _dragStartY) + 'px';
     });
     
+    // 核心清理函数：移除选框并重置状态
+    function cleanupDragSelection() {
+        _dragSelecting = false;
+        _dragStarted = false;
+        if (_dragBox) {
+            if (_dragBox.parentNode) {
+                try { _dragBox.parentNode.removeChild(_dragBox); } catch(e) {}
+            }
+            _dragBox = null;
+        }
+    }
+    
     document.addEventListener('mouseup', () => {
-        if (!_dragSelecting) return;
-        
-        // 如果已创建选框，执行框选逻辑
+        // 执行框选逻辑（在清理之前）
         if (_dragBox) {
             const boxRect = _dragBox.getBoundingClientRect();
             document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
@@ -20658,14 +20675,12 @@ function initDragSelection() {
                     }
                 }
             });
-            document.body.removeChild(_dragBox);
-            _dragBox = null;
+            updateMacroBatchBar();
         }
-        
-        _dragSelecting = false;
-        _dragStarted = false;
-        updateMacroBatchBar();
+        cleanupDragSelection();
     });
+    // 鼠标离开视口时也清理（防止在浏览器外释放鼠标）
+    document.addEventListener('mouseleave', cleanupDragSelection);
 }
 
 function isOverlapping(rect1, rect2) {
