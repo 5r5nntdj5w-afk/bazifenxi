@@ -206,8 +206,8 @@ function evaluateConditionNode(data, condNode) {
     return false;
   }
 
-  // 叶子节点：包含 op, val, field（优先检查，避免被条件组误判）
-  if (condNode.op && condNode.field !== undefined && !condNode.children) {
+  // 叶子节点：包含 op, val, field
+  if (condNode.op && condNode.field !== undefined) {
     return evaluateLeafCondition(data, condNode);
   }
 
