@@ -20072,6 +20072,7 @@ function openMacroManager() {
     updateMacroTagFilters();
     modal.classList.remove('hidden');
     renderMacroList();
+    initDragSelection();
 }
 
 function closeMacroManager() {
@@ -20160,7 +20161,7 @@ function renderMacroList() {
         <div class="border border-indigo-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow ${m.pinned ? 'border-l-4 border-l-indigo-500' : ''}">
             <div class="flex justify-between items-start mb-2">
                 <div class="flex items-start gap-2 flex-1 min-w-0">
-                    ${editable && m.createdBy && m.createdBy === getCurrentUserId() ? `<input type="checkbox" class="macro-item-checkbox mt-1" data-macro-id="${m.id}" onchange="toggleMacroSelection('${m.id}', this.checked)">` : ''}
+                    ${editable && m.createdBy && m.createdBy === getCurrentUserId() ? `<input type="checkbox" class="macro-item-checkbox mt-1" data-macro-id="${m.id}" onclick="handleMacroCheckboxClick('${m.id}', event)" onchange="toggleMacroSelection('${m.id}', this.checked)">` : ''}
                     <div>
                         <span class="font-bold text-indigo-800">${m.pinned ? '📌 ' : ''}🧩 ${escapeHtml(m.name)}</span>
                         <span class="ml-2 px-1.5 py-0.5 rounded text-xs ${permBg}">${permLabel}</span>
@@ -20376,6 +20377,145 @@ function updateMacroBatchBar() {
 function clearMacroSelection() {
     _selectedMacroIds.clear();
     document.querySelectorAll('.macro-item-checkbox').forEach(cb => cb.checked = false);
+    updateMacroBatchBar();
+}
+
+function selectAllMacros() {
+    _selectedMacroIds.clear();
+    document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
+        cb.checked = true;
+        _selectedMacroIds.add(cb.dataset.macroId);
+    });
+    updateMacroBatchBar();
+}
+
+function toggleAllMacros() {
+    document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
+        cb.checked = !cb.checked;
+        if (cb.checked) {
+            _selectedMacroIds.add(cb.dataset.macroId);
+        } else {
+            _selectedMacroIds.delete(cb.dataset.macroId);
+        }
+    });
+    updateMacroBatchBar();
+}
+
+function selectMacrosByTag(tag) {
+    document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
+        const macro = getMacroById(cb.dataset.macroId);
+        if (macro && (macro.tags || []).includes(tag)) {
+            cb.checked = true;
+            _selectedMacroIds.add(cb.dataset.macroId);
+        }
+    });
+    updateMacroBatchBar();
+}
+
+// ============ 快捷键支持 ============
+let _lastClickedMacroId = null;
+
+function handleMacroCheckboxClick(macroId, event) {
+    const cb = event.target;
+    if (event.shiftKey && _lastClickedMacroId) {
+        const checkboxes = Array.from(document.querySelectorAll('.macro-item-checkbox'));
+        const currentIndex = checkboxes.findIndex(c => c.dataset.macroId === macroId);
+        const lastIndex = checkboxes.findIndex(c => c.dataset.macroId === _lastClickedMacroId);
+        const start = Math.min(currentIndex, lastIndex);
+        const end = Math.max(currentIndex, lastIndex);
+        
+        for (let i = start; i <= end; i++) {
+            checkboxes[i].checked = cb.checked;
+            if (cb.checked) {
+                _selectedMacroIds.add(checkboxes[i].dataset.macroId);
+            } else {
+                _selectedMacroIds.delete(checkboxes[i].dataset.macroId);
+            }
+        }
+    }
+    
+    if (!event.ctrlKey && !event.metaKey) {
+        _lastClickedMacroId = macroId;
+    }
+    
+    toggleMacroSelection(macroId, cb.checked);
+}
+
+// ============ 拖拽框选 ============
+let _dragSelecting = false;
+let _dragStartX = 0;
+let _dragStartY = 0;
+let _dragBox = null;
+
+function initDragSelection() {
+    const container = document.getElementById('macro-list');
+    if (!container) return;
+    
+    container.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.macro-item-checkbox') || e.target.closest('button')) return;
+        _dragSelecting = true;
+        _dragStartX = e.clientX;
+        _dragStartY = e.clientY;
+        
+        _dragBox = document.createElement('div');
+        _dragBox.className = 'fixed border-2 border-blue-500 bg-blue-100 bg-opacity-30 pointer-events-none z-50';
+        _dragBox.style.left = _dragStartX + 'px';
+        _dragBox.style.top = _dragStartY + 'px';
+        _dragBox.style.width = '0px';
+        _dragBox.style.height = '0px';
+        document.body.appendChild(_dragBox);
+        
+        clearMacroSelection();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!_dragSelecting || !_dragBox) return;
+        
+        const rect = document.getElementById('macro-manager-modal').getBoundingClientRect();
+        const x = Math.min(Math.max(e.clientX, rect.left), rect.right);
+        const y = Math.min(Math.max(e.clientY, rect.top), rect.bottom);
+        
+        _dragBox.style.left = Math.min(_dragStartX, x) + 'px';
+        _dragBox.style.top = Math.min(_dragStartY, y) + 'px';
+        _dragBox.style.width = Math.abs(x - _dragStartX) + 'px';
+        _dragBox.style.height = Math.abs(y - _dragStartY) + 'px';
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (!_dragSelecting || !_dragBox) return;
+        
+        const boxRect = _dragBox.getBoundingClientRect();
+        document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
+            const cbRect = cb.getBoundingClientRect();
+            if (isOverlapping(boxRect, cbRect)) {
+                cb.checked = true;
+                _selectedMacroIds.add(cb.dataset.macroId);
+            }
+        });
+        
+        document.body.removeChild(_dragBox);
+        _dragBox = null;
+        _dragSelecting = false;
+        updateMacroBatchBar();
+    });
+}
+
+function isOverlapping(rect1, rect2) {
+    return !(rect1.right < rect2.left || 
+             rect1.left > rect2.right || 
+             rect1.bottom < rect2.top || 
+             rect1.top > rect2.bottom);
+}
+
+// ============ 条件筛选选择 ============
+function selectMacrosByCondition(predicate) {
+    document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
+        const macro = getMacroById(cb.dataset.macroId);
+        if (macro && predicate(macro)) {
+            cb.checked = true;
+            _selectedMacroIds.add(cb.dataset.macroId);
+        }
+    });
     updateMacroBatchBar();
 }
 
@@ -26085,6 +26225,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="recent">最近使用</option>
                     <option value="freq">使用频率</option>
                 </select>
+                <button onclick="selectAllMacros()" class="px-3 py-2 bg-blue-500 text-white rounded text-sm shrink-0">☑️ 全选</button>
+                <button onclick="toggleAllMacros()" class="px-3 py-2 bg-blue-400 text-white rounded text-sm shrink-0">↔️ 反选</button>
                 <button onclick="openMacroEditor()" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm shrink-0">➕ 新建条件宏</button>
                 <button onclick="openMacroTagManager()" class="px-3 py-2 bg-purple-600 text-white rounded text-sm shrink-0">🏷️ 标签管理</button>
             </div>
