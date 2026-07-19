@@ -181,10 +181,23 @@ function evaluateConditionNode(data, condNode) {
     var macroId = String(condNode.macroRef);
     var macros = data && data.macros;
     if (macros && macros.length > 0) {
+      // 先精确匹配 cloudId
       for (var mi = 0; mi < macros.length; mi++) {
         var m = macros[mi];
         if (m && m.conditions && (String(m.id) === macroId || String(m.cloudId) === macroId)) {
           return evaluateConditionNode(data, m.conditions);
+        }
+      }
+      // 未匹配到：尝试通过 idMapping 将本地 ID 转为 cloudId
+      if (data.idMapping && data.idMapping.macros) {
+        var resolvedCloudId = data.idMapping.macros[macroId];
+        if (resolvedCloudId) {
+          for (var mi = 0; mi < macros.length; mi++) {
+            var m = macros[mi];
+            if (m && m.conditions && String(m.id) === String(resolvedCloudId)) {
+              return evaluateConditionNode(data, m.conditions);
+            }
+          }
         }
       }
     }
@@ -1262,7 +1275,7 @@ function filterRulesByAccess(rules, currentUserId, isAdmin) {
 
 // ===================== 主匹配函数 =====================
 
-function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules, birthYear, macros) {
+function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules, birthYear, macros, macroIdMapping) {
   var md = {
     nian: { t: baziData.bazi.nian.gan, d: baziData.bazi.nian.zhi },
     yue:  { t: baziData.bazi.yue.gan, d: baziData.bazi.yue.zhi },
@@ -1271,7 +1284,8 @@ function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules
     dayun: null, liunian: null, liuyue: null, gender: gender,
     birthYear: birthYear || null,
     macros: macros || [],
-    rules: rules || []
+    rules: rules || [],
+    idMapping: macroIdMapping ? { macros: macroIdMapping } : null
   };
   if (dayunItem) md.dayun = { t: dayunItem.gan, d: dayunItem.zhi, ganZhi: dayunItem.ganZhi };
   if (liunianItem) md.liunian = { t: liunianItem.gan, d: liunianItem.zhi, ganZhi: liunianItem.ganZhi };
@@ -1413,7 +1427,7 @@ module.exports = async (req, res) => {
     var currentLiunian = body.currentLiunian || null;
     var currentLiuyue = body.currentLiuyue || null;
     
-    var matched = matchDuanyu(baziData, currentDayun, currentLiunian, currentLiuyue, baziData.gender, rules, birthYear, macros);
+    var matched = matchDuanyu(baziData, currentDayun, currentLiunian, currentLiuyue, baziData.gender, rules, birthYear, macros, body.macroIdMapping || null);
     var result = matched.map(function(r) {
       return {
         duanyu: r.duanyu_text,
