@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9121,6 +9121,7 @@
                         valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
                     });
                 }
+                return;
             }
             else if(field.startsWith('十神数量对比-')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -9136,6 +9137,7 @@
                         valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
                     });
                 }
+                return;
             }
             else if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) {
                 const config = _fieldConfigCache.find(f => f.field_value === field);
@@ -9145,22 +9147,27 @@
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         TIANGAN.forEach(g => { valSel.innerHTML += `<option value="${g}">${g}</option>`; });
+                        return;
                     } else if (tt === 'dizhi') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         DIZHI.forEach(d => { valSel.innerHTML += `<option value="${d}">${d}</option>`; });
+                        return;
                     } else if (tt === 'wuxing') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}</option>`; });
+                        return;
                     } else if (tt === 'shishen') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         FULL_SHEN.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}</option>`; });
+                        return;
                     } else if (tt === 'shishen_group') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         GROUPED_SHEN.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}</option>`; });
+                        return;
                     } else if (tt === 'count') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                         valSel.classList.remove('hidden');
@@ -9168,6 +9175,7 @@
                         for (let n = 0; n <= 12; n++) {
                             valSel.innerHTML += `<option value="${n}">${n}</option>`;
                         }
+                        return;
                     } else if (tt === 'count_compare_wuxing') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                         valSel.classList.remove('hidden');
@@ -9181,6 +9189,7 @@
                                 valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
                             });
                         }
+                        return;
                     } else if (tt === 'count_compare_shishen') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                         valSel.classList.remove('hidden');
@@ -9195,10 +9204,12 @@
                                 valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
                             });
                         }
+                        return;
                     } else if (tt === 'gender') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         valSel.innerHTML = '<option value="">请选择性别</option><option value="男">男</option><option value="女">女</option><option value="不限">不限</option>';
+                        return;
                     } else if (tt === 'age') {
                         opSel.innerHTML = '<option value="gt">大于</option><option value="ge">大于等于</option><option value="lt">小于</option><option value="le">小于等于</option>';
                         valInput.classList.remove('hidden');
@@ -9206,14 +9217,17 @@
                         valInput.min = '0';
                         valInput.max = '150';
                         valInput.placeholder = '输入年龄';
+                        return;
                     } else if (tt === 'exists') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         valSel.innerHTML = '<option value="">请选择</option><option value="是">是</option><option value="否">否</option>';
+                        return;
                     } else if (tt === 'trigger_scope') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
                         valSel.innerHTML = '<option value="">请选择触发范围</option><option value="仅原局">仅原局</option><option value="原局+大运">原局+大运</option><option value="原局+大运+流年">原局+大运+流年</option><option value="原局+大运+流年+流月">原局+大运+流年+流月</option>';
+                        return;
                     } else if (tt.startsWith('contain_')) {
                         opSel.innerHTML = '<option value="in">包含</option><option value="nin">不包含</option>';
                         valCheckbox.classList.remove('hidden');
@@ -9229,12 +9243,12 @@
                         } else if (subType === 'shishen_group') {
                             GROUPED_SHEN.forEach(s => { valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${s}">${s}</label>`; });
                         }
-                    } else {
-                        // 没有匹配到具体模板类型，继续往下走
+                        return;
                     }
                 }
             }
-            else if(field.includes('数量')){
+            
+            if(field.includes('数量')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择数量</option>';
