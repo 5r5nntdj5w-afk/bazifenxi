@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8210,27 +8210,20 @@
                 let childResult;
                 
                 if (child.macroRef) {
-                    console.log('=== 宏引用展开 ===');
-                    console.log('宏ID:', child.macroRef);
                     if (visitedMacros.has(child.macroRef)) {
-                        console.warn('检测到条件宏循环引用:', child.macroRef);
                         childResult = false;
                     } else {
                         const macro = (cache.conditionMacros || []).find(m => String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef));
                         if (macro && macro.conditions) {
-                            console.log('宏名称:', macro.name);
-                            console.log('宏条件结构:', JSON.stringify(macro.conditions));
                             const newVisited = new Set(visitedMacros);
                             newVisited.add(child.macroRef);
                             childResult = evaluateConditionGroup(macro.conditions, depth + 1, newVisited);
                         } else {
-                            console.warn('宏不存在:', child.macroRef);
                             childResult = false;
                         }
                     }
                 } else if (child.ruleRef) {
                     if (visitedMacros.has('rule:' + child.ruleRef)) {
-                        console.warn('检测到断语循环引用:', child.ruleRef);
                         childResult = false;
                     } else {
                         const refRule = (cache.rules || []).find(r => String(r.id) === String(child.ruleRef) || String(r.cloudId) === String(child.ruleRef));
@@ -8242,18 +8235,12 @@
                             childResult = false;
                         }
                     }
-                } else if (child.children) {
-                    childResult = evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
-                } else if (child.field) {
-                    console.log('=== 条件评估 ===');
-                    console.log('条件字段:', child.field);
-                    console.log('条件操作符:', child.op);
-                    console.log('条件值:', child.val);
+                } else if (child.field && !child.children) {
                     const { res } = evaluateSingleCondition(child);
-                    console.log('评估结果:', res);
                     childResult = res;
+                } else if (child.children && Array.isArray(child.children)) {
+                    childResult = evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
                 } else {
-                    console.warn('未知条件类型:', JSON.stringify(child));
                     childResult = false;
                 }
                 
@@ -9869,7 +9856,7 @@
                 if (!field || !val) {
                     return { error: '请完善所有条件！' };
                 }
-                children.push({ logic, field, op, val });
+                children.push({ field, op, val });
             } else if (child.classList.contains('condition-group')) {
                 // 递归收集条件组数据
                 const groupLogic = child.querySelector('.group-logic').value;
@@ -21630,7 +21617,7 @@ function loadConditionsToEditor(container, conditions) {
                 }
                 // change之后设置op/logic（onchange会重置op.innerHTML）
                 if (op) op.value = child.op || 'eq';
-                if (logic) logic.value = child.logic || 'and';
+                if (logic) logic.value = child.logic !== undefined ? child.logic : 'and';
                 // 设置值
                 setTimeout(() => {
                     const valSelect = item.querySelector('.condition-val-select');
