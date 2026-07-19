@@ -26113,13 +26113,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if(judgeType === '五行'){
             return WU_LIST.map(w => `<option value="${w}">${w}</option>`).join('');
         } else if(judgeType === '十神'){
-            // 日干的十神只能是比肩或劫财
             if(posKey === '日干'){
-                return `<option value="比肩">比肩</option><option value="劫财">劫财</option>`;
+                return `<option value="比肩">比肩</option>`;
             }
             return FULL_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
         } else if(judgeType === '十神组'){
-            // 日干的十神组只能是比劫
             if(posKey === '日干'){
                 return `<option value="比劫">比劫</option>`;
             }
@@ -26146,12 +26144,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // 获取缓存或默认值
             let cached = _positionCache[posKey];
             if(!cached){
-                // 默认勾选所有位置
                 cached = { checked: true, op: 'eq', val: '' };
-                // 日干设置默认值
                 if(posKey === '日干'){
                     cached.val = getDefaultDayValue(judgeType);
                 }
+                // 保存到缓存
+                _positionCache[posKey] = cached;
             }
             const valueOptions = getValueOptions(judgeType, posKey);
             
@@ -26172,7 +26170,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 </select>
             `;
             container.appendChild(row);
-            // 设置缓存的值
             const valSel = row.querySelector('.pb-pos-val');
             if(cached.val) valSel.value = cached.val;
             // 绑定变化事件，更新缓存
