@@ -6931,7 +6931,7 @@
     // 根据范围前缀获取五行数量
     function getScopeWuxingCount(name, data, stats) {
         // 检查是否包含范围前缀（支持多种格式：五行数量-、原局+大运五行数量-等）
-        const match = name.match(/(.*?)五行数量-(.+)/);
+        const match = name.match(/(.*?)五行数量(?:对比)?-(.+)/);
         if (match) {
             const scopePrefix = match[1];
             const wuxingName = match[2];
@@ -6976,7 +6976,7 @@
     // 根据范围前缀获取十神数量
     function getScopeShishenCount(name, data, stats) {
         // 检查是否包含范围前缀（支持多种格式：十神数量-、原局+大运十神数量-等）
-        const match = name.match(/(.*?)十神数量-(.+)/);
+        const match = name.match(/(.*?)十神数量(?:对比)?-(.+)/);
         if (match) {
             const scopePrefix = match[1];
             const shishenName = match[2];
