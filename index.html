@@ -20220,6 +20220,12 @@ function openMacroManager() {
 
 function closeMacroManager() {
     document.getElementById('macro-manager-modal').classList.add('hidden');
+    // 关闭弹窗时清理拖拽残留
+    if (_dragBox && _dragBox.parentNode) {
+        _dragBox.parentNode.removeChild(_dragBox);
+    }
+    _dragBox = null;
+    _dragSelecting = false;
 }
 
 // 全局版条件转文本（用于宏管理界面，不依赖局部作用域）
@@ -20595,26 +20601,36 @@ let _dragBox = null;
 function initDragSelection() {
     const container = document.getElementById('macro-list');
     if (!container) return;
+    let _dragStarted = false;
     
     container.addEventListener('mousedown', (e) => {
         if (e.target.closest('.macro-item-checkbox') || e.target.closest('button')) return;
         _dragSelecting = true;
+        _dragStarted = false;
         _dragStartX = e.clientX;
         _dragStartY = e.clientY;
-        
-        _dragBox = document.createElement('div');
-        _dragBox.className = 'fixed border-2 border-blue-500 bg-blue-100 bg-opacity-30 pointer-events-none z-50';
-        _dragBox.style.left = _dragStartX + 'px';
-        _dragBox.style.top = _dragStartY + 'px';
-        _dragBox.style.width = '0px';
-        _dragBox.style.height = '0px';
-        document.body.appendChild(_dragBox);
+        _dragBox = null;
         
         clearMacroSelection();
     });
     
     document.addEventListener('mousemove', (e) => {
-        if (!_dragSelecting || !_dragBox) return;
+        if (!_dragSelecting) return;
+        // 只有鼠标移动超过 5px 阈值才真正开始拖拽
+        if (!_dragStarted) {
+            const dx = Math.abs(e.clientX - _dragStartX);
+            const dy = Math.abs(e.clientY - _dragStartY);
+            if (dx < 5 && dy < 5) return;
+            _dragStarted = true;
+            
+            _dragBox = document.createElement('div');
+            _dragBox.className = 'fixed border-2 border-blue-500 bg-blue-100 bg-opacity-30 pointer-events-none z-50';
+            _dragBox.style.left = _dragStartX + 'px';
+            _dragBox.style.top = _dragStartY + 'px';
+            _dragBox.style.width = '0px';
+            _dragBox.style.height = '0px';
+            document.body.appendChild(_dragBox);
+        }
         
         const rect = document.getElementById('macro-manager-modal').getBoundingClientRect();
         const x = Math.min(Math.max(e.clientX, rect.left), rect.right);
@@ -20627,23 +20643,27 @@ function initDragSelection() {
     });
     
     document.addEventListener('mouseup', () => {
-        if (!_dragSelecting || !_dragBox) return;
+        if (!_dragSelecting) return;
         
-        const boxRect = _dragBox.getBoundingClientRect();
-        document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
-            const item = cb.closest('.border');
-            if (item) {
-                const itemRect = item.getBoundingClientRect();
-                if (isOverlapping(boxRect, itemRect)) {
-                    cb.checked = true;
-                    _selectedMacroIds.add(cb.dataset.macroId);
+        // 如果已创建选框，执行框选逻辑
+        if (_dragBox) {
+            const boxRect = _dragBox.getBoundingClientRect();
+            document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
+                const item = cb.closest('.border');
+                if (item) {
+                    const itemRect = item.getBoundingClientRect();
+                    if (isOverlapping(boxRect, itemRect)) {
+                        cb.checked = true;
+                        _selectedMacroIds.add(cb.dataset.macroId);
+                    }
                 }
-            }
-        });
+            });
+            document.body.removeChild(_dragBox);
+            _dragBox = null;
+        }
         
-        document.body.removeChild(_dragBox);
-        _dragBox = null;
         _dragSelecting = false;
+        _dragStarted = false;
         updateMacroBatchBar();
     });
 }
