@@ -1,4 +1,4 @@
-﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -2068,6 +2068,10 @@
                         </optgroup>
                         <optgroup label="【精确匹配】触发范围判断">
                         <option value="触发范围">触发范围</option>
+                        </optgroup>
+                        <optgroup label="【批量判断】定位批量判断">
+                        <option value="定位批量-五行">定位批量-五行</option>
+                        <option value="定位批量-十神">定位批量-十神</option>
                         </optgroup>
                     </select>
                         <div class="custom-field-trigger" tabindex="0" role="combobox" aria-haspopup="listbox">
@@ -7389,7 +7393,57 @@
         function evaluateSingleCondition(c) {
             let actual = '', res = false;
 
-            if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(c.field)){
+            // 定位批量判断
+            if(c.field.startsWith('定位批量-') && c.val && c.val.startsWith('定位批量|')){
+                const parts = c.val.split('|');
+                let pbType = '十神', pbGanZhi = '天干', pbScope = '原局';
+                const pbPositions = {};
+                parts.forEach(p => {
+                    if(p.startsWith('type=')) pbType = p.replace('type=','');
+                    else if(p.startsWith('ganZhi=')) pbGanZhi = p.replace('ganZhi=','');
+                    else if(p.startsWith('scope=')) pbScope = p.replace('scope=','');
+                    else if(p.includes('=')){
+                        let pop = 'eq';
+                        let pval = p;
+                        if(p.includes('!=')){ pop = 'ne'; pval = p.replace('!=','='); }
+                        const [pos, val] = pval.split('=');
+                        if(pos && val) pbPositions[pos] = { op: pop, val: val };
+                    }
+                });
+                const pbPathMap = {
+                    '年干':'nian.t','月干':'yue.t','日干':'ri.t','时干':'shi.t',
+                    '大运干':'dayun.t','流年干':'liunian.t','流月干':'liuyue.t',
+                    '年支':'nian.d','月支':'yue.d','日支':'ri.d','时支':'shi.d',
+                    '大运支':'dayun.d','流年支':'liunian.d','流月支':'liuyue.d'
+                };
+                const rg = data.ri?.t || '';
+                let allMatch = true;
+                for(const posName in pbPositions){
+                    const posCfg = pbPositions[posName];
+                    // 根据 ganZhi 转换位置名
+                    let actualPosName = posName;
+                    if(pbGanZhi === '地支') actualPosName = posName.replace('干','支');
+                    const path = pbPathMap[actualPosName];
+                    if(!path){ allMatch = false; break; }
+                    const [k, p] = path.split('.');
+                    const node = data[k]?.[p];
+                    if(!node){ allMatch = false; break; }
+                    let actualVal = '';
+                    if(pbType === '五行'){
+                        actualVal = WU_XING[node] || '';
+                    } else if(pbType === '十神'){
+                        actualVal = pbGanZhi === '天干' ? getExactShen(node, rg) : getDiShen(node, rg);
+                    } else if(pbType === '十神组'){
+                        const shenTmp = pbGanZhi === '天干' ? getExactShen(node, rg) : getDiShen(node, rg);
+                        actualVal = SHEN_TO_GROUP[shenTmp] || '';
+                    }
+                    const posMatch = (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
+                    if(!posMatch){ allMatch = false; break; }
+                }
+                res = allMatch;
+                actual = c.val;
+            }
+            else if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(c.field)){
                 const map = {年干:'nian',月干:'yue',日干:'ri',时干:'shi',大运干:'dayun',流年干:'liunian',流月干:'liuyue'};
                 actual = data[map[c.field]]?.t || '';
                 if(c.op === 'eq') res = actual === c.val;
@@ -8792,6 +8846,25 @@
                         }
                         cb.checked = shouldCheck;
                     });
+                } else if ((child.field || '').startsWith('定位批量-')) {
+                    // 定位批量字段：值已写入 valSel，需要更新摘要显示
+                    valSel.value = child.val || '';
+                    var summarySpan = item.querySelector('.position-batch-summary');
+                    if(summarySpan && child.val && child.val.startsWith('定位批量|')){
+                        // 解析编码值生成摘要
+                        var parts = child.val.split('|');
+                        var sType = '', sGz = '', sScope = '';
+                        var sPositions = [];
+                        parts.forEach(function(p){
+                            if(p.startsWith('type=')) sType = p.replace('type=','');
+                            else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
+                            else if(p.startsWith('scope=')) sScope = p.replace('scope=','');
+                            else if(p.includes('=')) sPositions.push(p);
+                        });
+                        var summaryText = sType + '·' + sGz + '·' + sScope + ': ' + sPositions.join(', ');
+                        summarySpan.textContent = summaryText;
+                        summarySpan.title = summaryText;
+                    }
                 } else {
                     if (!valSel.classList.contains('hidden')) {
                         valSel.value = child.val || '';
@@ -9056,6 +9129,33 @@
                         }
                     }
                 }
+            }
+            // 定位批量判断字段：显示按钮 + 摘要
+            else if(field.startsWith('定位批量-')){
+                opSel.innerHTML = '<option value="eq">等于</option>';
+                opSel.value = 'eq';
+                opSel.classList.add('hidden');
+                valSel.classList.add('hidden');
+                valInput.classList.add('hidden');
+                valCheckbox.classList.add('hidden');
+                // 显示批量设置按钮和摘要
+                let batchContainer = item.querySelector('.position-batch-container');
+                if(!batchContainer){
+                    batchContainer = document.createElement('div');
+                    batchContainer.className = 'position-batch-container flex items-center gap-2';
+                    batchContainer.innerHTML = `
+                        <button type="button" class="position-batch-btn px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded text-sm hover:bg-purple-200">⚙ 批量定位设置</button>
+                        <span class="position-batch-summary text-sm text-gray-600"></span>
+                    `;
+                    // 插入到 valCheckbox 之后
+                    valCheckbox.parentNode.appendChild(batchContainer);
+                    batchContainer.querySelector('.position-batch-btn').onclick = () => {
+                        openPositionBatchEditor(item, field);
+                    };
+                }
+                // 清空已有值
+                valSel.value = '';
+                valInput.value = '';
             }
         };
         
@@ -9501,6 +9601,30 @@
                             valCheckbox.innerHTML += `<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="${d}">${d}</label>`;
                         });
                     }
+                }
+                // 定位批量判断字段：显示按钮 + 摘要
+                else if(field.startsWith('定位批量-')){
+                    opSel.innerHTML = '<option value="eq">等于</option>';
+                    opSel.value = 'eq';
+                    opSel.classList.add('hidden');
+                    valSel.classList.add('hidden');
+                    valInput.classList.add('hidden');
+                    valCheckbox.classList.add('hidden');
+                    let batchContainer = item.querySelector('.position-batch-container');
+                    if(!batchContainer){
+                        batchContainer = document.createElement('div');
+                        batchContainer.className = 'position-batch-container flex items-center gap-2';
+                        batchContainer.innerHTML = `
+                            <button type="button" class="position-batch-btn px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded text-sm hover:bg-purple-200">⚙ 批量定位设置</button>
+                            <span class="position-batch-summary text-sm text-gray-600"></span>
+                        `;
+                        valCheckbox.parentNode.appendChild(batchContainer);
+                        batchContainer.querySelector('.position-batch-btn').onclick = () => {
+                            openPositionBatchEditor(item, field);
+                        };
+                    }
+                    valSel.value = '';
+                    valInput.value = '';
                 }
             };
         });
@@ -25891,6 +26015,217 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+
+<!-- 定位批量判断编辑器弹窗 -->
+<div id="position-batch-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[680px] max-h-[90vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-lg font-bold text-purple-800">⚙ 批量定位判断设置</h3>
+            <button onclick="closePositionBatchEditor()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto">
+            <!-- 配置区 -->
+            <div class="grid grid-cols-3 gap-3 mb-4 p-3 bg-purple-50 rounded">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">判断类型</label>
+                    <select id="pb-judge-type" class="w-full p-2 border rounded text-sm">
+                        <option value="五行">五行</option>
+                        <option value="十神">十神</option>
+                        <option value="十神组">十神组</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">干支</label>
+                    <select id="pb-ganzhi" class="w-full p-2 border rounded text-sm">
+                        <option value="天干">天干</option>
+                        <option value="地支">地支</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">层级</label>
+                    <select id="pb-scope" class="w-full p-2 border rounded text-sm">
+                        <option value="原局">原局</option>
+                        <option value="原局+大运">原局+大运</option>
+                        <option value="原局+大运+流年">原局+大运+流年</option>
+                        <option value="原局+大运+流年+流月">原局+大运+流年+流月</option>
+                    </select>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mb-2">提示：未勾选的位置表示"不限"；每个位置可独立选择"等于/不等于"。</p>
+            <!-- 位置勾选区 -->
+            <div id="pb-positions" class="space-y-2">
+                <!-- 由 JS 动态生成 -->
+            </div>
+        </div>
+        <div class="flex gap-2 justify-end border-t pt-3 p-4 shrink-0">
+            <button id="pb-save-btn" class="px-4 py-2 bg-purple-600 text-white rounded">确定</button>
+            <button onclick="closePositionBatchEditor()" class="px-4 py-2 bg-gray-300 rounded">取消</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 定位批量判断编辑器逻辑
+(function(){
+    // 位置定义
+    const PB_POSITIONS = ['年干','月干','日干','时干','大运干','流年干','流月干'];
+    const PB_SCOPE_MAP = {
+        '原局': ['年干','月干','日干','时干'],
+        '原局+大运': ['年干','月干','日干','时干','大运干'],
+        '原局+大运+流年': ['年干','月干','日干','时干','大运干','流年干'],
+        '原局+大运+流年+流月': ['年干','月干','日干','时干','大运干','流年干','流月干']
+    };
+
+    // 当前编辑的条件项引用
+    let _currentItem = null;
+    let _currentField = '';
+    // 记录层级切换前的勾选状态，避免切换层级时丢失
+    let _positionCache = {};
+
+    // 渲染位置勾选区
+    function renderPositions(scope, judgeType){
+        const positions = PB_SCOPE_MAP[scope] || [];
+        const container = document.getElementById('pb-positions');
+        container.innerHTML = '';
+        // 值选项
+        let valueOptions = '';
+        if(judgeType === '五行'){
+            WU_LIST.forEach(w => { valueOptions += `<option value="${w}">${w}</option>`; });
+        } else if(judgeType === '十神'){
+            FULL_SHEN.forEach(s => { valueOptions += `<option value="${s}">${s}</option>`; });
+        } else if(judgeType === '十神组'){
+            GROUPED_SHEN.forEach(s => { valueOptions += `<option value="${s}">${s}</option>`; });
+        }
+        positions.forEach(pos => {
+            const cached = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-2 p-2 border rounded hover:bg-purple-50';
+            row.innerHTML = `
+                <label class="flex items-center gap-1 w-20 shrink-0">
+                    <input type="checkbox" class="pb-pos-check" data-pos="${pos}" ${cached.checked ? 'checked' : ''}>
+                    <span class="text-sm font-medium">${pos}</span>
+                </label>
+                <select class="pb-pos-op w-24 p-1 border rounded text-sm" data-pos="${pos}">
+                    <option value="eq" ${cached.op === 'eq' ? 'selected' : ''}>等于</option>
+                    <option value="ne" ${cached.op === 'ne' ? 'selected' : ''}>不等于</option>
+                </select>
+                <select class="pb-pos-val flex-1 p-1 border rounded text-sm" data-pos="${pos}">
+                    <option value="">--不限--</option>
+                    ${valueOptions}
+                </select>
+            `;
+            container.appendChild(row);
+            // 设置缓存的值
+            const valSel = row.querySelector('.pb-pos-val');
+            if(cached.val) valSel.value = cached.val;
+            // 绑定变化事件，更新缓存
+            row.querySelector('.pb-pos-check').onchange = (e) => {
+                _positionCache[pos] = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
+                _positionCache[pos].checked = e.target.checked;
+            };
+            row.querySelector('.pb-pos-op').onchange = (e) => {
+                _positionCache[pos] = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
+                _positionCache[pos].op = e.target.value;
+            };
+            valSel.onchange = (e) => {
+                _positionCache[pos] = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
+                _positionCache[pos].val = e.target.value;
+            };
+        });
+    }
+
+    // 打开编辑器
+    window.openPositionBatchEditor = function(item, field){
+        _currentItem = item;
+        _currentField = field;
+        _positionCache = {};
+        // 从 item 中读取已有值
+        const valSel = item.querySelector('.condition-val-select');
+        const existingVal = valSel.value || '';
+        let judgeType = '十神';
+        let ganzhi = '天干';
+        let scope = '原局';
+        if(existingVal.startsWith('定位批量|')){
+            const parts = existingVal.split('|');
+            parts.forEach(p => {
+                if(p.startsWith('type=')) judgeType = p.replace('type=','');
+                else if(p.startsWith('ganZhi=')) ganzhi = p.replace('ganZhi=','');
+                else if(p.startsWith('scope=')) scope = p.replace('scope=','');
+                else if(p.includes('=')){
+                    // 支持 年干=食伤 和 年干!=食伤 两种格式
+                    let op = 'eq';
+                    let posVal = p;
+                    if(p.includes('!=')){
+                        op = 'ne';
+                        posVal = p.replace('!=','=');
+                    }
+                    const [pos, val] = posVal.split('=');
+                    if(PB_POSITIONS.includes(pos)){
+                        _positionCache[pos] = { checked: true, op: op, val: val };
+                    }
+                }
+            });
+        }
+        document.getElementById('pb-judge-type').value = judgeType;
+        document.getElementById('pb-ganzhi').value = ganzhi;
+        document.getElementById('pb-scope').value = scope;
+        renderPositions(scope, judgeType);
+        document.getElementById('position-batch-modal').classList.remove('hidden');
+    };
+
+    window.closePositionBatchEditor = function(){
+        document.getElementById('position-batch-modal').classList.add('hidden');
+        _currentItem = null;
+        _currentField = '';
+        _positionCache = {};
+    };
+
+    // 配置项变化时重新渲染
+    document.getElementById('pb-judge-type').onchange = function(){
+        renderPositions(document.getElementById('pb-scope').value, this.value);
+    };
+    document.getElementById('pb-ganzhi').onchange = function(){
+        // 干支变化不影响位置列表，只影响匹配逻辑
+    };
+    document.getElementById('pb-scope').onchange = function(){
+        renderPositions(this.value, document.getElementById('pb-judge-type').value);
+    };
+
+    // 保存按钮
+    document.getElementById('pb-save-btn').onclick = function(){
+        if(!_currentItem) return;
+        const judgeType = document.getElementById('pb-judge-type').value;
+        const ganzhi = document.getElementById('pb-ganzhi').value;
+        const scope = document.getElementById('pb-scope').value;
+        // 收集勾选的位置
+        const checked = [];
+        const positions = PB_SCOPE_MAP[scope] || [];
+        positions.forEach(pos => {
+            const cache = _positionCache[pos];
+            if(cache && cache.checked && cache.val){
+                checked.push(`${pos}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
+            }
+        });
+        if(checked.length === 0){
+            alert('请至少勾选一个位置并设置值');
+            return;
+        }
+        // 编码值
+        const encoded = `定位批量|type=${judgeType}|ganZhi=${ganzhi}|scope=${scope}|${checked.join('|')}`;
+        // 写入 valSel
+        const valSel = _currentItem.querySelector('.condition-val-select');
+        valSel.value = encoded;
+        // 更新摘要
+        const summary = _currentItem.querySelector('.position-batch-summary');
+        if(summary){
+            const summaryText = `${judgeType}·${ganzhi}·${scope}: ${checked.join(', ')}`;
+            summary.textContent = summaryText;
+            summary.title = summaryText;
+        }
+        closePositionBatchEditor();
+    };
+})();
+</script>
 
 </body>
 </html>

@@ -241,8 +241,84 @@ function evaluateLeafCondition(data, cond) {
   var actual = '';
   var res = false;
 
+  // ---- 定位批量判断 ----
+  if (field.indexOf('定位批量-') === 0 && val && val.indexOf('定位批量|') === 0) {
+    // 解析编码值
+    var parts = val.split('|');
+    var pbType = '十神', pbGanZhi = '天干', pbScope = '原局';
+    var pbPositions = {}; // {年干: {op:'eq', val:'食伤'}, ...}
+    for (var pi = 0; pi < parts.length; pi++) {
+      var p = parts[pi];
+      if (p.indexOf('type=') === 0) pbType = p.replace('type=','');
+      else if (p.indexOf('ganZhi=') === 0) pbGanZhi = p.replace('ganZhi=','');
+      else if (p.indexOf('scope=') === 0) pbScope = p.replace('scope=','');
+      else if (p.indexOf('=') > 0) {
+        var pop = 'eq';
+        var pval = p;
+        if (p.indexOf('!=') > 0) { pop = 'ne'; pval = p.replace('!=','='); }
+        var kv = pval.split('=');
+        if (kv.length === 2 && kv[1]) {
+          pbPositions[kv[0]] = { op: pop, val: kv[1] };
+        }
+      }
+    }
+    // 位置到 data 字段的映射
+    var pbPathMap = {
+      '年干': 'nian.t','月干': 'yue.t','日干': 'ri.t','时干': 'shi.t',
+      '大运干': 'dayun.t','流年干': 'liunian.t','流月干': 'liuyue.t',
+      '年支': 'nian.d','月支': 'yue.d','日支': 'ri.d','时支': 'shi.d',
+      '大运支': 'dayun.d','流年支': 'liunian.d','流月支': 'liuyue.d'
+    };
+    // 注意：UI 中位置名是 "年干/月干/.../大运干/流年干/流月干"（天干）或 "年干/月干/.../大运干/流年干/流月干"（地支时也是这些名字）
+    // 实际上 UI 中地支时位置名应为 "年支/月支/..."，但为了简化，UI 中位置名统一用 "年干/月干/..." 表示天干位置
+    // 当 ganZhi=地支 时，需要把 "年干" 转换为 "年支"
+    var rg = data.ri && data.ri.t ? data.ri.t : '';
+    var allMatch = true;
+    for (var posName in pbPositions) {
+      var posCfg = pbPositions[posName];
+      // 根据 ganZhi 转换位置名
+      var actualPosName = posName;
+      if (pbGanZhi === '地支') {
+        actualPosName = posName.replace('干', '支');
+      }
+      var path = pbPathMap[actualPosName];
+      if (!path) { allMatch = false; break; }
+      var keys = path.split('.');
+      var node = data;
+      for (var ki = 0; ki < keys.length; ki++) {
+        node = node ? node[keys[ki]] : null;
+      }
+      if (!node) { allMatch = false; break; }
+      // 根据 pbType 计算实际值
+      var actualVal = '';
+      if (pbType === '五行') {
+        actualVal = WU_XING[node] || '';
+      } else if (pbType === '十神') {
+        // 天干用 getExactShen，地支用 getDiShen
+        if (pbGanZhi === '天干') {
+          actualVal = getExactShen(node, rg);
+        } else {
+          actualVal = getDiShen(node, rg);
+        }
+      } else if (pbType === '十神组') {
+        var shenTmp;
+        if (pbGanZhi === '天干') {
+          shenTmp = getExactShen(node, rg);
+        } else {
+          shenTmp = getDiShen(node, rg);
+        }
+        actualVal = SHEN_TO_GROUP[shenTmp] || '';
+      }
+      // 比较
+      var posMatch = (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
+      if (!posMatch) { allMatch = false; break; }
+    }
+    res = allMatch;
+    actual = val;
+  }
+
   // ---- 天干/地支直接对比 ----
-  if (['年干','月干','日干','时干','大运干','流年干','流月干'].indexOf(field) >= 0) {
+  else if (['年干','月干','日干','时干','大运干','流年干','流月干'].indexOf(field) >= 0) {
     actual = getFieldValue(data, field);
     if (op === 'eq') res = actual === val;
     else if (op === 'ne') res = actual !== val;
