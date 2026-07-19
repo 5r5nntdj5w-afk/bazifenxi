@@ -20486,10 +20486,13 @@ function initDragSelection() {
         
         const boxRect = _dragBox.getBoundingClientRect();
         document.querySelectorAll('.macro-item-checkbox').forEach(cb => {
-            const cbRect = cb.getBoundingClientRect();
-            if (isOverlapping(boxRect, cbRect)) {
-                cb.checked = true;
-                _selectedMacroIds.add(cb.dataset.macroId);
+            const item = cb.closest('.border');
+            if (item) {
+                const itemRect = item.getBoundingClientRect();
+                if (isOverlapping(boxRect, itemRect)) {
+                    cb.checked = true;
+                    _selectedMacroIds.add(cb.dataset.macroId);
+                }
             }
         });
         
@@ -20522,17 +20525,24 @@ function selectMacrosByCondition(predicate) {
 function batchCopyMacros() {
     if (_selectedMacroIds.size === 0) return;
     let copiedCount = 0;
+    let encryptedCount = 0;
     _selectedMacroIds.forEach(id => {
         const macro = getMacroById(id);
         if (macro && macro.createdBy === getCurrentUserId()) {
-            copyMacroToMine(id);
+            copyMacroToMine(id, true);
             copiedCount++;
+            if (!canViewMacroConditions(macro)) encryptedCount++;
         }
     });
     clearMacroSelection();
     renderMacroList();
+    updateMacroTagFilters();
     if (copiedCount > 0) {
-        alert(`已成功复制 ${copiedCount} 个条件宏！`);
+        let msg = `已成功复制 ${copiedCount} 个条件宏！`;
+        if (encryptedCount > 0) {
+            msg += `\n其中 ${encryptedCount} 个宏条件已加密（复制后无条件内容）`;
+        }
+        alert(msg);
     } else {
         alert('没有可复制的条件宏（只能复制自己创建的宏）');
     }
@@ -22289,20 +22299,19 @@ function canEditMacro(macro) {
 }
 
 // 复制管理员公开宏到当前用户的宏列表（转为私有）
-function copyMacroToMine(macroId) {
+function copyMacroToMine(macroId, silent = false) {
     const macro = getMacroById(macroId);
     if (!macro) return;
-    if (!currentUser) { alert('请先登录'); return; }
-    // 安全检查：如果当前用户无权查看该宏的条件，则不复制条件
+    if (!currentUser) { if (!silent) alert('请先登录'); return; }
     const canViewConditions = canViewMacroConditions(macro);
     const newMacro = {
         ...macro,
-        id: null, // 生成新ID
+        id: null,
         name: macro.name + '（副本）',
-        permission: 0, // 复制后默认为私有
+        permission: 0,
         createdBy: getCurrentUserId(),
-        description: '', // 复制后清空描述
-        conditions: canViewConditions ? macro.conditions : null, // 无权查看则清空条件
+        description: '',
+        conditions: canViewConditions ? macro.conditions : null,
         createTime: new Date().toISOString(),
         updateTime: new Date().toISOString(),
         usageCount: 0,
@@ -22311,13 +22320,15 @@ function copyMacroToMine(macroId) {
         cloudId: undefined
     };
     saveMacro(newMacro);
-    if (!canViewConditions) {
-        alert(`已复制条件宏「${macro.name}」到您的宏列表（条件已加密，复制后无条件内容）`);
-        return;
+    if (!silent) {
+        if (!canViewConditions) {
+            alert(`已复制条件宏「${macro.name}」到您的宏列表（条件已加密，复制后无条件内容）`);
+            return;
+        }
+        renderMacroList();
+        updateMacroTagFilters();
+        alert(`已复制条件宏「${macro.name}」到您的宏列表`);
     }
-    renderMacroList();
-    updateMacroTagFilters();
-    alert(`已复制条件宏「${macro.name}」到您的宏列表`);
 }
 
 // 判断当前用户是否能查看宏的条件内容
