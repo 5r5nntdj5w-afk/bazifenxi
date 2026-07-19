@@ -8847,8 +8847,11 @@
                         cb.checked = shouldCheck;
                     });
                 } else if ((child.field || '').startsWith('定位批量-')) {
-                    // 定位批量字段：值已写入 valSel，需要更新摘要显示
-                    valSel.value = child.val || '';
+                    // 定位批量字段：添加对应的 option 确保值能正确保存和读取
+                    if(child.val){
+                        valSel.innerHTML = `<option value="${child.val}">${child.val}</option>`;
+                        valSel.value = child.val;
+                    }
                     var summarySpan = item.querySelector('.position-batch-summary');
                     if(summarySpan && child.val && child.val.startsWith('定位批量|')){
                         // 解析编码值生成摘要
@@ -9724,6 +9727,9 @@
                         return { error: '请至少选择一个值！' };
                     }
                     val = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+                } else if (field.startsWith('定位批量-')) {
+                    // 定位批量字段：值存储在 valSel.value 中（即使 valSel 是隐藏的）
+                    val = valSel.value;
                 } else {
                     val = valSel.classList.contains('hidden') ? valInput.value.trim() : valSel.value;
                 }
@@ -26224,8 +26230,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // 编码值
         const encoded = `定位批量|type=${judgeType}|ganZhi=${ganzhi}|scope=${scope}|${checked.join('|')}`;
-        // 写入 valSel
+        // 写入 valSel：添加对应的 option 确保值能正确保存和读取
         const valSel = _currentItem.querySelector('.condition-val-select');
+        valSel.innerHTML = `<option value="${encoded}">${encoded}</option>`;
         valSel.value = encoded;
         // 更新摘要
         const summary = _currentItem.querySelector('.position-batch-summary');
