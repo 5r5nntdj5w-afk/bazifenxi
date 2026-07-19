@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8210,23 +8210,15 @@
                 let childResult;
                 
                 if (child.macroRef) {
-                    console.log('=== 条件宏引用追踪 ===');
-                    console.log('宏引用ID:', child.macroRef);
-                    console.log('cache.conditionMacros长度:', (cache.conditionMacros || []).length);
-                    console.log('cache.conditionMacros列表:', (cache.conditionMacros || []).map(m => ({ id: m.id, cloudId: m.cloudId, name: m.name })));
                     if (visitedMacros.has(child.macroRef)) {
-                        console.warn('检测到条件宏循环引用:', child.macroRef);
                         childResult = false;
                     } else {
                         const macro = (cache.conditionMacros || []).find(m => String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef));
-                        console.log('宏查找结果:', macro ? `找到宏: ${macro.name}` : '未找到宏');
                         if (macro && macro.conditions) {
-                            console.log('宏条件结构:', JSON.stringify(macro.conditions));
                             const newVisited = new Set(visitedMacros);
                             newVisited.add(child.macroRef);
                             childResult = evaluateConditionGroup(macro.conditions, depth + 1, newVisited);
                         } else {
-                            console.warn('宏不存在或条件为空:', child.macroRef);
                             childResult = false;
                         }
                     }
@@ -8243,11 +8235,11 @@
                             childResult = false;
                         }
                     }
-                } else if (child.field && !child.children) {
+                } else if (child.children) {
+                    childResult = evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
+                } else if (child.field) {
                     const { res } = evaluateSingleCondition(child);
                     childResult = res;
-                } else if (child.children && Array.isArray(child.children)) {
-                    childResult = evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
                 } else {
                     childResult = false;
                 }
@@ -20654,18 +20646,18 @@ function selectMacrosByCondition(predicate) {
     updateMacroBatchBar();
 }
 
-function batchCopyMacros() {
+async function batchCopyMacros() {
     if (_selectedMacroIds.size === 0) return;
     let copiedCount = 0;
     let encryptedCount = 0;
-    _selectedMacroIds.forEach(id => {
+    for (const id of _selectedMacroIds) {
         const macro = getMacroById(id);
         if (macro && macro.createdBy === getCurrentUserId()) {
-            copyMacroToMine(id, true);
+            await copyMacroToMine(id, true);
             copiedCount++;
             if (!canViewMacroConditions(macro)) encryptedCount++;
         }
-    });
+    }
     clearMacroSelection();
     renderMacroList();
     updateMacroTagFilters();
@@ -22431,7 +22423,7 @@ function canEditMacro(macro) {
 }
 
 // 复制管理员公开宏到当前用户的宏列表（转为私有）
-function copyMacroToMine(macroId, silent = false) {
+async function copyMacroToMine(macroId, silent = false) {
     const macro = getMacroById(macroId);
     if (!macro) return;
     if (!currentUser) { if (!silent) alert('请先登录'); return; }
@@ -22451,7 +22443,23 @@ function copyMacroToMine(macroId, silent = false) {
         pinned: false,
         cloudId: undefined
     };
-    saveMacro(newMacro);
+    const saved = saveMacro(newMacro);
+    
+    // 同步到 Supabase（若已登录）
+    if (currentUser && supabaseClient) {
+        try {
+            const cloudMacro = await addSupabaseMacro(saved);
+            if (cloudMacro && cloudMacro.id) {
+                const idMapping = getIdMapping();
+                if (!idMapping.macros) idMapping.macros = {};
+                idMapping.macros[saved.id] = cloudMacro.id;
+                saveIdMapping(idMapping);
+            }
+        } catch(e) {
+            console.warn('复制宏同步到云端失败:', e);
+        }
+    }
+    
     if (!silent) {
         if (!canViewConditions) {
             alert(`已复制条件宏「${macro.name}」到您的宏列表（条件已加密，复制后无条件内容）`);
@@ -25103,6 +25111,72 @@ async function syncLocalToCloud() {
             }
         }
         
+        // 条件宏同步：基于ID映射
+        let addedMacros = 0;
+        let updatedMacros = 0;
+        
+        const localMacros = JSON.parse(localStorage.getItem(MACRO_KEY) || '[]');
+        
+        const { data: cloudMacros, error: macrosError } = await supabaseClient
+            .from('condition_macros')
+            .select('*')
+            .eq('user_id', user.id);
+        
+        if (macrosError) console.error('获取云端条件宏失败:', macrosError);
+        
+        const cloudMacrosLocalIdMap = new Map();
+        for (const macro of (cloudMacros || [])) {
+            const localId = getLocalIdByCloudId(idMapping, 'macros', macro.id);
+            if (localId) {
+                cloudMacrosLocalIdMap.set(localId, macro);
+            }
+        }
+        
+        for (const macro of localMacros) {
+            if (!macro.id) {
+                macro.id = crypto.randomUUID();
+            }
+            
+            const cloudId = getCloudId(idMapping, 'macros', macro.id);
+            const cloudMacro = cloudId ? cloudMacrosLocalIdMap.get(macro.id) : null;
+            
+            const record = {
+                name: macro.name || '',
+                description: macro.description || '',
+                conditions: macro.conditions || { logic: 'and', children: [] },
+                permission: macro.permission !== undefined ? macro.permission : 0,
+                tags: macro.tags || [],
+                pinned: macro.pinned || false,
+                user_id: user.id,
+                usage_count: macro.usageCount || 0
+            };
+            
+            if (cloudMacro) {
+                const { error } = await supabaseClient
+                    .from('condition_macros')
+                    .update(record)
+                    .eq('id', cloudId);
+                if (!error) {
+                    updatedMacros++;
+                } else {
+                    console.error('更新条件宏失败:', error, macro.name);
+                }
+            } else {
+                const { data: newMacro, error } = await supabaseClient
+                    .from('condition_macros')
+                    .insert([{ ...record, id: macro.id }])
+                    .select()
+                    .single();
+                
+                if (!error && newMacro) {
+                    setCloudId(idMapping, 'macros', macro.id, newMacro.id);
+                    addedMacros++;
+                } else {
+                    console.error('插入条件宏失败:', error, macro.name);
+                }
+            }
+        }
+        
         // 保存ID映射表
         saveIdMapping(idMapping);
         
@@ -25118,6 +25192,8 @@ async function syncLocalToCloud() {
         if (updatedCases > 0) resultMsg.push(`✓ 更新 ${updatedCases} 条案例`);
         if (addedTags > 0) resultMsg.push(`+ 新增 ${addedTags} 个标签`);
         if (updatedTags > 0) resultMsg.push(`✓ 更新 ${updatedTags} 个标签`);
+        if (addedMacros > 0) resultMsg.push(`+ 新增 ${addedMacros} 个条件宏`);
+        if (updatedMacros > 0) resultMsg.push(`✓ 更新 ${updatedMacros} 个条件宏`);
         
         if (resultMsg.length === 0) {
             alert('✓ 本地与云端数据已同步，无需更新');
