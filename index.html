@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -25164,7 +25164,7 @@ async function syncLocalToCloud() {
             } else {
                 const { data: newMacro, error } = await supabaseClient
                     .from('condition_macros')
-                    .insert([{ ...record, id: macro.id }])
+                    .insert([record])
                     .select()
                     .single();
                 
