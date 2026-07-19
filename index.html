@@ -8006,10 +8006,10 @@
                     if (valConfig && valConfig.template_type === 'count_compare_shishen') {
                         cnt2 = getScopeShishenCount(c.val, data, stats);
                     } else {
-                        cnt2 = stats.shenCount[c.val] || 0;
+                        cnt2 = (stats.shenCount[c.val] || stats.groupCount[c.val] || 0);
                     }
                 } else {
-                    cnt2 = stats.shenCount[c.val] || 0;
+                    cnt2 = (stats.shenCount[c.val] || stats.groupCount[c.val] || 0);
                 }
                 if(c.op === 'eq') res = cnt1 == cnt2;
                 else if(c.op === 'ge') res = cnt1 >= cnt2;
@@ -8112,7 +8112,7 @@
                         if (valConfig && valConfig.template_type === 'count_compare_shishen') {
                             cnt2 = getScopeShishenCount(c.val, data, stats);
                         } else {
-                            cnt2 = stats.shenCount[c.val] || 0;
+                            cnt2 = (stats.shenCount[c.val] || stats.groupCount[c.val] || 0);
                         }
                         if(c.op === 'eq') res = cnt1 == cnt2;
                         else if(c.op === 'ge') res = cnt1 >= cnt2;
