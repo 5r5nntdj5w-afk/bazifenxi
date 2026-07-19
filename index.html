@@ -20291,8 +20291,10 @@ async function saveMacroFromEditor() {
             if (editingMacroId) {
                 // 编辑：查找cloudId，更新云端
                 const idMapping = getIdMapping();
-                const cloudId = getCloudId(idMapping, 'macros', editingMacroId) || editingMacroId;
-                await updateSupabaseMacro(cloudId, macroData);
+                const cloudId = getCloudId(idMapping, 'macros', editingMacroId);
+                if (cloudId) {
+                    await updateSupabaseMacro(cloudId, macroData);
+                }
             } else {
                 // 新建：插入云端，建立映射
                 const newMacro = await addSupabaseMacro(macroData);
