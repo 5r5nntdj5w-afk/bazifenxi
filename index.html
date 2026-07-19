@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7970,7 +7970,7 @@
                     else if (c.op === 'lt') res = e < v;
                 }
             }
-            else if(c.field.includes('五行数量-') || c.field.startsWith('五行数量对比-')){
+            else if(c.field.startsWith('五行数量对比-')){
                 const cnt1 = getScopeWuxingCount(c.field, data, stats);
                 const cnt2 = getScopeWuxingCount(c.val, data, stats);
                 if(c.op === 'eq') res = cnt1 == cnt2;
@@ -7979,7 +7979,7 @@
                 else if(c.op === 'le') res = cnt1 <= cnt2;
                 else if(c.op === 'lt') res = cnt1 < cnt2;
             }
-            else if(c.field.includes('十神数量-') || c.field.startsWith('十神数量对比-')){
+            else if(c.field.startsWith('十神数量对比-')){
                 const cnt1 = getScopeShishenCount(c.field, data, stats);
                 const cnt2 = getScopeShishenCount(c.val, data, stats);
                 if(c.op === 'eq') res = cnt1 == cnt2;
@@ -7987,6 +7987,26 @@
                 else if(c.op === 'gt') res = cnt1 > cnt2;
                 else if(c.op === 'le') res = cnt1 <= cnt2;
                 else if(c.op === 'lt') res = cnt1 < cnt2;
+            }
+            else if(c.field.includes('五行数量-')){
+                const cnt = getScopeWuxingCount(c.field, data, stats);
+                const v = Number(c.val);
+                if(c.op === 'eq') res = cnt == v;
+                else if(c.op === 'ne') res = cnt != v;
+                else if(c.op === 'ge') res = cnt >= v;
+                else if(c.op === 'gt') res = cnt > v;
+                else if(c.op === 'le') res = cnt <= v;
+                else if(c.op === 'lt') res = cnt < v;
+            }
+            else if(c.field.includes('十神数量-')){
+                const cnt = getScopeShishenCount(c.field, data, stats);
+                const v = Number(c.val);
+                if(c.op === 'eq') res = cnt == v;
+                else if(c.op === 'ne') res = cnt != v;
+                else if(c.op === 'ge') res = cnt >= v;
+                else if(c.op === 'gt') res = cnt > v;
+                else if(c.op === 'le') res = cnt <= v;
+                else if(c.op === 'lt') res = cnt < v;
             }
             else if(c.field.startsWith('包含-')){
                 const fieldType = c.field.replace('包含-', '');
@@ -9022,32 +9042,29 @@
                 valInput.max = '150';
                 valInput.placeholder = '输入年龄';
             }
-            else if(field.includes('五行数量-') || field.startsWith('五行数量对比-')){
+            else if(field.startsWith('五行数量对比-')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择值</option>';
                 WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
-                // 添加其他五行数量字段作为选项
                 if (_fieldConfigCache) {
                     const compareFields = _fieldConfigCache.filter(f => 
-                        f.field_value && (f.field_value.includes('五行数量-') || f.field_value.startsWith('五行数量对比-')) && f.field_value !== field
+                        f.field_value && f.field_value.startsWith('五行数量对比-') && f.field_value !== field
                     );
                     compareFields.forEach(f => {
                         valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
                     });
                 }
             }
-            else if(field.includes('十神数量-') || field.startsWith('十神数量对比-')){
+            else if(field.startsWith('十神数量对比-')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择值</option>';
-                // 所有十神类型（区分阴阳+不区分阴阳）
                 const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
                 allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
-                // 添加其他十神数量字段作为选项
                 if (_fieldConfigCache) {
                     const compareFields = _fieldConfigCache.filter(f => 
-                        f.field_value && (f.field_value.includes('十神数量-') || f.field_value.startsWith('十神数量对比-')) && f.field_value !== field
+                        f.field_value && f.field_value.startsWith('十神数量对比-') && f.field_value !== field
                     );
                     compareFields.forEach(f => {
                         valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
