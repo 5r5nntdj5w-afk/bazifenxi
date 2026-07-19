@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8210,15 +8210,23 @@
                 let childResult;
                 
                 if (child.macroRef) {
+                    console.log('=== 条件宏引用追踪 ===');
+                    console.log('宏引用ID:', child.macroRef);
+                    console.log('cache.conditionMacros长度:', (cache.conditionMacros || []).length);
+                    console.log('cache.conditionMacros列表:', (cache.conditionMacros || []).map(m => ({ id: m.id, cloudId: m.cloudId, name: m.name })));
                     if (visitedMacros.has(child.macroRef)) {
+                        console.warn('检测到条件宏循环引用:', child.macroRef);
                         childResult = false;
                     } else {
                         const macro = (cache.conditionMacros || []).find(m => String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef));
+                        console.log('宏查找结果:', macro ? `找到宏: ${macro.name}` : '未找到宏');
                         if (macro && macro.conditions) {
+                            console.log('宏条件结构:', JSON.stringify(macro.conditions));
                             const newVisited = new Set(visitedMacros);
                             newVisited.add(child.macroRef);
                             childResult = evaluateConditionGroup(macro.conditions, depth + 1, newVisited);
                         } else {
+                            console.warn('宏不存在或条件为空:', child.macroRef);
                             childResult = false;
                         }
                     }
@@ -9856,7 +9864,7 @@
                 if (!field || !val) {
                     return { error: '请完善所有条件！' };
                 }
-                children.push({ field, op, val });
+                children.push({ logic, field, op, val });
             } else if (child.classList.contains('condition-group')) {
                 // 递归收集条件组数据
                 const groupLogic = child.querySelector('.group-logic').value;
