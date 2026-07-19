@@ -1,4 +1,4 @@
-﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -22637,13 +22637,13 @@ function generateMacroId() {
     }
 }
 
-function saveMacro(macroData) {
+async function saveMacro(macroData) {
     const macros = getAllMacros();
     const now = new Date().toISOString();
     const existing = macros.find(m => m.id === macroData.id);
+    const isNew = !existing;
     if (existing) {
         Object.assign(existing, macroData, { updateTime: now });
-        // 为旧数据补全 createdBy
         if (!existing.createdBy) existing.createdBy = getCurrentUserId() || '';
         if (existing.permission === undefined) existing.permission = 0;
     } else {
@@ -22659,13 +22659,138 @@ function saveMacro(macroData) {
     }
     cache.conditionMacros = macros;
     localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+    
+    // 自动同步到云端（若已登录）
+    if (currentUser && supabaseClient && macroData.createdBy === getCurrentUserId()) {
+        try {
+            const idMapping = getIdMapping();
+            if (isNew) {
+                const cloudMacro = await addSupabaseMacro(macroData);
+                if (cloudMacro && cloudMacro.id) {
+                    if (!idMapping.macros) idMapping.macros = {};
+                    idMapping.macros[macroData.id] = cloudMacro.id;
+                    saveIdMapping(idMapping);
+                }
+            } else {
+                const cloudId = getCloudId(idMapping, 'macros', macroData.id);
+                if (cloudId) {
+                    await updateSupabaseMacro(cloudId, macroData);
+                }
+            }
+        } catch(e) {
+            console.warn('条件宏自动同步到云端失败:', e);
+        }
+    }
+    
     return macroData;
 }
 
-function deleteMacro(macroId) {
+async function deleteMacro(macroId) {
     const macros = getAllMacros().filter(m => m.id !== macroId);
     cache.conditionMacros = macros;
     localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+    
+    // 同步删除云端（若已登录）
+    if (currentUser && supabaseClient) {
+        try {
+            const idMapping = getIdMapping();
+            const cloudId = getCloudId(idMapping, 'macros', macroId);
+            if (cloudId) {
+                await deleteSupabaseMacro(cloudId);
+                delete idMapping.macros[macroId];
+                saveIdMapping(idMapping);
+            }
+        } catch(e) {
+            console.warn('条件宏删除同步到云端失败:', e);
+        }
+    }
+}
+
+async function deduplicateMacros() {
+    if (!currentUser || !supabaseClient) {
+        alert('请先登录！');
+        return;
+    }
+    
+    const { data: cloudMacros, error } = await supabaseClient
+        .from('condition_macros')
+        .select('*')
+        .eq('user_id', currentUser.id);
+    
+    if (error) {
+        console.error('获取云端条件宏失败:', error);
+        return;
+    }
+    
+    const idMapping = getIdMapping();
+    const localMacros = getAllMacros();
+    
+    const keyMap = new Map();
+    const duplicates = [];
+    const referencedCloudIds = new Set();
+    
+    for (const localMacro of localMacros) {
+        const cloudId = getCloudId(idMapping, 'macros', localMacro.id);
+        if (cloudId) {
+            referencedCloudIds.add(cloudId);
+        }
+    }
+    
+    for (const cloudMacro of (cloudMacros || [])) {
+        const key = `${cloudMacro.name}|||${JSON.stringify(cloudMacro.conditions)}`;
+        if (!keyMap.has(key)) {
+            keyMap.set(key, []);
+        }
+        keyMap.get(key).push(cloudMacro);
+    }
+    
+    keyMap.forEach((macrosWithSameKey, key) => {
+        if (macrosWithSameKey.length > 1) {
+            const name = key.split('|||')[0];
+            macrosWithSameKey.forEach((macro, index) => {
+                if (index > 0) {
+                    duplicates.push({
+                        id: macro.id,
+                        name: macro.name,
+                        isReferenced: referencedCloudIds.has(macro.id)
+                    });
+                }
+            });
+        }
+    });
+    
+    if (duplicates.length === 0) {
+        alert('没有重复的条件宏！');
+        return;
+    }
+    
+    const referencedCount = duplicates.filter(d => d.isReferenced).length;
+    const unreferencedCount = duplicates.length - referencedCount;
+    
+    if (!confirm(`发现 ${duplicates.length} 个重复的条件宏！\n\n被引用的重复宏：${referencedCount} 个（将保留）\n未被引用的重复宏：${unreferencedCount} 个（将删除）\n\n确定要删除未被引用的重复宏吗？`)) {
+        return;
+    }
+    
+    let deletedCount = 0;
+    for (const dup of duplicates) {
+        if (!dup.isReferenced) {
+            try {
+                const { error: deleteError } = await supabaseClient
+                    .from('condition_macros')
+                    .delete()
+                    .eq('id', dup.id);
+                if (!deleteError) {
+                    deletedCount++;
+                } else {
+                    console.error('删除重复宏失败:', deleteError);
+                }
+            } catch(e) {
+                console.error('删除重复宏异常:', e);
+            }
+        }
+    }
+    
+    alert(`成功删除 ${deletedCount} 个未被引用的重复条件宏！`);
 }
 
 // 递归展开宏引用为实际的条件文本（用于显示）
@@ -25099,7 +25224,7 @@ async function syncLocalToCloud() {
                 // 云端没有对应数据，插入新标签
                 const { data: newTag, error } = await supabaseClient
                     .from('event_tags')
-                    .insert([{ ...record, id: tag.id }])
+                    .insert([record])
                     .select()
                     .single();
                 
