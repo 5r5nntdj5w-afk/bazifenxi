@@ -262,26 +262,17 @@ function evaluateLeafCondition(data, cond) {
         }
       }
     }
-    // 位置到 data 字段的映射
     var pbPathMap = {
       '年干': 'nian.t','月干': 'yue.t','日干': 'ri.t','时干': 'shi.t',
       '大运干': 'dayun.t','流年干': 'liunian.t','流月干': 'liuyue.t',
       '年支': 'nian.d','月支': 'yue.d','日支': 'ri.d','时支': 'shi.d',
       '大运支': 'dayun.d','流年支': 'liunian.d','流月支': 'liuyue.d'
     };
-    // 注意：UI 中位置名是 "年干/月干/.../大运干/流年干/流月干"（天干）或 "年干/月干/.../大运干/流年干/流月干"（地支时也是这些名字）
-    // 实际上 UI 中地支时位置名应为 "年支/月支/..."，但为了简化，UI 中位置名统一用 "年干/月干/..." 表示天干位置
-    // 当 ganZhi=地支 时，需要把 "年干" 转换为 "年支"
     var rg = data.ri && data.ri.t ? data.ri.t : '';
     var allMatch = true;
     for (var posName in pbPositions) {
       var posCfg = pbPositions[posName];
-      // 根据 ganZhi 转换位置名
-      var actualPosName = posName;
-      if (pbGanZhi === '地支') {
-        actualPosName = posName.replace('干', '支');
-      }
-      var path = pbPathMap[actualPosName];
+      var path = pbPathMap[posName];
       if (!path) { allMatch = false; break; }
       var keys = path.split('.');
       var node = data;
@@ -289,27 +280,24 @@ function evaluateLeafCondition(data, cond) {
         node = node ? node[keys[ki]] : null;
       }
       if (!node) { allMatch = false; break; }
-      // 根据 pbType 计算实际值
       var actualVal = '';
       if (pbType === '五行') {
         actualVal = WU_XING[node] || '';
       } else if (pbType === '十神') {
-        // 天干用 getExactShen，地支用 getDiShen
-        if (pbGanZhi === '天干') {
-          actualVal = getExactShen(node, rg);
-        } else {
+        if (posName.indexOf('支') >= 0) {
           actualVal = getDiShen(node, rg);
+        } else {
+          actualVal = getExactShen(node, rg);
         }
       } else if (pbType === '十神组') {
         var shenTmp;
-        if (pbGanZhi === '天干') {
-          shenTmp = getExactShen(node, rg);
-        } else {
+        if (posName.indexOf('支') >= 0) {
           shenTmp = getDiShen(node, rg);
+        } else {
+          shenTmp = getExactShen(node, rg);
         }
         actualVal = SHEN_TO_GROUP[shenTmp] || '';
       }
-      // 比较
       var posMatch = (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
       if (!posMatch) { allMatch = false; break; }
     }

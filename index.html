@@ -7420,10 +7420,7 @@
                 let allMatch = true;
                 for(const posName in pbPositions){
                     const posCfg = pbPositions[posName];
-                    // 根据 ganZhi 转换位置名
-                    let actualPosName = posName;
-                    if(pbGanZhi === '地支') actualPosName = posName.replace('干','支');
-                    const path = pbPathMap[actualPosName];
+                    const path = pbPathMap[posName];
                     if(!path){ allMatch = false; break; }
                     const [k, p] = path.split('.');
                     const node = data[k]?.[p];
@@ -7432,9 +7429,9 @@
                     if(pbType === '五行'){
                         actualVal = WU_XING[node] || '';
                     } else if(pbType === '十神'){
-                        actualVal = pbGanZhi === '天干' ? getExactShen(node, rg) : getDiShen(node, rg);
+                        actualVal = posName.indexOf('支') >= 0 ? getDiShen(node, rg) : getExactShen(node, rg);
                     } else if(pbType === '十神组'){
-                        const shenTmp = pbGanZhi === '天干' ? getExactShen(node, rg) : getDiShen(node, rg);
+                        const shenTmp = posName.indexOf('支') >= 0 ? getDiShen(node, rg) : getExactShen(node, rg);
                         actualVal = SHEN_TO_GROUP[shenTmp] || '';
                     }
                     const posMatch = (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
@@ -26085,8 +26082,11 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 // 定位批量判断编辑器逻辑
 (function(){
-    // 位置定义
-    const PB_POSITIONS = ['年干','月干','日干','时干','大运干','流年干','流月干'];
+    // 位置定义 - 天干
+    const PB_POSITIONS_TG = ['年干','月干','日干','时干','大运干','流年干','流月干'];
+    // 位置定义 - 地支
+    const PB_POSITIONS_DZ = ['年支','月支','日支','时支','大运支','流年支','流月支'];
+    // 层级映射 - 使用天干名称作为键（内部统一）
     const PB_SCOPE_MAP = {
         '原局': ['年干','月干','日干','时干'],
         '原局+大运': ['年干','月干','日干','时干','大运干'],
@@ -26100,34 +26100,73 @@ document.addEventListener('DOMContentLoaded', function() {
     // 记录层级切换前的勾选状态，避免切换层级时丢失
     let _positionCache = {};
 
+    // 根据干支类型获取显示位置名
+    function getPositionDisplayName(posKey, ganzhi){
+        if(ganzhi === '地支'){
+            return posKey.replace('干', '支');
+        }
+        return posKey;
+    }
+
+    // 根据判断类型和位置获取值选项
+    function getValueOptions(judgeType, posKey){
+        if(judgeType === '五行'){
+            return WU_LIST.map(w => `<option value="${w}">${w}</option>`).join('');
+        } else if(judgeType === '十神'){
+            // 日干的十神只能是比肩或劫财
+            if(posKey === '日干'){
+                return `<option value="比肩">比肩</option><option value="劫财">劫财</option>`;
+            }
+            return FULL_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
+        } else if(judgeType === '十神组'){
+            // 日干的十神组只能是比劫
+            if(posKey === '日干'){
+                return `<option value="比劫">比劫</option>`;
+            }
+            return GROUPED_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+        return '';
+    }
+
+    // 获取日干的默认值
+    function getDefaultDayValue(judgeType){
+        if(judgeType === '十神') return '比肩';
+        if(judgeType === '十神组') return '比劫';
+        return '';
+    }
+
     // 渲染位置勾选区
-    function renderPositions(scope, judgeType){
+    function renderPositions(scope, judgeType, ganzhi){
         const positions = PB_SCOPE_MAP[scope] || [];
         const container = document.getElementById('pb-positions');
         container.innerHTML = '';
-        // 值选项
-        let valueOptions = '';
-        if(judgeType === '五行'){
-            WU_LIST.forEach(w => { valueOptions += `<option value="${w}">${w}</option>`; });
-        } else if(judgeType === '十神'){
-            FULL_SHEN.forEach(s => { valueOptions += `<option value="${s}">${s}</option>`; });
-        } else if(judgeType === '十神组'){
-            GROUPED_SHEN.forEach(s => { valueOptions += `<option value="${s}">${s}</option>`; });
-        }
-        positions.forEach(pos => {
-            const cached = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
+        
+        positions.forEach(posKey => {
+            const displayName = getPositionDisplayName(posKey, ganzhi);
+            // 获取缓存或默认值
+            let cached = _positionCache[posKey];
+            if(!cached){
+                // 默认勾选所有位置
+                cached = { checked: true, op: 'eq', val: '' };
+                // 日干设置默认值
+                if(posKey === '日干'){
+                    cached.val = getDefaultDayValue(judgeType);
+                }
+            }
+            const valueOptions = getValueOptions(judgeType, posKey);
+            
             const row = document.createElement('div');
             row.className = 'flex items-center gap-2 p-2 border rounded hover:bg-purple-50';
             row.innerHTML = `
                 <label class="flex items-center gap-1 w-20 shrink-0">
-                    <input type="checkbox" class="pb-pos-check" data-pos="${pos}" ${cached.checked ? 'checked' : ''}>
-                    <span class="text-sm font-medium">${pos}</span>
+                    <input type="checkbox" class="pb-pos-check" data-pos="${posKey}" ${cached.checked ? 'checked' : ''}>
+                    <span class="text-sm font-medium">${displayName}</span>
                 </label>
-                <select class="pb-pos-op w-24 p-1 border rounded text-sm" data-pos="${pos}">
+                <select class="pb-pos-op w-24 p-1 border rounded text-sm" data-pos="${posKey}">
                     <option value="eq" ${cached.op === 'eq' ? 'selected' : ''}>等于</option>
                     <option value="ne" ${cached.op === 'ne' ? 'selected' : ''}>不等于</option>
                 </select>
-                <select class="pb-pos-val flex-1 p-1 border rounded text-sm" data-pos="${pos}">
+                <select class="pb-pos-val flex-1 p-1 border rounded text-sm" data-pos="${posKey}">
                     <option value="">--不限--</option>
                     ${valueOptions}
                 </select>
@@ -26138,18 +26177,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if(cached.val) valSel.value = cached.val;
             // 绑定变化事件，更新缓存
             row.querySelector('.pb-pos-check').onchange = (e) => {
-                _positionCache[pos] = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
-                _positionCache[pos].checked = e.target.checked;
+                _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
+                _positionCache[posKey].checked = e.target.checked;
             };
             row.querySelector('.pb-pos-op').onchange = (e) => {
-                _positionCache[pos] = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
-                _positionCache[pos].op = e.target.value;
+                _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
+                _positionCache[posKey].op = e.target.value;
             };
             valSel.onchange = (e) => {
-                _positionCache[pos] = _positionCache[pos] || { checked: false, op: 'eq', val: '' };
-                _positionCache[pos].val = e.target.value;
+                _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
+                _positionCache[posKey].val = e.target.value;
             };
         });
+    }
+
+    // 设置判断类型下拉框选项
+    function setJudgeTypeOptions(field){
+        const select = document.getElementById('pb-judge-type');
+        if(field === '定位批量-五行'){
+            select.innerHTML = '<option value="五行">五行</option>';
+            select.value = '五行';
+            select.disabled = true;
+        } else if(field === '定位批量-十神'){
+            select.innerHTML = '<option value="十神">十神</option><option value="十神组">十神组</option>';
+            select.value = '十神';
+            select.disabled = false;
+        }
     }
 
     // 打开编辑器
@@ -26157,10 +26210,12 @@ document.addEventListener('DOMContentLoaded', function() {
         _currentItem = item;
         _currentField = field;
         _positionCache = {};
+        // 设置判断类型选项
+        setJudgeTypeOptions(field);
         // 从 item 中读取已有值
         const valSel = item.querySelector('.condition-val-select');
         const existingVal = valSel.value || '';
-        let judgeType = '十神';
+        let judgeType = field === '定位批量-五行' ? '五行' : '十神';
         let ganzhi = '天干';
         let scope = '原局';
         if(existingVal.startsWith('定位批量|')){
@@ -26170,7 +26225,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 else if(p.startsWith('ganZhi=')) ganzhi = p.replace('ganZhi=','');
                 else if(p.startsWith('scope=')) scope = p.replace('scope=','');
                 else if(p.includes('=')){
-                    // 支持 年干=食伤 和 年干!=食伤 两种格式
                     let op = 'eq';
                     let posVal = p;
                     if(p.includes('!=')){
@@ -26178,8 +26232,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         posVal = p.replace('!=','=');
                     }
                     const [pos, val] = posVal.split('=');
-                    if(PB_POSITIONS.includes(pos)){
-                        _positionCache[pos] = { checked: true, op: op, val: val };
+                    // 兼容天干和地支的位置名（统一转换为天干键名）
+                    const posKey = pos.replace('支', '干');
+                    if(PB_POSITIONS_TG.includes(posKey)){
+                        _positionCache[posKey] = { checked: true, op: op, val: val };
                     }
                 }
             });
@@ -26187,7 +26243,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pb-judge-type').value = judgeType;
         document.getElementById('pb-ganzhi').value = ganzhi;
         document.getElementById('pb-scope').value = scope;
-        renderPositions(scope, judgeType);
+        renderPositions(scope, judgeType, ganzhi);
         document.getElementById('position-batch-modal').classList.remove('hidden');
     };
 
@@ -26200,13 +26256,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 配置项变化时重新渲染
     document.getElementById('pb-judge-type').onchange = function(){
-        renderPositions(document.getElementById('pb-scope').value, this.value);
+        const ganzhi = document.getElementById('pb-ganzhi').value;
+        const scope = document.getElementById('pb-scope').value;
+        renderPositions(scope, this.value, ganzhi);
     };
     document.getElementById('pb-ganzhi').onchange = function(){
-        // 干支变化不影响位置列表，只影响匹配逻辑
+        const judgeType = document.getElementById('pb-judge-type').value;
+        const scope = document.getElementById('pb-scope').value;
+        renderPositions(scope, judgeType, this.value);
     };
     document.getElementById('pb-scope').onchange = function(){
-        renderPositions(this.value, document.getElementById('pb-judge-type').value);
+        const judgeType = document.getElementById('pb-judge-type').value;
+        const ganzhi = document.getElementById('pb-ganzhi').value;
+        renderPositions(this.value, judgeType, ganzhi);
     };
 
     // 保存按钮
@@ -26218,10 +26280,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // 收集勾选的位置
         const checked = [];
         const positions = PB_SCOPE_MAP[scope] || [];
-        positions.forEach(pos => {
-            const cache = _positionCache[pos];
+        positions.forEach(posKey => {
+            const cache = _positionCache[posKey];
             if(cache && cache.checked && cache.val){
-                checked.push(`${pos}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
+                // 使用显示名称（天干或地支）
+                const displayName = getPositionDisplayName(posKey, ganzhi);
+                checked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
             }
         });
         if(checked.length === 0){
