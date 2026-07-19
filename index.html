@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7972,7 +7972,25 @@
             }
             else if(c.field.startsWith('五行数量对比-')){
                 const cnt1 = getScopeWuxingCount(c.field, data, stats);
-                const cnt2 = getScopeWuxingCount(c.val, data, stats);
+                let cnt2;
+                if (_fieldConfigCache) {
+                    const valConfig = _fieldConfigCache.find(f => f.field_value === c.val);
+                    if (valConfig && valConfig.template_type === 'count_compare_wuxing') {
+                        cnt2 = getScopeWuxingCount(c.val, data, stats);
+                    } else if (WU_LIST.includes(c.val)) {
+                        cnt2 = stats.wuCount[c.val] || 0;
+                    } else if (c.val.startsWith('五行数量对比-')) {
+                        cnt2 = getScopeWuxingCount(c.val, data, stats);
+                    } else {
+                        cnt2 = getScopeWuxingCount(c.val, data, stats);
+                    }
+                } else {
+                    if (WU_LIST.includes(c.val)) {
+                        cnt2 = stats.wuCount[c.val] || 0;
+                    } else {
+                        cnt2 = getScopeWuxingCount(c.val, data, stats);
+                    }
+                }
                 if(c.op === 'eq') res = cnt1 == cnt2;
                 else if(c.op === 'ge') res = cnt1 >= cnt2;
                 else if(c.op === 'gt') res = cnt1 > cnt2;
@@ -7981,7 +7999,17 @@
             }
             else if(c.field.startsWith('十神数量对比-')){
                 const cnt1 = getScopeShishenCount(c.field, data, stats);
-                const cnt2 = getScopeShishenCount(c.val, data, stats);
+                let cnt2;
+                if (_fieldConfigCache) {
+                    const valConfig = _fieldConfigCache.find(f => f.field_value === c.val);
+                    if (valConfig && valConfig.template_type === 'count_compare_shishen') {
+                        cnt2 = getScopeShishenCount(c.val, data, stats);
+                    } else {
+                        cnt2 = stats.shenCount[c.val] || 0;
+                    }
+                } else {
+                    cnt2 = stats.shenCount[c.val] || 0;
+                }
                 if(c.op === 'eq') res = cnt1 == cnt2;
                 else if(c.op === 'ge') res = cnt1 >= cnt2;
                 else if(c.op === 'gt') res = cnt1 > cnt2;
@@ -8062,7 +8090,15 @@
                     const tt = config.template_type;
                     if (tt === 'count_compare_wuxing') {
                         const cnt1 = getScopeWuxingCount(c.field, data, stats);
-                        const cnt2 = getScopeWuxingCount(c.val, data, stats);
+                        let cnt2;
+                        const valConfig = _fieldConfigCache.find(f => f.field_value === c.val);
+                        if (valConfig && valConfig.template_type === 'count_compare_wuxing') {
+                            cnt2 = getScopeWuxingCount(c.val, data, stats);
+                        } else if (WU_LIST.includes(c.val)) {
+                            cnt2 = stats.wuCount[c.val] || 0;
+                        } else {
+                            cnt2 = getScopeWuxingCount(c.val, data, stats);
+                        }
                         if(c.op === 'eq') res = cnt1 == cnt2;
                         else if(c.op === 'ge') res = cnt1 >= cnt2;
                         else if(c.op === 'gt') res = cnt1 > cnt2;
@@ -8070,7 +8106,13 @@
                         else if(c.op === 'lt') res = cnt1 < cnt2;
                     } else if (tt === 'count_compare_shishen') {
                         const cnt1 = getScopeShishenCount(c.field, data, stats);
-                        const cnt2 = getScopeShishenCount(c.val, data, stats);
+                        let cnt2;
+                        const valConfig = _fieldConfigCache.find(f => f.field_value === c.val);
+                        if (valConfig && valConfig.template_type === 'count_compare_shishen') {
+                            cnt2 = getScopeShishenCount(c.val, data, stats);
+                        } else {
+                            cnt2 = stats.shenCount[c.val] || 0;
+                        }
                         if(c.op === 'eq') res = cnt1 == cnt2;
                         else if(c.op === 'ge') res = cnt1 >= cnt2;
                         else if(c.op === 'gt') res = cnt1 > cnt2;
@@ -9071,6 +9113,14 @@
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择值</option>';
                 WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
+                if (_fieldConfigCache) {
+                    const compareFields = _fieldConfigCache.filter(f => 
+                        f.field_value && (f.field_value.startsWith('五行数量对比-') || f.template_type === 'count_compare_wuxing') && f.field_value !== field
+                    );
+                    compareFields.forEach(f => {
+                        valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
+                    });
+                }
             }
             else if(field.startsWith('十神数量对比-')){
                 opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -9078,6 +9128,14 @@
                 valSel.innerHTML = '<option value="">请选择值</option>';
                 const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
                 allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
+                if (_fieldConfigCache) {
+                    const compareFields = _fieldConfigCache.filter(f => 
+                        f.field_value && (f.field_value.startsWith('十神数量对比-') || f.template_type === 'count_compare_shishen') && f.field_value !== field
+                    );
+                    compareFields.forEach(f => {
+                        valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
+                    });
+                }
             }
             else if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) {
                 const config = _fieldConfigCache.find(f => f.field_value === field);
@@ -9115,12 +9173,28 @@
                         valSel.classList.remove('hidden');
                         valSel.innerHTML = '<option value="">请选择值</option>';
                         WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
+                        if (_fieldConfigCache) {
+                            const compareFields = _fieldConfigCache.filter(f => 
+                                f.field_value && f.template_type === 'count_compare_wuxing' && f.field_value !== field
+                            );
+                            compareFields.forEach(f => {
+                                valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
+                            });
+                        }
                     } else if (tt === 'count_compare_shishen') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
                         valSel.classList.remove('hidden');
                         valSel.innerHTML = '<option value="">请选择值</option>';
                         const allShenTypes = ['比肩','劫财','食神','伤官','正财','偏财','正官','七杀','正印','偏印','比劫','食伤','财星','官杀','印星'];
                         allShenTypes.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}数量</option>`; });
+                        if (_fieldConfigCache) {
+                            const compareFields = _fieldConfigCache.filter(f => 
+                                f.field_value && f.template_type === 'count_compare_shishen' && f.field_value !== field
+                            );
+                            compareFields.forEach(f => {
+                                valSel.innerHTML += `<option value="${f.field_value}">${f.field_name}</option>`;
+                            });
+                        }
                     } else if (tt === 'gender') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ne">不等于</option>';
                         valSel.classList.remove('hidden');
