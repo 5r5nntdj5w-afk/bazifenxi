@@ -8732,14 +8732,81 @@
         cache.lastCalcData = data;
         positionShenCards(); // 更新十神卡片位置
         if (!data.hasBirthData) {
-            // 手动修改了天干地支 → 走本地匹配
+            // 手动修改了天干地支 → 调用 API 匹配（而非本地匹配）
             window.apiDuanyuCache = null;
-            matchRules(data);
+            callManualApiDuanyu(data);
         } else {
             // 使用 API 断语缓存渲染（保护断语规则不暴露在客户端）
             renderApiDuanyu();
         }
         saveHistory(data);
+    }
+
+    /** 手动修改天干地支后调用 API 匹配断语 */
+    let _manualApiCalling = false;
+    function callManualApiDuanyu(data) {
+        if (_manualApiCalling) { renderApiDuanyu(); return; }
+        // API 返回后 cache 已设置，直接渲染（阻断 calcAll 循环调用）
+        if (window.apiDuanyuCache) { renderApiDuanyu(); return; }
+        _manualApiCalling = true;
+        
+        var baziForMatch = {
+            nian: { gan: data.nian.t, zhi: data.nian.d },
+            yue: { gan: data.yue.t, zhi: data.yue.d },
+            ri: { gan: data.ri.t, zhi: data.ri.d },
+            shi: { gan: data.shi.t, zhi: data.shi.d }
+        };
+        
+        var genderStr = (document.getElementById('birth-gender')?.value === '1' ? '男' : '女');
+        var birthYear = window.lastPaipanData ? window.lastPaipanData.birthYear : null;
+        
+        var currentDayunItem = null;
+        if (window.currentDaYun) {
+            var dyGanZhi = window.currentDaYun.getGanZhi();
+            currentDayunItem = {
+                gan: dyGanZhi ? dyGanZhi.charAt(0) : '',
+                zhi: dyGanZhi ? dyGanZhi.charAt(1) : '',
+                ganZhi: dyGanZhi,
+                startAge: window.currentDaYun.getStartAge(),
+                startYear: window.currentDaYun.getStartYear(),
+                endYear: window.currentDaYun.getEndYear()
+            };
+        }
+        
+        var currentLiunianItem = null;
+        var activeLiunian = document.querySelector('.liunian-item.active');
+        if (activeLiunian) {
+            var lnYear = parseInt(activeLiunian.querySelector('.liunian-year')?.textContent);
+            var lnGanZhi = activeLiunian.querySelector('.liunian-ganzhi')?.textContent;
+            if (!isNaN(lnYear) && lnGanZhi) {
+                currentLiunianItem = {
+                    year: lnYear,
+                    gan: lnGanZhi.charAt(0),
+                    zhi: lnGanZhi.charAt(1),
+                    ganZhi: lnGanZhi
+                };
+            }
+        }
+        
+        var currentLiuyueItem = null;
+        var liuyueGan = document.querySelector('.tiangan[data-type="liuyue"]')?.value;
+        var liuyueZhi = document.querySelector('.dizhi[data-type="liuyue"]')?.value;
+        if (liuyueGan && liuyueZhi) {
+            currentLiuyueItem = { gan: liuyueGan, zhi: liuyueZhi };
+        }
+        
+        callDuanyuMatchApi(baziForMatch, genderStr, birthYear, null, null,
+            currentDayunItem, currentLiunianItem, currentLiuyueItem
+        ).then(function(duanyu) {
+            _manualApiCalling = false;
+            window.apiDuanyuCache = { duanyu: duanyu || [] };
+            calcAll();
+        }).catch(function(e) {
+            console.warn('手动修改-API断语匹配失败:', e.message);
+            _manualApiCalling = false;
+            window.apiDuanyuCache = null;
+            calcAll();
+        });
     }
 
     function clearCalc(){
