@@ -8743,8 +8743,13 @@
 
     /** 手动修改天干地支后调用 API 匹配断语 */
     let _manualApiCalling = false;
+    let _manualApiRetry = false;
     function callManualApiDuanyu(data) {
-        if (_manualApiCalling) { renderApiDuanyu(); return; }
+        if (_manualApiCalling) {
+            // 已有 API 请求在途中，标记需要重试（用最新数据重新调 API）
+            _manualApiRetry = true;
+            return;
+        }
         // API 返回后 cache 已设置，直接渲染（阻断 calcAll 循环调用）
         if (window.apiDuanyuCache) { renderApiDuanyu(); return; }
         _manualApiCalling = true;
@@ -8798,11 +8803,18 @@
             currentDayunItem, currentLiunianItem, currentLiuyueItem
         ).then(function(duanyu) {
             _manualApiCalling = false;
+            if (_manualApiRetry) {
+                // 在 API 请求途中数据又变更了，不更新缓存，重新触发 calcAll
+                _manualApiRetry = false;
+                calcAll();
+                return;
+            }
             window.apiDuanyuCache = { duanyu: duanyu || [] };
             calcAll();
         }).catch(function(e) {
             console.warn('手动修改-API断语匹配失败:', e.message);
             _manualApiCalling = false;
+            _manualApiRetry = false;
             window.apiDuanyuCache = null;
             calcAll();
         });
