@@ -8733,7 +8733,6 @@
         positionShenCards(); // 更新十神卡片位置
         if (!data.hasBirthData) {
             // 手动修改了天干地支 → 调用 API 匹配（而非本地匹配）
-            window.apiDuanyuCache = null;
             callManualApiDuanyu(data);
         } else {
             // 使用 API 断语缓存渲染（保护断语规则不暴露在客户端）
