@@ -21706,6 +21706,29 @@ function loadConditionsToEditor(container, conditions) {
                             cb.checked = shouldCheck;
                         });
                     }
+                    // 定位批量字段：valSelect/valInput/valCheckbox 均被隐藏，需要单独解析和回显摘要
+                    if ((child.field || '').startsWith('定位批量-') && child.val && child.val.startsWith('定位批量|')) {
+                        // 将编码值存入隐藏的 valSelect（供保存时 collectConditionGroupData 读取）
+                        if (valSelect) {
+                            valSelect.innerHTML = '<option value="' + escapeHtml(child.val) + '">' + escapeHtml(child.val) + '</option>';
+                            valSelect.value = child.val;
+                        }
+                        var summarySpan = item.querySelector('.position-batch-summary');
+                        if (summarySpan) {
+                            var parts = child.val.split('|');
+                            var sType = '', sGz = '', sScope = '';
+                            var sPositions = [];
+                            parts.forEach(function(p){
+                                if(p.startsWith('type=')) sType = p.replace('type=','');
+                                else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
+                                else if(p.startsWith('scope=')) sScope = p.replace('scope=','');
+                                else if(p.includes('=')) sPositions.push(p);
+                            });
+                            var summaryText = sType + '·' + sGz + '·' + sScope + ': ' + sPositions.join(', ');
+                            summarySpan.textContent = summaryText;
+                            summarySpan.title = summaryText;
+                        }
+                    }
                 }, 0);
             }
         }
