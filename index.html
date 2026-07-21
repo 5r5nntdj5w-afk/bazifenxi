@@ -22857,6 +22857,72 @@ async function saveMacro(macroData) {
     cache.conditionMacros = macros;
     localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
     
+    if (!isNew) {
+        const macroId = String(macroData.id);
+        const macroCloudId = String(macroData.cloudId || '');
+        const newName = macroData.name;
+        
+        let updated = false;
+        macros.forEach(m => {
+            if (m.id === macroData.id) return;
+            if (!m.conditions || !m.conditions.children) return;
+            
+            const updateRefNames = (children) => {
+                if (!children || !Array.isArray(children)) return;
+                children.forEach(c => {
+                    if (c.macroRef) {
+                        const refId = String(c.macroRef);
+                        if (refId === macroId || refId === macroCloudId) {
+                            if (c.macroName !== newName) {
+                                c.macroName = newName;
+                                updated = true;
+                            }
+                        }
+                    }
+                    if (c.children) {
+                        updateRefNames(c.children);
+                    }
+                });
+            };
+            
+            updateRefNames(m.conditions.children);
+        });
+        
+        if (updated) {
+            cache.conditionMacros = macros;
+            localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+        }
+        
+        let rulesUpdated = false;
+        (cache.rules || []).forEach(rule => {
+            if (!rule.conditions || !rule.conditions.children) return;
+            
+            const updateRuleRefNames = (children) => {
+                if (!children || !Array.isArray(children)) return;
+                children.forEach(c => {
+                    if (c.macroRef) {
+                        const refId = String(c.macroRef);
+                        if (refId === macroId || refId === macroCloudId) {
+                            if (c.macroName !== newName) {
+                                c.macroName = newName;
+                                rulesUpdated = true;
+                            }
+                        }
+                    }
+                    if (c.children) {
+                        updateRuleRefNames(c.children);
+                    }
+                });
+            };
+            
+            updateRuleRefNames(rule.conditions.children);
+        });
+        
+        if (rulesUpdated) {
+            localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+        }
+    }
+    
     // 自动同步到云端（若已登录）
     if (currentUser && supabaseClient && macroData.createdBy === getCurrentUserId()) {
         try {
