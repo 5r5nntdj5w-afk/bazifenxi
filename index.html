@@ -1594,11 +1594,12 @@
                 <div class="condition-group border-2 border-purple-300 rounded-lg p-3 bg-purple-50 mb-3">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="text-sm text-purple-700 font-bold">条件组</span>
-                        <select class="group-logic w-20 p-1 border rounded text-sm">
+                        <select class="group-logic w-22 p-1 border rounded text-sm">
                             <option value="and">并且</option>
                             <option value="or">或者</option>
+                            <option value="not_all">全排除</option>
                         </select>
-                        <span class="text-sm text-gray-500">满足以下</span>
+                        <span class="group-logic-desc text-sm text-gray-500">满足以下</span>
                         <button class="add-child-condition px-2 py-1 bg-blue-500 text-white rounded text-xs">+条件</button>
                         <button class="add-child-group px-2 py-1 bg-purple-500 text-white rounded text-xs">+子组</button>
                         <button class="del-group px-2 py-1 bg-red-500 text-white rounded text-xs ml-auto">删除组</button>
@@ -1633,6 +1634,9 @@
                         <option value="and">并且</option>
                         <option value="or">或者</option>
                     </select>
+                    <label class="condition-exclude-label text-xs text-red-500 flex items-center gap-0.5 cursor-pointer select-none" title="勾选后该条件取反（不满足时成立）">
+                        <input type="checkbox" class="condition-exclude"> 排除
+                    </label>
                     <div class="condition-field-wrapper">
                         <select class="condition-field" style="display:none">
                         <option value="">选择字段</option>
@@ -8217,61 +8221,69 @@
             return { res, actual };
         }
         
-        // 递归评估条件组（支持宏引用 + 嵌套 + 循环引用检测）
+        // 递归评估条件组（支持宏引用 + 嵌套 + 循环引用检测 + 排除逻辑）
         function evaluateConditionGroup(group, depth = 0, visitedMacros = new Set()) {
             const logic = group.logic || 'and';
+            if (depth > 20) return false;
+            
+            if (logic === 'not_all') {
+                for (let i = 0; i < group.children.length; i++) {
+                    const child = group.children[i];
+                    const childResult = evaluateChildNode(child, depth, visitedMacros);
+                    if (child.exclude) childResult = !childResult;
+                    if (childResult) return false;
+                }
+                return true;
+            }
+            
             let result = logic === 'and';
-            if (depth > 20) return result; // 安全阀
             
             for (let i = 0; i < group.children.length; i++) {
                 const child = group.children[i];
-                let childResult;
-                
-                if (child.macroRef) {
-                    if (visitedMacros.has(child.macroRef)) {
-                        childResult = false;
-                    } else {
-                        const macro = (cache.conditionMacros || []).find(m => String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef));
-                        if (macro && macro.conditions) {
-                            const newVisited = new Set(visitedMacros);
-                            newVisited.add(child.macroRef);
-                            childResult = evaluateConditionGroup(macro.conditions, depth + 1, newVisited);
-                        } else {
-                            childResult = false;
-                        }
-                    }
-                } else if (child.ruleRef) {
-                    if (visitedMacros.has('rule:' + child.ruleRef)) {
-                        childResult = false;
-                    } else {
-                        const refRule = (cache.rules || []).find(r => String(r.id) === String(child.ruleRef) || String(r.cloudId) === String(child.ruleRef));
-                        if (refRule && refRule.conditions) {
-                            const newVisited = new Set(visitedMacros);
-                            newVisited.add('rule:' + child.ruleRef);
-                            childResult = evaluateConditionGroup(refRule.conditions, depth + 1, newVisited);
-                        } else {
-                            childResult = false;
-                        }
-                    }
-                } else if (child.children) {
-                    childResult = evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
-                } else if (child.field) {
-                    const { res } = evaluateSingleCondition(child);
-                    childResult = res;
-                } else {
-                    childResult = false;
-                }
+                const childResult = evaluateChildNode(child, depth, visitedMacros);
+                const finalResult = child.exclude ? !childResult : childResult;
                 
                 if (logic === 'and') {
-                    result = result && childResult;
+                    result = result && finalResult;
                     if (!result) break;
                 } else {
-                    result = result || childResult;
+                    result = result || finalResult;
                     if (result) break;
                 }
             }
             
             return result;
+        }
+        
+        function evaluateChildNode(child, depth, visitedMacros) {
+            if (child.macroRef) {
+                if (visitedMacros.has(child.macroRef)) return false;
+                const macro = (cache.conditionMacros || []).find(m => String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef));
+                if (macro && macro.conditions) {
+                    const newVisited = new Set(visitedMacros);
+                    newVisited.add(child.macroRef);
+                    return evaluateConditionGroup(macro.conditions, depth + 1, newVisited);
+                }
+                return false;
+            }
+            if (child.ruleRef) {
+                if (visitedMacros.has('rule:' + child.ruleRef)) return false;
+                const refRule = (cache.rules || []).find(r => String(r.id) === String(child.ruleRef) || String(r.cloudId) === String(child.ruleRef));
+                if (refRule && refRule.conditions) {
+                    const newVisited = new Set(visitedMacros);
+                    newVisited.add('rule:' + child.ruleRef);
+                    return evaluateConditionGroup(refRule.conditions, depth + 1, newVisited);
+                }
+                return false;
+            }
+            if (child.children) {
+                return evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
+            }
+            if (child.field) {
+                const { res } = evaluateSingleCondition(child);
+                return res;
+            }
+            return false;
         }
         
         cache.rules.forEach((rule) => {
@@ -8904,6 +8916,7 @@
         
         const logicSel = group.querySelector('.group-logic');
         logicSel.value = logic;
+        updateGroupLogicDesc(logicSel);
         
         if (isRoot) {
             group.querySelector('.del-group').remove();
@@ -8913,6 +8926,19 @@
         }
         
         return group;
+    }
+    
+    function updateGroupLogicDesc(logicSel) {
+        const desc = logicSel.closest('.condition-group').querySelector('.group-logic-desc');
+        if (!desc) return;
+        const logicVal = logicSel.value;
+        if (logicVal === 'not_all') {
+            desc.textContent = '都不满足以下条件';
+        } else if (logicVal === 'or') {
+            desc.textContent = '满足任一';
+        } else {
+            desc.textContent = '满足以下';
+        }
     }
     
     // 创建条件项元素
@@ -8999,6 +9025,9 @@
                 opSel.value = child.op || 'eq';
                 logicSel.value = child.logic || 'and';
                 
+                const excludeCb = item.querySelector('.condition-exclude');
+                if (excludeCb) excludeCb.checked = child.exclude === true;
+                
                 // 设置值
                 if (!valCheckbox.classList.contains('hidden') && child.val) {
                     var values;
@@ -9064,6 +9093,11 @@
             // 点击组内任何位置都记录该组的子容器
             const children = this.querySelector('.group-children');
             if (children) window._lastGroupChildren = children;
+        });
+        
+        const logicSel = group.querySelector('.group-logic');
+        logicSel.addEventListener('change', function() {
+            updateGroupLogicDesc(this);
         });
         
         // 添加子条件按钮
@@ -9931,6 +9965,7 @@
                 const field = child.querySelector('.condition-field').value;
                 const op = child.querySelector('.condition-op').value;
                 const logic = child.querySelector('.condition-logic')?.value || 'and';
+                const exclude = child.querySelector('.condition-exclude')?.checked === true;
                 let val = '';
 
                 const valSel = child.querySelector('.condition-val-select');
@@ -9953,7 +9988,7 @@
                 if (!field || !val) {
                     return { error: '请完善所有条件！' };
                 }
-                children.push({ logic, field, op, val });
+                children.push({ logic, field, op, val, exclude: exclude || undefined });
             } else if (child.classList.contains('condition-group')) {
                 // 递归收集条件组数据
                 const groupLogic = child.querySelector('.group-logic').value;
@@ -10271,30 +10306,32 @@
                 } else if (c.macroRef) {
                     const macro = getMacroById(c.macroRef);
                     const macroName = macro ? macro.name : (c.macroName || '(已删除)');
-                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}[宏:${macroName}]`;
+                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}${c.exclude ? '排除:' : ''}[宏:${macroName}]`;
                 } else if (c.ruleRef) {
                     const refRule = (cache.rules || []).find(r => String(r.id) === String(c.ruleRef) || String(r.cloudId) === String(c.ruleRef));
                     const refName = refRule ? refRule.duanyu : (c.ruleName || '(已删除)');
-                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}[引用:${refName}]`;
+                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}${c.exclude ? '排除:' : ''}[引用:${refName}]`;
                 } else {
-                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
+                    text += `${i > 0 ? (c.logic === 'and' ? ' 并且 ' : ' 或者 ') : ''}${c.exclude ? '排除:' : ''}${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
                 }
             });
         } else if (conditions.children) {
             conditions.children.forEach((c, i) => {
-                if (i > 0 && text) text += (c.logic === 'and' || conditions.logic === 'and') ? ' 并且 ' : ' 或者 ';
+                const connector = text ? ((c.logic === 'and' || conditions.logic === 'and') ? ' 并且 ' : ' 或者 ') : '';
+                text += connector;
+                const excludePrefix = c.exclude ? '排除:' : '';
                 if (c.macroRef) {
                     const macro = getMacroById(c.macroRef);
                     const macroName = macro ? macro.name : (c.macroName || '(已删除)');
-                    text += `[宏:${macroName}]`;
+                    text += `${excludePrefix}[宏:${macroName}]`;
                 } else if (c.ruleRef) {
                     const refRule = (cache.rules || []).find(r => String(r.id) === String(c.ruleRef) || String(r.cloudId) === String(c.ruleRef));
                     const refName = refRule ? refRule.duanyu : (c.ruleName || '(已删除)');
-                    text += `[引用:${refName}]`;
+                    text += `${excludePrefix}[引用:${refName}]`;
                 } else if (c.children) {
                     text += conditionsToText(c.children, depth + 1);
                 } else {
-                    text += `${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
+                    text += `${excludePrefix}${c.field || ''} ${getOpText(c.op)} ${c.val || ''}`;
                 }
             });
         }

@@ -227,14 +227,29 @@ function evaluateConditionNode(data, condNode) {
   // 分支节点：包含 logic, children
   if (condNode.logic && condNode.children && condNode.children.length > 0) {
     var children = condNode.children;
+    
+    // not_all 逻辑：全排除 — 所有子条件都不满足时才返回 true
+    if (condNode.logic === 'not_all') {
+      for (var i = 0; i < children.length; i++) {
+        var childResult = evaluateConditionNode(data, children[i]);
+        if (children[i].exclude) childResult = !childResult; // 子条件自身的排除取反
+        if (childResult) return false; // 任一条件满足 → 全排除失败
+      }
+      return true; // 全都不满足 → 全排除成立
+    }
+    
     if (condNode.logic === 'or') {
       for (var i = 0; i < children.length; i++) {
-        if (evaluateConditionNode(data, children[i])) return true;
+        var childResult = evaluateConditionNode(data, children[i]);
+        if (children[i].exclude) childResult = !childResult;
+        if (childResult) return true;
       }
       return false;
     } else {
       for (var i = 0; i < children.length; i++) {
-        if (!evaluateConditionNode(data, children[i])) return false;
+        var childResult = evaluateConditionNode(data, children[i]);
+        if (children[i].exclude) childResult = !childResult;
+        if (!childResult) return false;
       }
       return true;
     }
