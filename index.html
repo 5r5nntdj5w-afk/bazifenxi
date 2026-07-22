@@ -1102,6 +1102,16 @@
 
         <div class="bg-white p-4 rounded shadow">
             <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-bold text-amber-800">📚 历史排盘记录</h3>
+                <button id="clear-history" class="px-3 py-1 bg-gray-200 rounded text-sm">清空历史</button>
+            </div>
+            <div id="history-list" class="max-h-200 overflow-y-auto space-y-2 p-2">
+                <p class="text-gray-500">暂无历史排盘记录</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded shadow">
+            <div class="flex justify-between items-center mb-3">
                 <h3 class="text-lg font-bold text-amber-800">📝 八字输入区</h3>
                 <button id="reset-bazi" class="px-3 py-1 bg-gray-200 rounded text-sm">清空八字</button>
             </div>
@@ -1127,16 +1137,6 @@
                         <td class="border p-1"><select class="dizhi bazi-select text-xs sm:text-sm" data-type="liuyue"></select></td>
                     </tr>
                 </table>
-            </div>
-        </div>
-
-        <div class="bg-white p-4 rounded shadow">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-bold text-amber-800">📚 历史排盘记录</h3>
-                <button id="clear-history" class="px-3 py-1 bg-gray-200 rounded text-sm">清空历史</button>
-            </div>
-            <div id="history-list" class="max-h-200 overflow-y-auto space-y-2 p-2">
-                <p class="text-gray-500">暂无历史排盘记录</p>
             </div>
         </div>
 
@@ -21753,6 +21753,7 @@ function loadConditionsToEditor(container, conditions) {
             item.innerHTML = `
                 <span class="text-xs font-bold text-indigo-700">🧩 宏：${macro ? escapeHtml(macro.name) : '(已删除)'}</span>
                 <input type="hidden" class="macro-ref-id" value="${child.macroRef}">
+                <input type="hidden" class="macro-ref-name" value="${escapeHtml(child.macroName || (macro ? macro.name : ''))}">
                 <button type="button" class="ml-auto text-red-500 hover:text-red-700 text-sm font-bold" onclick="this.closest('.condition-item').remove()">&times;</button>
             `;
             container.appendChild(item);
@@ -22837,7 +22838,7 @@ function generateMacroId() {
 async function saveMacro(macroData) {
     const macros = getAllMacros();
     const now = new Date().toISOString();
-    const existing = macros.find(m => m.id === macroData.id);
+    const existing = macros.find(m => String(m.id) === String(macroData.id));
     const isNew = !existing;
     if (existing) {
         Object.assign(existing, macroData, { updateTime: now });
@@ -22864,7 +22865,7 @@ async function saveMacro(macroData) {
         
         let updated = false;
         macros.forEach(m => {
-            if (m.id === macroData.id) return;
+            if (String(m.id) === String(macroData.id)) return;
             if (!m.conditions || !m.conditions.children) return;
             
             const updateRefNames = (children) => {
@@ -22949,7 +22950,7 @@ async function saveMacro(macroData) {
 }
 
 async function deleteMacro(macroId) {
-    const macros = getAllMacros().filter(m => m.id !== macroId);
+    const macros = getAllMacros().filter(m => String(m.id) !== String(macroId));
     cache.conditionMacros = macros;
     localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
     
