@@ -21793,6 +21793,9 @@ function loadConditionsToEditor(container, conditions) {
                 // change之后设置op/logic（onchange会重置op.innerHTML）
                 if (op) op.value = child.op || 'eq';
                 if (logic) logic.value = child.logic !== undefined ? child.logic : 'and';
+                // 设置排除复选框
+                const excludeCb = item.querySelector('.condition-exclude');
+                if (excludeCb) excludeCb.checked = child.exclude === true;
                 // 设置值
                 setTimeout(() => {
                     const valSelect = item.querySelector('.condition-val-select');
