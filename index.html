@@ -9949,7 +9949,13 @@
             if (child.classList.contains('macro-ref-item')) {
                 // 条件宏引用节点
                 const macroId = child.querySelector('.macro-ref-id')?.value;
-                const macroName = child.querySelector('.macro-ref-name')?.value || '';
+                let macroName = child.querySelector('.macro-ref-name')?.value || '';
+                // 防御性回退：当macroName为空或为"(已删除)"时，尝试从缓存中获取宏名称
+                // 如果宏实际存在则不保存"(已删除)"，确保引用名称始终是最新的
+                if (macroId && (!macroName || macroName === '(已删除)')) {
+                    const resolved = getMacroById(macroId);
+                    if (resolved) macroName = resolved.name;
+                }
                 if (macroId) {
                     children.push({ macroRef: macroId, macroName: macroName });
                 }
@@ -21750,10 +21756,12 @@ function loadConditionsToEditor(container, conditions) {
             const macro = getMacroById(child.macroRef);
             const item = document.createElement('div');
             item.className = 'condition-item macro-ref-item flex items-center gap-2 mb-2 p-2 bg-indigo-100 border border-indigo-300 rounded';
+            // 始终使用宏的当前名称填充 macro-ref-name（确保保存时名称是最新的）
+            const currentMacroName = macro ? macro.name : (child.macroName || '(已删除)');
             item.innerHTML = `
                 <span class="text-xs font-bold text-indigo-700">🧩 宏：${macro ? escapeHtml(macro.name) : '(已删除)'}</span>
                 <input type="hidden" class="macro-ref-id" value="${child.macroRef}">
-                <input type="hidden" class="macro-ref-name" value="${escapeHtml(child.macroName || (macro ? macro.name : ''))}">
+                <input type="hidden" class="macro-ref-name" value="${escapeHtml(currentMacroName)}">
                 <button type="button" class="ml-auto text-red-500 hover:text-red-700 text-sm font-bold" onclick="this.closest('.condition-item').remove()">&times;</button>
             `;
             container.appendChild(item);
@@ -22953,9 +22961,68 @@ async function saveMacro(macroData) {
 }
 
 async function deleteMacro(macroId) {
-    const macros = getAllMacros().filter(m => String(m.id) !== String(macroId));
+    // 先获取被删宏的信息（用于后续清理引用）
+    const deletedMacro = getMacroById(macroId);
+    const deletedIdStr = String(macroId);
+    const deletedCloudIdStr = deletedMacro ? String(deletedMacro.cloudId || '') : '';
+    
+    const macros = getAllMacros().filter(m => String(m.id) !== deletedIdStr);
     cache.conditionMacros = macros;
     localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+    
+    // 清理其他宏中对被删宏的引用名称
+    let macrosUpdated = false;
+    macros.forEach(m => {
+        if (!m.conditions || !m.conditions.children) return;
+        const cleanRefs = (children) => {
+            if (!children || !Array.isArray(children)) return;
+            children.forEach(c => {
+                if (c.macroRef) {
+                    const refId = String(c.macroRef);
+                    if (refId === deletedIdStr || (deletedCloudIdStr && refId === deletedCloudIdStr)) {
+                        if (c.macroName !== '(已删除)') {
+                            c.macroName = '(已删除)';
+                            macrosUpdated = true;
+                        }
+                    }
+                }
+                if (c.children) {
+                    cleanRefs(c.children);
+                }
+            });
+        };
+        cleanRefs(m.conditions.children);
+    });
+    if (macrosUpdated) {
+        localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+    }
+    
+    // 清理规则中对被删宏的引用名称
+    let rulesUpdated = false;
+    (cache.rules || []).forEach(rule => {
+        if (!rule.conditions || !rule.conditions.children) return;
+        const cleanRuleRefs = (children) => {
+            if (!children || !Array.isArray(children)) return;
+            children.forEach(c => {
+                if (c.macroRef) {
+                    const refId = String(c.macroRef);
+                    if (refId === deletedIdStr || (deletedCloudIdStr && refId === deletedCloudIdStr)) {
+                        if (c.macroName !== '(已删除)') {
+                            c.macroName = '(已删除)';
+                            rulesUpdated = true;
+                        }
+                    }
+                }
+                if (c.children) {
+                    cleanRuleRefs(c.children);
+                }
+            });
+        };
+        cleanRuleRefs(rule.conditions.children);
+    });
+    if (rulesUpdated) {
+        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+    }
     
     // 同步删除云端（若已登录）
     if (currentUser && supabaseClient) {
