@@ -8975,7 +8975,15 @@
                 renderConditionGroup(child, groupChildren);
             } else if (child.macroRef) {
                 // 条件宏引用节点
-                const macro = getMacroById(child.macroRef);
+                let macro = getMacroById(child.macroRef);
+                // 【修复】当通过 macroRef 找不到宏时，尝试通过 macroName 回退查找并修复 ID
+                if (!macro && child.macroName) {
+                    const foundByName = (cache.conditionMacros || []).find(m => m.name === child.macroName);
+                    if (foundByName) {
+                        child.macroRef = String(foundByName.cloudId || foundByName.id);
+                        macro = foundByName;
+                    }
+                }
                 const macroName = macro ? macro.name : (child.macroName || '(已删除)');
                 const item = document.createElement('div');
                 item.className = 'condition-item macro-ref-item flex items-center gap-2 mb-2 p-2 bg-indigo-100 border border-indigo-300 rounded';
@@ -9950,11 +9958,26 @@
                 // 条件宏引用节点
                 const macroId = child.querySelector('.macro-ref-id')?.value;
                 let macroName = child.querySelector('.macro-ref-name')?.value || '';
+                const originalMacroName = macroName; // 保存原始值用于调试
                 // 防御性回退：当macroName为空或为"(已删除)"时，尝试从缓存中获取宏名称
                 // 如果宏实际存在则不保存"(已删除)"，确保引用名称始终是最新的
+                // 【修复加强】如果通过 macroRef 找不到宏，还尝试通过存储的 macroName 查找
+                let resolved = macroId ? getMacroById(macroId) : null;
+                if (!resolved && macroName && macroName !== '(已删除)') {
+                    // 通过名称查找（用于修复 macroRef 失效的情况）
+                    resolved = (cache.conditionMacros || []).find(m => m.name === macroName);
+                }
                 if (macroId && (!macroName || macroName === '(已删除)')) {
-                    const resolved = getMacroById(macroId);
                     if (resolved) macroName = resolved.name;
+                }
+                // 【调试】记录宏引用收集情况
+                if (originalMacroName !== macroName || macroName === '(已删除)') {
+                    console.log('【宏引用调试】collectConditionGroupData:', {
+                        macroRef: macroId,
+                        originalMacroName: originalMacroName,
+                        resolvedMacroName: macroName,
+                        macroResolved: getMacroById(macroId) ? getMacroById(macroId).name : null
+                    });
                 }
                 if (macroId) {
                     children.push({ macroRef: macroId, macroName: macroName });
@@ -12567,14 +12590,25 @@
                     const result = normalizeRuleConditions(rule.conditions, rule.permissionLevel > 0 || rule.isPublic === true);
                     if (result.changed) {
                         migrationChanged = true;
-                        // 本地缓存已更新，无需写回 Supabase（前端 anon 密钥无 PATCH 权限）
+                    }
+                }
+            }
+            // 【修复】同时迁移条件宏自身的条件中的 macroRef
+            for (const macro of (cache.conditionMacros || [])) {
+                if (macro.conditions) {
+                    const result = normalizeRuleConditions(macro.conditions);
+                    if (result.changed) {
+                        migrationChanged = true;
                     }
                 }
             }
             if (migrationChanged) {
-                console.log('条件宏引用迁移完成：部分断语的 macroRef 已更新为 cloudId');
+                console.log('条件宏引用迁移完成：部分 macroRef 已更新为 cloudId');
+                localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+                localStorage.setItem(MACRO_KEY, JSON.stringify(cache.conditionMacros || []));
             }
             
+            // 始终保存规则（即使 migrationChanged 为 false 也需保存前面合并的结果）
             localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
             // 安全清洗：移除当前用户无权访问的断语（第二道防线）
             cleanUnauthorizedRules();
@@ -12631,11 +12665,13 @@
                             // 宏未找到，可能是旧格式本地ID
                             // 检查 ID 映射表能否解析
                             const idMapping = getIdMapping();
+                            let foundViaMapping = false;
                             if (idMapping && idMapping.macros) {
                                 for (const [localId, cloudId] of Object.entries(idMapping.macros)) {
                                     if (localId === refIdStr) {
                                         c.macroRef = cloudId;
                                         changed = true;
+                                        foundViaMapping = true;
                                         // 通过 cloudId 重新查找宏
                                         const resolved = getMacroById(cloudId);
                                         if (resolved) {
@@ -12649,6 +12685,22 @@
                                             }
                                         }
                                         break;
+                                    }
+                                }
+                            }
+                            // 【修复】如果以上方式都找不到宏，尝试通过存储的 macroName 查找
+                            // 这可以修复因 sync 后 cloudId 变化导致的引用失效问题
+                            if (!foundViaMapping && c.macroName) {
+                                const byName = (cache.conditionMacros || []).find(m => m.name === c.macroName);
+                                if (byName) {
+                                    const newRefId = String(byName.cloudId || byName.id);
+                                    if (newRefId !== refIdStr) {
+                                        c.macroRef = newRefId;
+                                        changed = true;
+                                    }
+                                    if (c.macroName !== byName.name) {
+                                        c.macroName = byName.name;
+                                        changed = true;
                                     }
                                 }
                             }
@@ -20553,6 +20605,15 @@ async function saveMacroFromEditor() {
         }
     };
     
+    // 【修复】保存前归一化 macroRef：确保使用 cloudId，补全 macroName
+    if (macroData.conditions && macroData.conditions.children && macroData.conditions.children.length > 0) {
+        normalizeRuleConditions(macroData.conditions);
+    }
+    
+    // 【调试】记录保存时的宏引用数据
+    console.log('【宏引用调试】saveMacroFromEditor 保存宏引用:', 
+        JSON.parse(JSON.stringify(macroData.conditions.children.filter(c => c.macroRef))));
+    
     // 先保存到本地
     const saved = saveMacro(macroData);
     
@@ -21753,7 +21814,30 @@ function loadConditionsToEditor(container, conditions) {
     if (!conditions || !conditions.children) return;
     conditions.children.forEach(child => {
         if (child.macroRef) {
-            const macro = getMacroById(child.macroRef);
+            let macro = getMacroById(child.macroRef);
+            // 【调试】记录宏引用加载状态
+            // 【修复】当通过 macroRef 找不到宏时，尝试通过 macroName 回退查找
+            // 如果找到了，自动修复 child.macroRef 中的 ID，避免"(已删除)"问题反复出现
+            if (!macro && child.macroName) {
+                const foundByName = (cache.conditionMacros || []).find(m => m.name === child.macroName);
+                if (foundByName) {
+                    console.warn('【宏引用修复】通过名称找到宏，修复 macroRef:', {
+                        oldRef: child.macroRef,
+                        newRef: foundByName.id || foundByName.cloudId,
+                        macroName: child.macroName
+                    });
+                    child.macroRef = String(foundByName.cloudId || foundByName.id);
+                    macro = foundByName;
+                }
+            }
+            if (!macro) {
+                console.warn('【宏引用调试】宏未找到:', {
+                    macroRef: child.macroRef,
+                    macroRefType: typeof child.macroRef,
+                    storedMacroName: child.macroName,
+                    availableMacros: (cache.conditionMacros||[]).map(m => ({ id: m.id, cloudId: m.cloudId, name: m.name }))
+                });
+            }
             const item = document.createElement('div');
             item.className = 'condition-item macro-ref-item flex items-center gap-2 mb-2 p-2 bg-indigo-100 border border-indigo-300 rounded';
             // 始终使用宏的当前名称填充 macro-ref-name（确保保存时名称是最新的）
@@ -22637,37 +22721,31 @@ async function copyMacroToMine(macroId, silent = false) {
     if (!macro) return;
     if (!currentUser) { if (!silent) alert('请先登录'); return; }
     const canViewConditions = canViewMacroConditions(macro);
+    
+    // 【修复】深拷贝条件对象，防止副本与原宏共享同一条件引用
+    // 原代码直接使用 macro.conditions（引用共享），修改副本条件会同时污染原宏
+    const conditionsCopy = canViewConditions && macro.conditions
+        ? JSON.parse(JSON.stringify(macro.conditions))
+        : null;
+    
     const newMacro = {
-        ...macro,
-        id: null,
+        id: null, // 不继承原宏的扩展属性，只取需要的字段
         name: macro.name + '（副本）',
-        permission: 0,
-        createdBy: getCurrentUserId(),
         description: '',
-        conditions: canViewConditions ? macro.conditions : null,
+        permission: 0,
+        tags: Array.isArray(macro.tags) ? [...macro.tags] : [],
+        pinned: false,
+        createdBy: getCurrentUserId(),
+        conditions: conditionsCopy,
         createTime: new Date().toISOString(),
         updateTime: new Date().toISOString(),
         usageCount: 0,
         lastUsedAt: null,
-        pinned: false,
         cloudId: undefined
     };
+    // saveMacro 内部已包含自动同步到 Supabase 的逻辑（isNew 分支），
+    // 此处不再冗余同步，避免在云端创建重复记录
     const saved = saveMacro(newMacro);
-    
-    // 同步到 Supabase（若已登录）
-    if (currentUser && supabaseClient) {
-        try {
-            const cloudMacro = await addSupabaseMacro(saved);
-            if (cloudMacro && cloudMacro.id) {
-                const idMapping = getIdMapping();
-                if (!idMapping.macros) idMapping.macros = {};
-                idMapping.macros[saved.id] = cloudMacro.id;
-                saveIdMapping(idMapping);
-            }
-        } catch(e) {
-            console.warn('复制宏同步到云端失败:', e);
-        }
-    }
     
     if (!silent) {
         if (!canViewConditions) {
