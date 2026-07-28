@@ -3682,31 +3682,38 @@
       var genderStr = (String(lastPaipan.gender) === '1' || String(lastPaipan.gender) === '男') ? '男' : '女';
 
       var currentDayunItem = null;
-      if (window.currentDaYun) {
-        var dyGanZhi = window.currentDaYun.getGanZhi();
+      var dyGan = document.querySelector('.tiangan[data-type="dayun"]')?.value;
+      var dyZhi = document.querySelector('.dizhi[data-type="dayun"]')?.value;
+      if (dyGan && dyZhi) {
+        var startAge = window.currentDaYun ? window.currentDaYun.getStartAge() : null;
+        var startYear = window.currentDaYun ? window.currentDaYun.getStartYear() : null;
+        var endYear = window.currentDaYun ? window.currentDaYun.getEndYear() : null;
         currentDayunItem = {
-          gan: dyGanZhi ? dyGanZhi.charAt(0) : '',
-          zhi: dyGanZhi ? dyGanZhi.charAt(1) : '',
-          ganZhi: dyGanZhi,
-          startAge: window.currentDaYun.getStartAge(),
-          startYear: window.currentDaYun.getStartYear(),
-          endYear: window.currentDaYun.getEndYear()
+          gan: dyGan,
+          zhi: dyZhi,
+          ganZhi: dyGan + dyZhi,
+          startAge: startAge,
+          startYear: startYear,
+          endYear: endYear
         };
       }
 
       var currentLiunianItem = null;
-      var activeLiunian = document.querySelector('.liunian-item.active');
-      if (activeLiunian) {
-        var lnYear = parseInt(activeLiunian.querySelector('.liunian-year')?.textContent);
-        var lnGanZhi = activeLiunian.querySelector('.liunian-ganzhi')?.textContent;
-        if (!isNaN(lnYear) && lnGanZhi) {
-          currentLiunianItem = {
-            year: lnYear,
-            gan: lnGanZhi.charAt(0),
-            zhi: lnGanZhi.charAt(1),
-            ganZhi: lnGanZhi
-          };
+      var lnGan = document.querySelector('.tiangan[data-type="liunian"]')?.value;
+      var lnZhi = document.querySelector('.dizhi[data-type="liunian"]')?.value;
+      if (lnGan && lnZhi) {
+        var lnYear = null;
+        var activeLiunian = document.querySelector('.liunian-item.active');
+        if (activeLiunian) {
+          var parsedYear = parseInt(activeLiunian.querySelector('.liunian-year')?.textContent);
+          if (!isNaN(parsedYear)) lnYear = parsedYear;
         }
+        currentLiunianItem = {
+          year: lnYear,
+          gan: lnGan,
+          zhi: lnZhi,
+          ganZhi: lnGan + lnZhi
+        };
       }
 
       var currentLiuyueItem = null;
@@ -6427,6 +6434,9 @@
                 const validDizhi = getValidDizhiByGan(gan);
                 renderDizhiSelect(dizhiEl, validDizhi);
                 calcAll();
+                if (['dayun', 'liunian', 'liuyue'].includes(type)) {
+                    refreshApiDuanyu();
+                }
             });
         });
 
@@ -6439,7 +6449,13 @@
                     clearBirthData();
                 }
             });
-            select.onchange = debounce(calcAll);
+            select.onchange = debounce(() => {
+                calcAll();
+                const type = select.dataset.type;
+                if (['dayun', 'liunian', 'liuyue'].includes(type)) {
+                    refreshApiDuanyu();
+                }
+            });
         });
     }
 
@@ -8777,31 +8793,38 @@
         var birthYear = window.lastPaipanData ? window.lastPaipanData.birthYear : null;
         
         var currentDayunItem = null;
-        if (window.currentDaYun) {
-            var dyGanZhi = window.currentDaYun.getGanZhi();
+        var dyGan = document.querySelector('.tiangan[data-type="dayun"]')?.value;
+        var dyZhi = document.querySelector('.dizhi[data-type="dayun"]')?.value;
+        if (dyGan && dyZhi) {
+            var startAge = window.currentDaYun ? window.currentDaYun.getStartAge() : null;
+            var startYear = window.currentDaYun ? window.currentDaYun.getStartYear() : null;
+            var endYear = window.currentDaYun ? window.currentDaYun.getEndYear() : null;
             currentDayunItem = {
-                gan: dyGanZhi ? dyGanZhi.charAt(0) : '',
-                zhi: dyGanZhi ? dyGanZhi.charAt(1) : '',
-                ganZhi: dyGanZhi,
-                startAge: window.currentDaYun.getStartAge(),
-                startYear: window.currentDaYun.getStartYear(),
-                endYear: window.currentDaYun.getEndYear()
+                gan: dyGan,
+                zhi: dyZhi,
+                ganZhi: dyGan + dyZhi,
+                startAge: startAge,
+                startYear: startYear,
+                endYear: endYear
             };
         }
         
         var currentLiunianItem = null;
-        var activeLiunian = document.querySelector('.liunian-item.active');
-        if (activeLiunian) {
-            var lnYear = parseInt(activeLiunian.querySelector('.liunian-year')?.textContent);
-            var lnGanZhi = activeLiunian.querySelector('.liunian-ganzhi')?.textContent;
-            if (!isNaN(lnYear) && lnGanZhi) {
-                currentLiunianItem = {
-                    year: lnYear,
-                    gan: lnGanZhi.charAt(0),
-                    zhi: lnGanZhi.charAt(1),
-                    ganZhi: lnGanZhi
-                };
+        var lnGan = document.querySelector('.tiangan[data-type="liunian"]')?.value;
+        var lnZhi = document.querySelector('.dizhi[data-type="liunian"]')?.value;
+        if (lnGan && lnZhi) {
+            var lnYear = null;
+            var activeLiunian = document.querySelector('.liunian-item.active');
+            if (activeLiunian) {
+                var parsedYear = parseInt(activeLiunian.querySelector('.liunian-year')?.textContent);
+                if (!isNaN(parsedYear)) lnYear = parsedYear;
             }
+            currentLiunianItem = {
+                year: lnYear,
+                gan: lnGan,
+                zhi: lnZhi,
+                ganZhi: lnGan + lnZhi
+            };
         }
         
         var currentLiuyueItem = null;
