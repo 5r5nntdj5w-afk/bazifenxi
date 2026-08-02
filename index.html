@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -23403,86 +23403,124 @@ async function deduplicateMacros() {
         alert('请先登录！');
         return;
     }
-    
+
+    // 获取云端当前用户的所有宏
     const { data: cloudMacros, error } = await supabaseClient
         .from('condition_macros')
         .select('*')
         .eq('user_id', currentUser.id);
-    
+
     if (error) {
         console.error('获取云端条件宏失败:', error);
+        alert('获取云端条件宏失败: ' + (error.message || error));
         return;
     }
-    
+
     const idMapping = getIdMapping();
     const localMacros = getAllMacros();
-    
-    const keyMap = new Map();
-    const duplicates = [];
-    const referencedCloudIds = new Set();
-    
+
+    // 收集本地所有有效的 cloudId（本地仍存在的宏对应的云端ID）
+    const localCloudIds = new Set();
     for (const localMacro of localMacros) {
-        const cloudId = getCloudId(idMapping, 'macros', localMacro.id);
-        if (cloudId) {
-            referencedCloudIds.add(cloudId);
-        }
+        const cid = localMacro.cloudId || getCloudId(idMapping, 'macros', localMacro.id);
+        if (cid) localCloudIds.add(String(cid));
     }
-    
+
+    const toDelete = [];
+    const keyMap = new Map();
+
     for (const cloudMacro of (cloudMacros || [])) {
-        const key = `${cloudMacro.name}|||${JSON.stringify(cloudMacro.conditions)}`;
+        const cloudIdStr = String(cloudMacro.id);
+        const isLocalPresent = localCloudIds.has(cloudIdStr);
+
+        // --- 类别1：本地已删除但云端残留 ---
+        if (!isLocalPresent) {
+            toDelete.push({
+                id: cloudMacro.id,
+                name: cloudMacro.name,
+                reason: '本地已删除',
+                isReferenced: false
+            });
+            continue;
+        }
+
+        // --- 类别2：完全重复（name+conditions 相同） ---
+        const condStr = normalizeConditionsForCompare(cloudMacro.conditions);
+        const key = `${cloudMacro.name}|||${condStr}`;
         if (!keyMap.has(key)) {
             keyMap.set(key, []);
         }
         keyMap.get(key).push(cloudMacro);
     }
-    
+
+    // 处理类别2：同 name+conditions 的重复，保留第一个（本地存在的优先），其余标记删除
     keyMap.forEach((macrosWithSameKey, key) => {
         if (macrosWithSameKey.length > 1) {
-            const name = key.split('|||')[0];
-            macrosWithSameKey.forEach((macro, index) => {
-                if (index > 0) {
-                    duplicates.push({
-                        id: macro.id,
-                        name: macro.name,
-                        isReferenced: referencedCloudIds.has(macro.id)
+            const sorted = macrosWithSameKey.sort((a, b) => {
+                const aLocal = localCloudIds.has(String(a.id)) ? 0 : 1;
+                const bLocal = localCloudIds.has(String(b.id)) ? 0 : 1;
+                return aLocal - bLocal;
+            });
+            for (let i = 1; i < sorted.length; i++) {
+                if (!toDelete.find(d => String(d.id) === String(sorted[i].id))) {
+                    toDelete.push({
+                        id: sorted[i].id,
+                        name: sorted[i].name,
+                        reason: '完全重复',
+                        isReferenced: false
                     });
                 }
-            });
-        }
-    });
-    
-    if (duplicates.length === 0) {
-        alert('没有重复的条件宏！');
-        return;
-    }
-    
-    const referencedCount = duplicates.filter(d => d.isReferenced).length;
-    const unreferencedCount = duplicates.length - referencedCount;
-    
-    if (!confirm(`发现 ${duplicates.length} 个重复的条件宏！\n\n被引用的重复宏：${referencedCount} 个（将保留）\n未被引用的重复宏：${unreferencedCount} 个（将删除）\n\n确定要删除未被引用的重复宏吗？`)) {
-        return;
-    }
-    
-    let deletedCount = 0;
-    for (const dup of duplicates) {
-        if (!dup.isReferenced) {
-            try {
-                const { error: deleteError } = await supabaseClient
-                    .from('condition_macros')
-                    .delete()
-                    .eq('id', dup.id);
-                if (!deleteError) {
-                    deletedCount++;
-                } else {
-                    console.error('删除重复宏失败:', deleteError);
-                }
-            } catch(e) {
-                console.error('删除重复宏异常:', e);
             }
         }
+    });
+
+    if (toDelete.length === 0) {
+        alert(`没有需要清理的冗余条件宏！\n\n本地: ${localMacros.length} 条\n云端: ${(cloudMacros || []).length} 条`);
+        return;
     }
-    
-    alert(`成功删除 ${deletedCount} 个未被引用的重复条件宏！`);
+
+    const deletedReasonCount = toDelete.filter(d => d.reason === '本地已删除').length;
+    const duplicateReasonCount = toDelete.filter(d => d.reason === '完全重复').length;
+
+    // 构建预览列表（最多显示50条）
+    const previewList = toDelete.slice(0, 50).map((d, i) =>
+        `${i + 1}. [${d.reason}] ${d.name} (云端ID: ${d.id})`
+    ).join('\n');
+    const moreHint = toDelete.length > 50 ? `\n... 还有 ${toDelete.length - 50} 条未显示` : '';
+
+    if (!confirm(`发现 ${toDelete.length} 个云端冗余条件宏！\n\n` +
+        `• 本地已删除但云端残留: ${deletedReasonCount} 条\n` +
+        `• 完全重复（同名同条件）: ${duplicateReasonCount} 条\n\n` +
+        `本地: ${localMacros.length} 条 | 云端: ${(cloudMacros || []).length} 条\n\n` +
+        `将删除以下冗余宏（预览前50条）：\n${previewList}${moreHint}\n\n` +
+        `确定要删除这些云端冗余条件宏吗？`)) {
+        return;
+    }
+
+    let deletedCount = 0;
+    let failedCount = 0;
+    for (const dup of toDelete) {
+        try {
+            const { error: deleteError } = await supabaseClient
+                .from('condition_macros')
+                .delete()
+                .eq('id', dup.id);
+            if (!deleteError) {
+                deletedCount++;
+            } else {
+                console.error('删除冗余宏失败:', dup.id, deleteError);
+                failedCount++;
+            }
+        } catch (e) {
+            console.error('删除冗余宏异常:', dup.id, e);
+            failedCount++;
+        }
+    }
+
+    alert(`清理完成！\n\n成功删除: ${deletedCount} 条\n失败: ${failedCount} 条\n\n点击确定后自动同步本地数据...`);
+    // 清理后重新同步
+    try { await syncMacros(); } catch (e) {}
+    if (typeof renderMacroList === 'function') renderMacroList();
 }
 
 // 递归展开宏引用为实际的条件文本（用于显示）
@@ -27265,6 +27303,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button onclick="toggleAllMacros()" class="px-3 py-2 bg-blue-400 text-white rounded text-sm shrink-0">↔️ 反选</button>
                 <button onclick="openMacroEditor()" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm shrink-0">➕ 新建条件宏</button>
                 <button onclick="openMacroTagManager()" class="px-3 py-2 bg-purple-600 text-white rounded text-sm shrink-0">🏷️ 标签管理</button>
+                <button onclick="deduplicateMacros()" class="px-3 py-2 bg-red-500 text-white rounded text-sm shrink-0">🧹 清理云端冗余</button>
             </div>
             <div id="macro-batch-bar" class="hidden flex flex-wrap gap-2 mb-4 items-center p-3 bg-indigo-50 border border-indigo-200 rounded">
                 <span class="text-sm text-indigo-700">已选择 <span id="macro-selected-count" class="font-bold">0</span> 个条件宏</span>
