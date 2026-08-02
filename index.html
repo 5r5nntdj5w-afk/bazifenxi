@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7434,12 +7434,14 @@
             // 定位批量判断
             if(c.field.startsWith('定位批量-') && c.val && c.val.startsWith('定位批量|')){
                 const parts = c.val.split('|');
-                let pbType = '十神', pbGanZhi = '天干', pbScope = '原局';
+                let pbType = '十神', pbGanZhi = '天干', pbScope = '原局', pbQuZhi = '', pbInheritId = '';
                 const pbPositions = {};
                 parts.forEach(p => {
                     if(p.startsWith('type=')) pbType = p.replace('type=','');
                     else if(p.startsWith('ganZhi=')) pbGanZhi = p.replace('ganZhi=','');
                     else if(p.startsWith('scope=')) pbScope = p.replace('scope=','');
+                    else if(p.startsWith('取值=')) pbQuZhi = p.replace('取值=','');
+                    else if(p.startsWith('inherit=')) pbInheritId = p.replace('inherit=','');
                     else if(p.includes('=')){
                         let pop = 'eq';
                         let pval = p;
@@ -7454,28 +7456,125 @@
                     '年支':'nian.d','月支':'yue.d','日支':'ri.d','时支':'shi.d',
                     '大运支':'dayun.d','流年支':'liunian.d','流月支':'liuyue.d'
                 };
+                const pbColumnPathMap = {
+                    '年柱':['nian.t','nian.d'],'月柱':['yue.t','yue.d'],'日柱':['ri.t','ri.d'],'时柱':['shi.t','shi.d'],
+                    '大运柱':['dayun.t','dayun.d'],'流年柱':['liunian.t','liunian.d'],'流月柱':['liuyue.t','liuyue.d']
+                };
                 const rg = data.ri?.t || '';
-                let allMatch = true;
-                for(const posName in pbPositions){
-                    const posCfg = pbPositions[posName];
-                    const path = pbPathMap[posName];
-                    if(!path){ allMatch = false; break; }
+                // 单个位置检查函数
+                const checkPos = (path, posCfg, posName) => {
                     const [k, p] = path.split('.');
                     const node = data[k]?.[p];
-                    if(!node){ allMatch = false; break; }
+                    if(!node) return false;
                     let actualVal = '';
                     if(pbType === '五行'){
                         actualVal = WU_XING[node] || '';
                     } else if(pbType === '十神'){
-                        actualVal = posName.indexOf('支') >= 0 ? getDiShen(node, rg) : getExactShen(node, rg);
+                        actualVal = (posName.indexOf('支') >= 0 || path.indexOf('.d') > 0) ? getDiShen(node, rg) : getExactShen(node, rg);
                     } else if(pbType === '十神组'){
-                        const shenTmp = posName.indexOf('支') >= 0 ? getDiShen(node, rg) : getExactShen(node, rg);
+                        const shenTmp = (posName.indexOf('支') >= 0 || path.indexOf('.d') > 0) ? getDiShen(node, rg) : getExactShen(node, rg);
                         actualVal = SHEN_TO_GROUP[shenTmp] || '';
                     }
-                    const posMatch = (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
-                    if(!posMatch){ allMatch = false; break; }
+                    return (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
+                };
+                // 评估一组位置条件
+                const evalPositions = (positions) => {
+                    if(pbGanZhi === '通用'){
+                        const targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
+                        for(const posName in positions){
+                            const posCfg = positions[posName];
+                            const colPaths = pbColumnPathMap[posName];
+                            if(!colPaths){
+                                const directPath = pbPathMap[posName];
+                                if(!directPath) return false;
+                                if(directPath.indexOf(targetSuffix) < 0) continue;
+                                if(!checkPos(directPath, posCfg, posName)) return false;
+                            } else {
+                                const targetPath = (pbQuZhi === '地支') ? colPaths[1] : colPaths[0];
+                                if(!checkPos(targetPath, posCfg, posName)) return false;
+                            }
+                        }
+                        return true;
+                    }
+                    for(const posName in positions){
+                        const posCfg = positions[posName];
+                        const path = pbPathMap[posName];
+                        if(!path) return false;
+                        if(!checkPos(path, posCfg, posName)) return false;
+                    }
+                    return true;
+                };
+                // inherit 模式
+                if(pbInheritId){
+                    // 从条件宏列表中查找
+                    const macros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
+                    const visited = {};
+                    const extractArrangements = (macroId) => {
+                        if(!macroId || visited[macroId]) return [];
+                        visited[macroId] = true;
+                        const macro = macros.find(m => String(m.id) === String(macroId) || String(m.cloudId) === String(macroId));
+                        if(!macro || !macro.conditions) return [];
+                        const arrs = [];
+                        const walk = (node) => {
+                            if(!node) return;
+                            if(node.macroRef){
+                                const sub = extractArrangements(node.macroRef);
+                                sub.forEach(v => arrs.push(v));
+                                return;
+                            }
+                            if(node.field && node.field.startsWith('定位批量-') && node.val && node.val.startsWith('定位批量|')){
+                                let subInherit = '';
+                                const sp = node.val.split('|');
+                                sp.forEach(pp => { if(pp.startsWith('inherit=')) subInherit = pp.replace('inherit=',''); });
+                                if(subInherit){
+                                    const subArrs = extractArrangements(subInherit);
+                                    const incPos = {};
+                                    sp.forEach(pp => {
+                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=')){
+                                            let op2 = 'eq', v2 = pp;
+                                            if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
+                                            const [pn, pv] = v2.split('=');
+                                            if(pn && pv) incPos[pn] = { op: op2, val: pv };
+                                        }
+                                    });
+                                    subArrs.forEach(basePositions => {
+                                        // subArrs 返回的是位置对象 {posName: {op, val}}，直接合并
+                                        const merged = { ...basePositions };
+                                        Object.assign(merged, incPos);
+                                        arrs.push(merged);
+                                    });
+                                } else {
+                                    const posObj = {};
+                                    sp.forEach(pp => {
+                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=')){
+                                            let op2 = 'eq', v2 = pp;
+                                            if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
+                                            const [pn, pv] = v2.split('=');
+                                            if(pn && pv) posObj[pn] = { op: op2, val: pv };
+                                        }
+                                    });
+                                    arrs.push(posObj);
+                                }
+                                return;
+                            }
+                            if(node.logic && node.children) node.children.forEach(walk);
+                        };
+                        walk(macro.conditions);
+                        return arrs;
+                    };
+                    const arrangements = extractArrangements(pbInheritId);
+                    if(arrangements.length === 0){
+                        res = false;
+                    } else {
+                        res = arrangements.some(basePositions => {
+                            const merged = { ...basePositions };
+                            Object.assign(merged, pbPositions);
+                            return evalPositions(merged);
+                        });
+                    }
+                } else {
+                    res = evalPositions(pbPositions);
                 }
-                res = allMatch;
                 actual = c.val;
             }
             else if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(c.field)){
@@ -9091,17 +9190,26 @@
                     }
                     var summarySpan = item.querySelector('.position-batch-summary');
                     if(summarySpan && child.val && child.val.startsWith('定位批量|')){
-                        // 解析编码值生成摘要
                         var parts = child.val.split('|');
-                        var sType = '', sGz = '', sScope = '';
+                        var sType = '', sGz = '', sScope = '', sQz = '', sInherit = '';
                         var sPositions = [];
                         parts.forEach(function(p){
                             if(p.startsWith('type=')) sType = p.replace('type=','');
                             else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
                             else if(p.startsWith('scope=')) sScope = p.replace('scope=','');
+                            else if(p.startsWith('取值=')) sQz = p.replace('取值=','');
+                            else if(p.startsWith('inherit=')) sInherit = p.replace('inherit=','');
                             else if(p.includes('=')) sPositions.push(p);
                         });
-                        var summaryText = sType + '·' + sGz + '·' + sScope + ': ' + sPositions.join(', ');
+                        var summaryText;
+                        if(sInherit){
+                            var refMacro = getMacroById(sInherit);
+                            var macroName = refMacro ? refMacro.name : '未知';
+                            var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
+                            summaryText = '继承[' + macroName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + incText;
+                        } else {
+                            summaryText = sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + '·' + sScope + ': ' + sPositions.join(', ');
+                        }
                         summarySpan.textContent = summaryText;
                         summarySpan.title = summaryText;
                     }
@@ -21951,15 +22059,25 @@ function loadConditionsToEditor(container, conditions) {
                         var summarySpan = item.querySelector('.position-batch-summary');
                         if (summarySpan) {
                             var parts = child.val.split('|');
-                            var sType = '', sGz = '', sScope = '';
+                            var sType = '', sGz = '', sScope = '', sQz = '', sInherit = '';
                             var sPositions = [];
                             parts.forEach(function(p){
                                 if(p.startsWith('type=')) sType = p.replace('type=','');
                                 else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
                                 else if(p.startsWith('scope=')) sScope = p.replace('scope=','');
+                                else if(p.startsWith('取值=')) sQz = p.replace('取值=','');
+                                else if(p.startsWith('inherit=')) sInherit = p.replace('inherit=','');
                                 else if(p.includes('=')) sPositions.push(p);
                             });
-                            var summaryText = sType + '·' + sGz + '·' + sScope + ': ' + sPositions.join(', ');
+                            var summaryText;
+                            if(sInherit){
+                                var refMacro = getMacroById(sInherit);
+                                var macroName = refMacro ? refMacro.name : '未知';
+                                var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
+                                summaryText = '继承[' + macroName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + incText;
+                            } else {
+                                summaryText = sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + '·' + sScope + ': ' + sPositions.join(', ');
+                            }
                             summarySpan.textContent = summaryText;
                             summarySpan.title = summaryText;
                         }
@@ -27299,7 +27417,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="p-4 flex-1 overflow-y-auto">
             <!-- 配置区 -->
-            <div class="grid grid-cols-3 gap-3 mb-4 p-3 bg-purple-50 rounded">
+            <div class="grid grid-cols-3 gap-3 mb-4 p-3 bg-purple-50 rounded" id="pb-config-row">
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">判断类型</label>
                     <select id="pb-judge-type" class="w-full p-2 border rounded text-sm">
@@ -27313,9 +27431,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <select id="pb-ganzhi" class="w-full p-2 border rounded text-sm">
                         <option value="天干">天干</option>
                         <option value="地支">地支</option>
+                        <option value="通用">通用</option>
                     </select>
                 </div>
-                <div>
+                <div id="pb-quzhi-cell" style="display:none;">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">取值维度</label>
+                    <select id="pb-quzhi" class="w-full p-2 border rounded text-sm">
+                        <option value="天干">天干</option>
+                        <option value="地支">地支</option>
+                    </select>
+                </div>
+                <div id="pb-scope-cell">
                     <label class="block text-xs font-medium text-gray-700 mb-1">层级</label>
                     <select id="pb-scope" class="w-full p-2 border rounded text-sm">
                         <option value="原局">原局</option>
@@ -27323,6 +27449,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         <option value="原局+大运+流年">原局+大运+流年</option>
                         <option value="原局+大运+流年+流月">原局+大运+流年+流月</option>
                     </select>
+                </div>
+            </div>
+            <!-- 继承引用区 -->
+            <div class="mb-4 p-3 border border-indigo-200 rounded bg-indigo-50">
+                <label class="flex items-center gap-2 mb-2">
+                    <input type="checkbox" id="pb-inherit-enable" class="pb-inherit-enable">
+                    <span class="text-sm font-medium text-indigo-800">启用继承引用（跨层复用上层条件宏的排列）</span>
+                </label>
+                <div id="pb-inherit-config" style="display:none;">
+                    <div class="flex items-center gap-2 mb-2">
+                        <label class="text-xs text-gray-700 shrink-0">继承条件宏:</label>
+                        <select id="pb-inherit-macro" class="flex-1 p-1.5 border rounded text-sm"></select>
+                    </div>
+                    <div id="pb-inherit-preview" class="text-xs text-gray-600 bg-white border rounded p-2 max-h-32 overflow-y-auto">
+                        <span class="text-gray-400">请选择条件宏</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">ℹ 引用层排列为只读，如需修改请进入引用层条件宏编辑</p>
                 </div>
             </div>
             <p class="text-xs text-gray-500 mb-2">提示：未勾选的位置表示"不限"；每个位置可独立选择"等于/不等于"。</p>
@@ -27345,12 +27488,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const PB_POSITIONS_TG = ['年干','月干','日干','时干','大运干','流年干','流月干'];
     // 位置定义 - 地支
     const PB_POSITIONS_DZ = ['年支','月支','日支','时支','大运支','流年支','流月支'];
+    // 位置定义 - 通用（柱）
+    const PB_POSITIONS_COL = ['年柱','月柱','日柱','时柱','大运柱','流年柱','流月柱'];
     // 层级映射 - 使用天干名称作为键（内部统一）
     const PB_SCOPE_MAP = {
         '原局': ['年干','月干','日干','时干'],
         '原局+大运': ['年干','月干','日干','时干','大运干'],
         '原局+大运+流年': ['年干','月干','日干','时干','大运干','流年干'],
         '原局+大运+流年+流月': ['年干','月干','日干','时干','大运干','流年干','流月干']
+    };
+    // 通用模式的层级映射（柱命名）
+    const PB_SCOPE_MAP_COL = {
+        '原局': ['年柱','月柱','日柱','时柱'],
+        '原局+大运': ['年柱','月柱','日柱','时柱','大运柱'],
+        '原局+大运+流年': ['年柱','月柱','日柱','时柱','大运柱','流年柱'],
+        '原局+大运+流年+流月': ['年柱','月柱','日柱','时柱','大运柱','流年柱','流月柱']
     };
 
     // 当前编辑的条件项引用
@@ -27364,19 +27516,29 @@ document.addEventListener('DOMContentLoaded', function() {
         if(ganzhi === '地支'){
             return posKey.replace('干', '支');
         }
+        if(ganzhi === '通用'){
+            // 天干键名 → 柱名
+            return posKey.replace('干', '柱');
+        }
         return posKey;
+    }
+
+    // 通用模式下判断是否为日柱（用于限制十神/十神组的值选项）
+    function isDayPosition(posKey, ganzhi){
+        if(ganzhi === '通用') return posKey === '日柱' || posKey === '日干';
+        return posKey === '日干';
     }
 
     function getValueOptions(judgeType, posKey, ganzhi){
         if(judgeType === '五行'){
             return WU_LIST.map(w => `<option value="${w}">${w}</option>`).join('');
         } else if(judgeType === '十神'){
-            if(ganzhi === '天干' && posKey === '日干'){
+            if(isDayPosition(posKey, ganzhi) && (ganzhi === '天干' || ganzhi === '通用')){
                 return `<option value="比肩">比肩</option>`;
             }
             return FULL_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
         } else if(judgeType === '十神组'){
-            if(ganzhi === '天干' && posKey === '日干'){
+            if(isDayPosition(posKey, ganzhi) && (ganzhi === '天干' || ganzhi === '通用')){
                 return `<option value="比劫">比劫</option>`;
             }
             return GROUPED_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -27385,17 +27547,40 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getDefaultDayValue(judgeType, ganzhi){
-        if(ganzhi !== '天干') return '';
+        if(ganzhi === '地支') return '';
+        // 天干和通用模式下日柱默认值
         if(judgeType === '十神') return '比肩';
         if(judgeType === '十神组') return '比劫';
         return '';
     }
 
+    // 获取当前层级的位置列表（根据干支模式选择对应映射）
+    function getScopePositions(scope, ganzhi){
+        if(ganzhi === '通用'){
+            return PB_SCOPE_MAP_COL[scope] || [];
+        }
+        return PB_SCOPE_MAP[scope] || [];
+    }
+
+    // 将显示位置名统一转换为内部天干键名（用于缓存）
+    function posNameToKey(displayName, ganzhi){
+        if(ganzhi === '地支') return displayName.replace('支', '干');
+        if(ganzhi === '通用') return displayName.replace('柱', '干');
+        return displayName;
+    }
+
     // 渲染位置勾选区
     function renderPositions(scope, judgeType, ganzhi){
-        const positions = PB_SCOPE_MAP[scope] || [];
+        const positions = getScopePositions(scope, ganzhi);
         const container = document.getElementById('pb-positions');
         container.innerHTML = '';
+        const inheritEnabled = document.getElementById('pb-inherit-enable')?.checked;
+        // 继承模式下原局位置只读
+        const isReadOnly = (posKey) => {
+            if(!inheritEnabled) return false;
+            // 原局位置（年/月/日/时）只读
+            return ['年干','月干','日干','时干','年支','月支','日支','时支','年柱','月柱','日柱','时柱'].includes(posKey);
+        };
         
         positions.forEach(posKey => {
             const displayName = getPositionDisplayName(posKey, ganzhi);
@@ -27403,26 +27588,27 @@ document.addEventListener('DOMContentLoaded', function() {
             let cached = _positionCache[posKey];
             if(!cached){
                 cached = { checked: true, op: 'eq', val: '' };
-                if(posKey === '日干'){
+                if(isDayPosition(posKey, ganzhi)){
                     cached.val = getDefaultDayValue(judgeType, ganzhi);
                 }
                 // 保存到缓存
                 _positionCache[posKey] = cached;
             }
             const valueOptions = getValueOptions(judgeType, posKey, ganzhi);
+            const readOnly = isReadOnly(posKey);
             
             const row = document.createElement('div');
-            row.className = 'flex items-center gap-2 p-2 border rounded hover:bg-purple-50';
+            row.className = 'flex items-center gap-2 p-2 border rounded ' + (readOnly ? 'bg-gray-100' : 'hover:bg-purple-50');
             row.innerHTML = `
                 <label class="flex items-center gap-1 w-20 shrink-0">
-                    <input type="checkbox" class="pb-pos-check" data-pos="${posKey}" ${cached.checked ? 'checked' : ''}>
-                    <span class="text-sm font-medium">${displayName}</span>
+                    <input type="checkbox" class="pb-pos-check" data-pos="${posKey}" ${cached.checked ? 'checked' : ''} ${readOnly ? 'disabled' : ''}>
+                    <span class="text-sm font-medium ${readOnly ? 'text-gray-400' : ''}">${displayName}${readOnly ? '🔒' : ''}</span>
                 </label>
-                <select class="pb-pos-op w-24 p-1 border rounded text-sm" data-pos="${posKey}">
+                <select class="pb-pos-op w-24 p-1 border rounded text-sm" data-pos="${posKey}" ${readOnly ? 'disabled' : ''}>
                     <option value="eq" ${cached.op === 'eq' ? 'selected' : ''}>等于</option>
                     <option value="ne" ${cached.op === 'ne' ? 'selected' : ''}>不等于</option>
                 </select>
-                <select class="pb-pos-val flex-1 p-1 border rounded text-sm" data-pos="${posKey}">
+                <select class="pb-pos-val flex-1 p-1 border rounded text-sm" data-pos="${posKey}" ${readOnly ? 'disabled' : ''}>
                     <option value="">--不限--</option>
                     ${valueOptions}
                 </select>
@@ -27430,19 +27616,21 @@ document.addEventListener('DOMContentLoaded', function() {
             container.appendChild(row);
             const valSel = row.querySelector('.pb-pos-val');
             if(cached.val) valSel.value = cached.val;
-            // 绑定变化事件，更新缓存
-            row.querySelector('.pb-pos-check').onchange = (e) => {
-                _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
-                _positionCache[posKey].checked = e.target.checked;
-            };
-            row.querySelector('.pb-pos-op').onchange = (e) => {
-                _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
-                _positionCache[posKey].op = e.target.value;
-            };
-            valSel.onchange = (e) => {
-                _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
-                _positionCache[posKey].val = e.target.value;
-            };
+            // 绑定变化事件，更新缓存（只读位置不绑定）
+            if(!readOnly){
+                row.querySelector('.pb-pos-check').onchange = (e) => {
+                    _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
+                    _positionCache[posKey].checked = e.target.checked;
+                };
+                row.querySelector('.pb-pos-op').onchange = (e) => {
+                    _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
+                    _positionCache[posKey].op = e.target.value;
+                };
+                valSel.onchange = (e) => {
+                    _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
+                    _positionCache[posKey].val = e.target.value;
+                };
+            }
         });
     }
 
@@ -27460,6 +27648,85 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 从条件宏中提取所有定位批量排列（递归遍历条件树）
+    function extractBatchArrangements(macro){
+        const arrangements = [];
+        if(!macro || !macro.conditions) return arrangements;
+        function walk(node){
+            if(!node) return;
+            if(node.macroRef){
+                // 引用了其他条件宏，递归提取
+                const refMacro = getMacroById(node.macroRef);
+                if(refMacro) walk(refMacro.conditions);
+                return;
+            }
+            if(node.field && node.field.startsWith('定位批量-') && node.val && node.val.startsWith('定位批量|')){
+                arrangements.push({ field: node.field, val: node.val });
+                return;
+            }
+            if(node.logic && node.children){
+                node.children.forEach(walk);
+            }
+        }
+        walk(macro.conditions);
+        return arrangements;
+    }
+
+    // 生成排列的摘要文本
+    function arrangementToText(val){
+        if(!val || !val.startsWith('定位批量|')) return '';
+        const parts = val.split('|');
+        const positions = [];
+        let sType = '', sGz = '', sQz = '';
+        parts.forEach(p => {
+            if(p.startsWith('type=')) sType = p.replace('type=','');
+            else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
+            else if(p.startsWith('取值=')) sQz = p.replace('取值=','');
+            else if(p.includes('=')) positions.push(p);
+        });
+        let label = sType;
+        if(sGz === '通用' && sQz) label += '·通用·取值' + sQz;
+        else label += '·' + sGz;
+        return label + ': ' + positions.join(', ');
+    }
+
+    // 渲染继承引用预览
+    function renderInheritPreview(macroId){
+        const previewEl = document.getElementById('pb-inherit-preview');
+        if(!macroId){
+            previewEl.innerHTML = '<span class="text-gray-400">请选择条件宏</span>';
+            return;
+        }
+        const macro = getMacroById(macroId);
+        if(!macro){
+            previewEl.innerHTML = '<span class="text-red-400">未找到条件宏</span>';
+            return;
+        }
+        const arrangements = extractBatchArrangements(macro);
+        if(arrangements.length === 0){
+            previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无定位批量排列</span>';
+            return;
+        }
+        previewEl.innerHTML = arrangements.map((a, i) => {
+            const text = arrangementToText(a.val);
+            return `<div class="py-0.5">${i+1}. ${escapeHtml(text)}</div>`;
+        }).join('');
+    }
+
+    // 初始化继承引用区域
+    function initInheritArea(){
+        const macroSelect = document.getElementById('pb-inherit-macro');
+        // 填充条件宏列表
+        const macros = (cache.conditionMacros || []).filter(m => m.name);
+        macroSelect.innerHTML = '<option value="">--请选择--</option>' + macros.map(m =>
+            `<option value="${m.cloudId || m.id}">${escapeHtml(m.name)}</option>`
+        ).join('');
+        // 绑定变化事件
+        macroSelect.onchange = function(){
+            renderInheritPreview(this.value);
+        };
+    }
+
     // 打开编辑器
     window.openPositionBatchEditor = function(item, field){
         _currentItem = item;
@@ -27467,18 +27734,25 @@ document.addEventListener('DOMContentLoaded', function() {
         _positionCache = {};
         // 设置判断类型选项
         setJudgeTypeOptions(field);
+        // 初始化继承引用区域
+        initInheritArea();
         // 从 item 中读取已有值
         const valSel = item.querySelector('.condition-val-select');
         const existingVal = valSel.value || '';
         let judgeType = field === '定位批量-五行' ? '五行' : '十神组';
         let ganzhi = '天干';
         let scope = '原局';
+        let quzhi = '天干';
+        let inheritId = '';
+        // 解析已有值
         if(existingVal.startsWith('定位批量|')){
             const parts = existingVal.split('|');
             parts.forEach(p => {
                 if(p.startsWith('type=')) judgeType = p.replace('type=','');
                 else if(p.startsWith('ganZhi=')) ganzhi = p.replace('ganZhi=','');
                 else if(p.startsWith('scope=')) scope = p.replace('scope=','');
+                else if(p.startsWith('取值=')) quzhi = p.replace('取值=','');
+                else if(p.startsWith('inherit=')) inheritId = p.replace('inherit=','');
                 else if(p.includes('=')){
                     let op = 'eq';
                     let posVal = p;
@@ -27487,8 +27761,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         posVal = p.replace('!=','=');
                     }
                     const [pos, val] = posVal.split('=');
-                    // 兼容天干和地支的位置名（统一转换为天干键名）
-                    const posKey = pos.replace('支', '干');
+                    // 兼容天干/地支/通用（柱）的位置名，统一转换为天干键名
+                    const posKey = posNameToKey(pos, ganzhi);
                     if(PB_POSITIONS_TG.includes(posKey)){
                         _positionCache[posKey] = { checked: true, op: op, val: val };
                     }
@@ -27498,6 +27772,29 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pb-judge-type').value = judgeType;
         document.getElementById('pb-ganzhi').value = ganzhi;
         document.getElementById('pb-scope').value = scope;
+        // 取值维度下拉框
+        const quzhiCell = document.getElementById('pb-quzhi-cell');
+        const scopeCell = document.getElementById('pb-scope-cell');
+        if(ganzhi === '通用'){
+            quzhiCell.style.display = '';
+            document.getElementById('pb-quzhi').value = quzhi;
+        } else {
+            quzhiCell.style.display = 'none';
+        }
+        // 继承引用回显
+        const inheritCheck = document.getElementById('pb-inherit-enable');
+        const inheritConfig = document.getElementById('pb-inherit-config');
+        if(inheritId){
+            inheritCheck.checked = true;
+            inheritConfig.style.display = '';
+            document.getElementById('pb-inherit-macro').value = inheritId;
+            renderInheritPreview(inheritId);
+            // 继承模式下层级自动调整为包含原局+大运
+            // 若有增量位置（大运柱等），根据增量推断scope
+        } else {
+            inheritCheck.checked = false;
+            inheritConfig.style.display = 'none';
+        }
         renderPositions(scope, judgeType, ganzhi);
         document.getElementById('position-batch-modal').classList.remove('hidden');
     };
@@ -27518,12 +27815,27 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('pb-ganzhi').onchange = function(){
         const judgeType = document.getElementById('pb-judge-type').value;
         const scope = document.getElementById('pb-scope').value;
+        const quzhiCell = document.getElementById('pb-quzhi-cell');
+        if(this.value === '通用'){
+            quzhiCell.style.display = '';
+        } else {
+            quzhiCell.style.display = 'none';
+        }
         renderPositions(scope, judgeType, this.value);
     };
     document.getElementById('pb-scope').onchange = function(){
         const judgeType = document.getElementById('pb-judge-type').value;
         const ganzhi = document.getElementById('pb-ganzhi').value;
         renderPositions(this.value, judgeType, ganzhi);
+    };
+    // 继承引用 checkbox 事件
+    document.getElementById('pb-inherit-enable').onchange = function(){
+        const config = document.getElementById('pb-inherit-config');
+        config.style.display = this.checked ? '' : 'none';
+        const scope = document.getElementById('pb-scope').value;
+        const judgeType = document.getElementById('pb-judge-type').value;
+        const ganzhi = document.getElementById('pb-ganzhi').value;
+        renderPositions(scope, judgeType, ganzhi);
     };
 
     // 保存按钮
@@ -27532,31 +27844,73 @@ document.addEventListener('DOMContentLoaded', function() {
         const judgeType = document.getElementById('pb-judge-type').value;
         const ganzhi = document.getElementById('pb-ganzhi').value;
         const scope = document.getElementById('pb-scope').value;
+        const quzhi = document.getElementById('pb-quzhi').value;
+        const inheritEnabled = document.getElementById('pb-inherit-enable').checked;
+        const inheritMacroId = document.getElementById('pb-inherit-macro').value;
         // 收集勾选的位置
         const checked = [];
-        const positions = PB_SCOPE_MAP[scope] || [];
+        const positions = getScopePositions(scope, ganzhi);
         positions.forEach(posKey => {
             const cache = _positionCache[posKey];
             if(cache && cache.checked && cache.val){
-                // 使用显示名称（天干或地支）
+                // 使用显示名称（天干/地支/柱）
                 const displayName = getPositionDisplayName(posKey, ganzhi);
                 checked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
             }
         });
-        if(checked.length === 0){
-            alert('请至少勾选一个位置并设置值');
-            return;
+        // 构建编码
+        let encoded;
+        if(inheritEnabled && inheritMacroId){
+            // inherit 模式：只编码增量位置条件（不含原局位置）
+            // 过滤出非原局位置（大运柱/流年柱/流月柱等）
+            const incrementChecked = [];
+            positions.forEach(posKey => {
+                const cache = _positionCache[posKey];
+                if(cache && cache.checked && cache.val){
+                    const displayName = getPositionDisplayName(posKey, ganzhi);
+                    // 排除原局位置（年/月/日/时）
+                    if(!['年干','月干','日干','时干','年支','月支','日支','时支','年柱','月柱','日柱','时柱'].includes(posKey)){
+                        incrementChecked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
+                    }
+                }
+            });
+            // inherit 编码
+            const parts = [`定位批量`, `inherit=${inheritMacroId}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
+            if(ganzhi === '通用') parts.push(`取值=${quzhi}`);
+            if(incrementChecked.length > 0) parts.push(incrementChecked.join('|'));
+            encoded = parts.join('|');
+            // inherit 模式允许无增量位置（纯继承原局）
+        } else {
+            // 普通模式
+            if(checked.length === 0){
+                alert('请至少勾选一个位置并设置值');
+                return;
+            }
+            const parts = [`定位批量`, `type=${judgeType}`, `ganZhi=${ganzhi}`, `scope=${scope}`];
+            if(ganzhi === '通用') parts.push(`取值=${quzhi}`);
+            parts.push(checked.join('|'));
+            encoded = parts.join('|');
         }
-        // 编码值
-        const encoded = `定位批量|type=${judgeType}|ganZhi=${ganzhi}|scope=${scope}|${checked.join('|')}`;
-        // 写入 valSel：添加对应的 option 确保值能正确保存和读取
+        // 写入 valSel
         const valSel = _currentItem.querySelector('.condition-val-select');
         valSel.innerHTML = `<option value="${encoded}">${encoded}</option>`;
         valSel.value = encoded;
         // 更新摘要
         const summary = _currentItem.querySelector('.position-batch-summary');
         if(summary){
-            const summaryText = `${judgeType}·${ganzhi}·${scope}: ${checked.join(', ')}`;
+            let summaryText;
+            if(inheritEnabled && inheritMacroId){
+                const macro = getMacroById(inheritMacroId);
+                const macroName = macro ? macro.name : '未知';
+                const increment = checked.filter(c => {
+                    // 过滤出增量位置
+                    return !c.startsWith('年') && !c.startsWith('月') || c.startsWith('大运') || c.startsWith('流年') || c.startsWith('流月');
+                });
+                const incText = increment.length > 0 ? `·增量: ${increment.join(', ')}` : '';
+                summaryText = `继承[${macroName}]·${judgeType}·${ganzhi}${ganzhi === '通用' ? '·取值' + quzhi : ''}${incText}`;
+            } else {
+                summaryText = `${judgeType}·${ganzhi}${ganzhi === '通用' ? '·取值' + quzhi : ''}·${scope}: ${checked.join(', ')}`;
+            }
             summary.textContent = summaryText;
             summary.title = summaryText;
         }
