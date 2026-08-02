@@ -417,41 +417,47 @@ function evaluateBatchPositions(data, positions, pbType, pbGanZhi, pbQuZhi) {
   };
   var rg = data.ri && data.ri.t ? data.ri.t : '';
 
+  // 先统一收集所有合法位置键（排除元信息意外混入）
+  var validKeys = [];
+  for (var _k in positions) {
+    if (positions.hasOwnProperty && !positions.hasOwnProperty(_k)) continue;
+    // 合法位置：天干命名/地支命名/通用柱命名
+    if (pbPathMap[_k] || PB_COLUMN_PATH_MAP[_k]) validKeys.push(_k);
+  }
+  if (validKeys.length === 0) return false; // 没有任何合法位置→不匹配
+
   // 通用模式：按取值维度只判断对应维度
   if (pbGanZhi === '通用') {
     // 模板模式（未选取值维度）不应直接用于匹配，只通过 inherit 引用
     if (!pbQuZhi) return false;
-    // 没有位置条件时不匹配
-    var hasAnyPosition = false;
-    for (var k in positions) { hasAnyPosition = true; break; }
-    if (!hasAnyPosition) return false;
-    // 通用模式下，位置名是"柱"（年柱/月柱等），需要展开为天干或地支
-    // 取值=天干 → 只判断天干维度；取值=地支 → 只判断地支维度
     var targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
-    for (var posName in positions) {
+    var checkedCount = 0; // 实际参与目标维度判断的位置数（防止跳过所有后 return true）
+    for (var vi = 0; vi < validKeys.length; vi++) {
+      var posName = validKeys[vi];
       var posCfg = positions[posName];
       var colPaths = PB_COLUMN_PATH_MAP[posName];
       if (!colPaths) {
         // 可能是天干/地支命名的位置（兼容混用），按名称后缀判断
         var directPath = pbPathMap[posName];
         if (!directPath) return false;
-        // 只判断目标维度
-        if (directPath.indexOf(targetSuffix) < 0) continue; // 跳过非目标维度
+        if (directPath.indexOf(targetSuffix) < 0) continue; // 非目标维度→跳过
+        checkedCount++;
         if (!checkSinglePosition(data, directPath, posCfg, pbType, posName, rg)) return false;
       } else {
         // 柱名：取目标维度路径
         var targetPath = (pbQuZhi === '地支') ? colPaths[1] : colPaths[0];
+        checkedCount++;
         if (!checkSinglePosition(data, targetPath, posCfg, pbType, posName, rg)) return false;
       }
     }
+    // 如果没有任何位置落入目标维度，视为不匹配（条件不完整）
+    if (checkedCount === 0) return false;
     return true;
   }
 
   // 天干/地支模式（现有逻辑）
-  var hasAnyPositionTG = false;
-  for (var k2 in positions) { hasAnyPositionTG = true; break; }
-  if (!hasAnyPositionTG) return false;
-  for (var posName2 in positions) {
+  for (var vi2 = 0; vi2 < validKeys.length; vi2++) {
+    var posName2 = validKeys[vi2];
     var posCfg2 = positions[posName2];
     var path2 = pbPathMap[posName2];
     if (!path2) return false;
