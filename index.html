@@ -27437,6 +27437,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div id="pb-quzhi-cell" style="display:none;">
                     <label class="block text-xs font-medium text-gray-700 mb-1">取值维度</label>
                     <select id="pb-quzhi" class="w-full p-2 border rounded text-sm">
+                        <option value="">--不指定（模板）--</option>
                         <option value="天干">天干</option>
                         <option value="地支">地支</option>
                     </select>
@@ -27594,15 +27595,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         positions.forEach(posKey => {
             const displayName = getPositionDisplayName(posKey, ganzhi);
+            // 统一用天干键名作为缓存键（兼容天干/地支/通用三种模式）
+            const cacheKey = posNameToKey(posKey, ganzhi);
             // 获取缓存或默认值
-            let cached = _positionCache[posKey];
+            let cached = _positionCache[cacheKey];
             if(!cached){
                 cached = { checked: true, op: 'eq', val: '' };
                 if(isDayPosition(posKey, ganzhi)){
                     cached.val = getDefaultDayValue(judgeType, ganzhi);
                 }
                 // 保存到缓存
-                _positionCache[posKey] = cached;
+                _positionCache[cacheKey] = cached;
             }
             const valueOptions = getValueOptions(judgeType, posKey, ganzhi);
             const readOnly = isReadOnly(posKey);
@@ -27611,14 +27614,14 @@ document.addEventListener('DOMContentLoaded', function() {
             row.className = 'flex items-center gap-2 p-2 border rounded ' + (readOnly ? 'bg-gray-100' : 'hover:bg-purple-50');
             row.innerHTML = `
                 <label class="flex items-center gap-1 w-20 shrink-0">
-                    <input type="checkbox" class="pb-pos-check" data-pos="${posKey}" ${cached.checked ? 'checked' : ''} ${readOnly ? 'disabled' : ''}>
+                    <input type="checkbox" class="pb-pos-check" data-pos="${posKey}" data-cache-key="${cacheKey}" ${cached.checked ? 'checked' : ''} ${readOnly ? 'disabled' : ''}>
                     <span class="text-sm font-medium ${readOnly ? 'text-gray-400' : ''}">${displayName}${readOnly ? '🔒' : ''}</span>
                 </label>
-                <select class="pb-pos-op w-24 p-1 border rounded text-sm" data-pos="${posKey}" ${readOnly ? 'disabled' : ''}>
+                <select class="pb-pos-op w-24 p-1 border rounded text-sm" data-pos="${posKey}" data-cache-key="${cacheKey}" ${readOnly ? 'disabled' : ''}>
                     <option value="eq" ${cached.op === 'eq' ? 'selected' : ''}>等于</option>
                     <option value="ne" ${cached.op === 'ne' ? 'selected' : ''}>不等于</option>
                 </select>
-                <select class="pb-pos-val flex-1 p-1 border rounded text-sm" data-pos="${posKey}" ${readOnly ? 'disabled' : ''}>
+                <select class="pb-pos-val flex-1 p-1 border rounded text-sm" data-pos="${posKey}" data-cache-key="${cacheKey}" ${readOnly ? 'disabled' : ''}>
                     <option value="">--不限--</option>
                     ${valueOptions}
                 </select>
@@ -27629,16 +27632,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // 绑定变化事件，更新缓存（只读位置不绑定）
             if(!readOnly){
                 row.querySelector('.pb-pos-check').onchange = (e) => {
-                    _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
-                    _positionCache[posKey].checked = e.target.checked;
+                    const ck = e.target.dataset.cacheKey;
+                    _positionCache[ck] = _positionCache[ck] || { checked: false, op: 'eq', val: '' };
+                    _positionCache[ck].checked = e.target.checked;
                 };
                 row.querySelector('.pb-pos-op').onchange = (e) => {
-                    _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
-                    _positionCache[posKey].op = e.target.value;
+                    const ck = e.target.dataset.cacheKey;
+                    _positionCache[ck] = _positionCache[ck] || { checked: false, op: 'eq', val: '' };
+                    _positionCache[ck].op = e.target.value;
                 };
                 valSel.onchange = (e) => {
-                    _positionCache[posKey] = _positionCache[posKey] || { checked: false, op: 'eq', val: '' };
-                    _positionCache[posKey].val = e.target.value;
+                    const ck = e.target.dataset.cacheKey;
+                    _positionCache[ck] = _positionCache[ck] || { checked: false, op: 'eq', val: '' };
+                    _positionCache[ck].val = e.target.value;
                 };
             }
         });
@@ -27804,7 +27810,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let judgeType = field === '定位批量-五行' ? '五行' : '十神组';
         let ganzhi = '天干';
         let scope = '原局';
-        let quzhi = '天干';
+        let quzhi = '';
         let inheritId = '';
         // 解析已有值
         if(existingVal.startsWith('定位批量|')){
@@ -27923,7 +27929,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const checked = [];
         const positions = getScopePositions(scope, ganzhi);
         positions.forEach(posKey => {
-            const cache = _positionCache[posKey];
+            const cacheKey = posNameToKey(posKey, ganzhi);
+            const cache = _positionCache[cacheKey];
             if(cache && cache.checked && cache.val){
                 // 使用显示名称（天干/地支/柱）
                 const displayName = getPositionDisplayName(posKey, ganzhi);
@@ -27937,18 +27944,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // 过滤出非原局位置（大运柱/流年柱/流月柱等）
             const incrementChecked = [];
             positions.forEach(posKey => {
-                const cache = _positionCache[posKey];
+                const cacheKey = posNameToKey(posKey, ganzhi);
+                const cache = _positionCache[cacheKey];
                 if(cache && cache.checked && cache.val){
                     const displayName = getPositionDisplayName(posKey, ganzhi);
                     // 排除原局位置（年/月/日/时）
-                    if(!['年干','月干','日干','时干','年支','月支','日支','时支','年柱','月柱','日柱','时柱'].includes(posKey)){
+                    if(!['年干','月干','日干','时干'].includes(cacheKey)){
                         incrementChecked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
                     }
                 }
             });
             // inherit 编码
             const parts = [`定位批量`, `inherit=${inheritMacroId}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
-            if(ganzhi === '通用') parts.push(`取值=${quzhi}`);
+            if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
             if(incrementChecked.length > 0) parts.push(incrementChecked.join('|'));
             encoded = parts.join('|');
             // inherit 模式允许无增量位置（纯继承原局）
@@ -27959,7 +27967,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             const parts = [`定位批量`, `type=${judgeType}`, `ganZhi=${ganzhi}`, `scope=${scope}`];
-            if(ganzhi === '通用') parts.push(`取值=${quzhi}`);
+            if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
             parts.push(checked.join('|'));
             encoded = parts.join('|');
         }
@@ -27979,9 +27987,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     return !c.startsWith('年') && !c.startsWith('月') || c.startsWith('大运') || c.startsWith('流年') || c.startsWith('流月');
                 });
                 const incText = increment.length > 0 ? `·增量: ${increment.join(', ')}` : '';
-                summaryText = `继承[${macroName}]·${judgeType}·${ganzhi}${ganzhi === '通用' ? '·取值' + quzhi : ''}${incText}`;
+                summaryText = `继承[${macroName}]·${judgeType}·${ganzhi}${ganzhi === '通用' && quzhi ? '·取值' + quzhi : ''}${incText}`;
             } else {
-                summaryText = `${judgeType}·${ganzhi}${ganzhi === '通用' ? '·取值' + quzhi : ''}·${scope}: ${checked.join(', ')}`;
+                summaryText = `${judgeType}·${ganzhi}${ganzhi === '通用' && quzhi ? '·取值' + quzhi : ''}·${scope}: ${checked.join(', ')}`;
             }
             summary.textContent = summaryText;
             summary.title = summaryText;
