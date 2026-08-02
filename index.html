@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7480,6 +7480,12 @@
                 // 评估一组位置条件
                 const evalPositions = (positions) => {
                     if(pbGanZhi === '通用'){
+                        // 模板模式（未选取值维度）不应直接用于匹配
+                        if(!pbQuZhi) return false;
+                        // 没有位置条件时不匹配
+                        let hasPos = false;
+                        for(const _k in positions){ hasPos = true; break; }
+                        if(!hasPos) return false;
                         const targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
                         for(const posName in positions){
                             const posCfg = positions[posName];
@@ -7496,6 +7502,10 @@
                         }
                         return true;
                     }
+                    // 天干/地支模式：没有位置条件时不匹配
+                    let hasPosTG = false;
+                    for(const _k2 in positions){ hasPosTG = true; break; }
+                    if(!hasPosTG) return false;
                     for(const posName in positions){
                         const posCfg = positions[posName];
                         const path = pbPathMap[posName];

@@ -419,6 +419,12 @@ function evaluateBatchPositions(data, positions, pbType, pbGanZhi, pbQuZhi) {
 
   // 通用模式：按取值维度只判断对应维度
   if (pbGanZhi === '通用') {
+    // 模板模式（未选取值维度）不应直接用于匹配，只通过 inherit 引用
+    if (!pbQuZhi) return false;
+    // 没有位置条件时不匹配
+    var hasAnyPosition = false;
+    for (var k in positions) { hasAnyPosition = true; break; }
+    if (!hasAnyPosition) return false;
     // 通用模式下，位置名是"柱"（年柱/月柱等），需要展开为天干或地支
     // 取值=天干 → 只判断天干维度；取值=地支 → 只判断地支维度
     var targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
@@ -442,6 +448,9 @@ function evaluateBatchPositions(data, positions, pbType, pbGanZhi, pbQuZhi) {
   }
 
   // 天干/地支模式（现有逻辑）
+  var hasAnyPositionTG = false;
+  for (var k2 in positions) { hasAnyPositionTG = true; break; }
+  if (!hasAnyPositionTG) return false;
   for (var posName2 in positions) {
     var posCfg2 = positions[posName2];
     var path2 = pbPathMap[posName2];
