@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -27460,10 +27460,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div id="pb-inherit-config" style="display:none;">
                     <div class="flex items-center gap-2 mb-2">
                         <label class="text-xs text-gray-700 shrink-0">继承条件宏:</label>
-                        <select id="pb-inherit-macro" class="flex-1 p-1.5 border rounded text-sm"></select>
+                        <input type="text" id="pb-inherit-search" class="flex-1 p-1.5 border rounded text-sm" placeholder="搜索名称或标签...">
+                        <select id="pb-inherit-tag-filter" class="p-1.5 border rounded text-sm min-w-[90px]">
+                            <option value="">全部标签</option>
+                        </select>
                     </div>
-                    <div id="pb-inherit-preview" class="text-xs text-gray-600 bg-white border rounded p-2 max-h-32 overflow-y-auto">
-                        <span class="text-gray-400">请选择条件宏</span>
+                    <div id="pb-inherit-list" class="border rounded max-h-40 overflow-y-auto bg-white">
+                        <p class="text-gray-400 text-xs text-center py-2">请选择条件宏</p>
+                    </div>
+                    <div id="pb-inherit-selected-info" class="text-xs text-indigo-700 mt-1 font-medium" style="display:none;"></div>
+                    <div id="pb-inherit-preview" class="text-xs text-gray-600 bg-white border rounded p-2 max-h-32 overflow-y-auto mt-1">
+                        <span class="text-gray-400">选择条件宏后将显示引用层排列</span>
                     </div>
                     <p class="text-xs text-gray-400 mt-1">ℹ 引用层排列为只读，如需修改请进入引用层条件宏编辑</p>
                 </div>
@@ -27510,6 +27517,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let _currentField = '';
     // 记录层级切换前的勾选状态，避免切换层级时丢失
     let _positionCache = {};
+    // 当前选中的继承宏ID
+    let _selectedInheritId = '';
 
     // 根据干支类型获取显示位置名
     function getPositionDisplayName(posKey, ganzhi){
@@ -27525,7 +27534,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 通用模式下判断是否为日柱（用于限制十神/十神组的值选项）
     function isDayPosition(posKey, ganzhi){
-        if(ganzhi === '通用') return posKey === '日柱' || posKey === '日干';
+        if(ganzhi === '通用') return false; // 通用模式不限制日柱值选项（取值维度可选天干或地支）
         return posKey === '日干';
     }
 
@@ -27533,12 +27542,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if(judgeType === '五行'){
             return WU_LIST.map(w => `<option value="${w}">${w}</option>`).join('');
         } else if(judgeType === '十神'){
-            if(isDayPosition(posKey, ganzhi) && (ganzhi === '天干' || ganzhi === '通用')){
+            if(isDayPosition(posKey, ganzhi) && ganzhi === '天干'){
                 return `<option value="比肩">比肩</option>`;
             }
             return FULL_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
         } else if(judgeType === '十神组'){
-            if(isDayPosition(posKey, ganzhi) && (ganzhi === '天干' || ganzhi === '通用')){
+            if(isDayPosition(posKey, ganzhi) && ganzhi === '天干'){
                 return `<option value="比劫">比劫</option>`;
             }
             return GROUPED_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -27548,7 +27557,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getDefaultDayValue(judgeType, ganzhi){
         if(ganzhi === '地支') return '';
-        // 天干和通用模式下日柱默认值
+        if(ganzhi === '通用') return ''; // 通用模式日柱不设默认值
+        // 天干模式下日干默认值
         if(judgeType === '十神') return '比肩';
         if(judgeType === '十神组') return '比劫';
         return '';
@@ -27693,15 +27703,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // 渲染继承引用预览
     function renderInheritPreview(macroId){
         const previewEl = document.getElementById('pb-inherit-preview');
+        const selectedInfo = document.getElementById('pb-inherit-selected-info');
         if(!macroId){
-            previewEl.innerHTML = '<span class="text-gray-400">请选择条件宏</span>';
+            previewEl.innerHTML = '<span class="text-gray-400">选择条件宏后将显示引用层排列</span>';
+            selectedInfo.style.display = 'none';
             return;
         }
         const macro = getMacroById(macroId);
         if(!macro){
             previewEl.innerHTML = '<span class="text-red-400">未找到条件宏</span>';
+            selectedInfo.style.display = 'none';
             return;
         }
+        selectedInfo.textContent = '已选择: ' + macro.name;
+        selectedInfo.style.display = '';
         const arrangements = extractBatchArrangements(macro);
         if(arrangements.length === 0){
             previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无定位批量排列</span>';
@@ -27713,18 +27728,65 @@ document.addEventListener('DOMContentLoaded', function() {
         }).join('');
     }
 
+    // 渲染继承条件宏列表（带搜索过滤）
+    function renderInheritMacroList(){
+        const listEl = document.getElementById('pb-inherit-list');
+        const searchQuery = (document.getElementById('pb-inherit-search')?.value || '').toLowerCase();
+        const tagFilter = document.getElementById('pb-inherit-tag-filter')?.value || '';
+        let macros = (cache.conditionMacros || []).filter(m => m.name);
+        // 搜索过滤
+        if(searchQuery){
+            macros = macros.filter(m => {
+                if(m.name.toLowerCase().includes(searchQuery)) return true;
+                if(m.tags && m.tags.some(t => t.toLowerCase().includes(searchQuery))) return true;
+                return false;
+            });
+        }
+        // 标签过滤
+        if(tagFilter){
+            macros = macros.filter(m => (m.tags || []).includes(tagFilter));
+        }
+        if(macros.length === 0){
+            listEl.innerHTML = '<p class="text-gray-400 text-xs text-center py-2">无匹配条件宏</p>';
+            return;
+        }
+        listEl.innerHTML = macros.map(m => {
+            const id = m.cloudId || m.id;
+            const isSelected = id === _selectedInheritId;
+            const tags = (m.tags || []).map(t => `<span class="inline-block px-1 bg-indigo-50 text-indigo-600 rounded text-xs">${escapeHtml(t)}</span>`).join(' ');
+            return `<div class="px-2 py-1.5 border-b last:border-b-0 cursor-pointer ${isSelected ? 'bg-indigo-100' : 'hover:bg-indigo-50'}" data-macro-id="${id}">
+                <div class="text-sm font-medium ${isSelected ? 'text-indigo-800' : ''}">🧩 ${escapeHtml(m.name)}${isSelected ? ' ✓' : ''}</div>
+                ${tags ? `<div class="mt-0.5">${tags}</div>` : ''}
+            </div>`;
+        }).join('');
+        // 绑定点击事件
+        listEl.querySelectorAll('[data-macro-id]').forEach(el => {
+            el.onclick = function(){
+                _selectedInheritId = this.dataset.macroId;
+                renderInheritMacroList();
+                renderInheritPreview(_selectedInheritId);
+            };
+        });
+    }
+
     // 初始化继承引用区域
     function initInheritArea(){
-        const macroSelect = document.getElementById('pb-inherit-macro');
-        // 填充条件宏列表
-        const macros = (cache.conditionMacros || []).filter(m => m.name);
-        macroSelect.innerHTML = '<option value="">--请选择--</option>' + macros.map(m =>
-            `<option value="${m.cloudId || m.id}">${escapeHtml(m.name)}</option>`
+        // 填充标签过滤下拉框
+        const tagSelect = document.getElementById('pb-inherit-tag-filter');
+        const allTags = getAllMacroTags();
+        tagSelect.innerHTML = '<option value="">全部标签</option>' + allTags.map(t =>
+            `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`
         ).join('');
-        // 绑定变化事件
-        macroSelect.onchange = function(){
-            renderInheritPreview(this.value);
+        // 绑定搜索事件
+        const searchInput = document.getElementById('pb-inherit-search');
+        searchInput.oninput = function(){
+            renderInheritMacroList();
         };
+        tagSelect.onchange = function(){
+            renderInheritMacroList();
+        };
+        // 渲染列表
+        renderInheritMacroList();
     }
 
     // 打开编辑器
@@ -27784,13 +27846,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // 继承引用回显
         const inheritCheck = document.getElementById('pb-inherit-enable');
         const inheritConfig = document.getElementById('pb-inherit-config');
+        _selectedInheritId = inheritId || '';
         if(inheritId){
             inheritCheck.checked = true;
             inheritConfig.style.display = '';
-            document.getElementById('pb-inherit-macro').value = inheritId;
+            // 清空搜索框，渲染列表（列表会高亮选中的宏）
+            if(document.getElementById('pb-inherit-search'))
+                document.getElementById('pb-inherit-search').value = '';
+            renderInheritMacroList();
             renderInheritPreview(inheritId);
-            // 继承模式下层级自动调整为包含原局+大运
-            // 若有增量位置（大运柱等），根据增量推断scope
         } else {
             inheritCheck.checked = false;
             inheritConfig.style.display = 'none';
@@ -27804,6 +27868,7 @@ document.addEventListener('DOMContentLoaded', function() {
         _currentItem = null;
         _currentField = '';
         _positionCache = {};
+        _selectedInheritId = '';
     };
 
     // 配置项变化时重新渲染
@@ -27832,6 +27897,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('pb-inherit-enable').onchange = function(){
         const config = document.getElementById('pb-inherit-config');
         config.style.display = this.checked ? '' : 'none';
+        if(this.checked){
+            // 启用时重新渲染列表
+            renderInheritMacroList();
+            if(!_selectedInheritId){
+                renderInheritPreview('');
+            }
+        }
         const scope = document.getElementById('pb-scope').value;
         const judgeType = document.getElementById('pb-judge-type').value;
         const ganzhi = document.getElementById('pb-ganzhi').value;
@@ -27846,7 +27918,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const scope = document.getElementById('pb-scope').value;
         const quzhi = document.getElementById('pb-quzhi').value;
         const inheritEnabled = document.getElementById('pb-inherit-enable').checked;
-        const inheritMacroId = document.getElementById('pb-inherit-macro').value;
+        const inheritMacroId = _selectedInheritId;
         // 收集勾选的位置
         const checked = [];
         const positions = getScopePositions(scope, ganzhi);
