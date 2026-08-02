@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -20696,6 +20696,7 @@ function renderMacroList() {
     const PERM_LABELS = { 0:'🔒私有', 1:'🔓公开只读', 2:'🔐公开加密', 3:'🌍公开可转私有' };
     container.innerHTML = macros.map(m => {
         const refCount = getRulesReferencingMacro(m.id).length;
+        const macroRefCount = getMacrosReferencingMacro(m.id).length;
         const effectivePerm = getEffectiveMacroPerm(m);
         const canView = canViewMacroConditions(m);
         const condText = canView ? macroConditionsToText(m.conditions) : '🔒 条件已隐藏（无权限）';
@@ -20735,7 +20736,9 @@ function renderMacroList() {
                 <button onclick="navigator.clipboard.writeText('${m.cloudId}')" class="text-blue-500 hover:text-blue-700" title="复制云端ID">📋</button></span>` : '<span class="text-orange-500">⚠️ 未同步到云端（无cloudId）</span>'}
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-                ${refCount > 0 ? `<span class="text-xs text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">被 ${refCount} 条断语引用</span>` : '<span class="text-xs text-gray-400">未被引用</span>'}
+                ${refCount > 0 ? `<span class="text-xs text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">被 ${refCount} 条断语引用</span>` : ''}
+                ${macroRefCount > 0 ? `<span class="text-xs text-purple-600 bg-purple-50 inline-block px-2 py-0.5 rounded">被 ${macroRefCount} 个条件宏引用</span>` : ''}
+                ${(refCount === 0 && macroRefCount === 0) ? '<span class="text-xs text-gray-400">未被引用</span>' : ''}
                 ${m.usageCount > 0 ? `<span class="text-xs text-gray-400">已使用 ${m.usageCount} 次</span>` : ''}
                 ${m.lastUsedAt ? `<span class="text-xs text-gray-400">最近使用：${new Date(m.lastUsedAt).toLocaleDateString()}</span>` : ''}
             </div>
@@ -20894,9 +20897,13 @@ async function deleteMacroConfirm(macroId) {
     const macro = getMacroById(macroId);
     if (!macro) return;
     const refCount = getRulesReferencingMacro(macroId).length;
+    const macroRefCount = getMacrosReferencingMacro(macroId).length;
     let msg = `确定要删除条件宏「${macro.name}」吗？`;
     if (refCount > 0) {
         msg += `\n\n⚠️ 该宏正在被 ${refCount} 条断语引用，删除后这些断语中的宏引用将失效！`;
+    }
+    if (macroRefCount > 0) {
+        msg += `\n\n⚠️ 该宏正在被 ${macroRefCount} 个条件宏引用，删除后这些条件宏中的引用将失效！`;
     }
     if (!confirm(msg)) return;
     
@@ -23556,10 +23563,31 @@ function doesRuleReferenceMacro(rule, macroId) {
     return checkConditionsForMacroRef(rule.conditions.children, macroId);
 }
 
+// 判断 macroRef 值是否匹配指定宏（同时按本地ID和cloudId双向匹配）
+function macroRefMatches(refVal, macroId) {
+    if (!refVal || !macroId) return false;
+    if (macroId === '__any__') return true;
+    const refStr = String(refVal);
+    const targetStr = String(macroId);
+    if (refStr === targetStr) return true;
+    // 按 cloudId / 本地ID 双向匹配
+    const target = getMacroById(macroId);
+    if (target) {
+        if (target.cloudId && refStr === String(target.cloudId)) return true;
+        if (target.id && refStr === String(target.id)) return true;
+    }
+    const refMacro = getMacroById(refVal);
+    if (refMacro) {
+        if (refMacro.id && targetStr === String(refMacro.id)) return true;
+        if (refMacro.cloudId && targetStr === String(refMacro.cloudId)) return true;
+    }
+    return false;
+}
+
 function checkConditionsForMacroRef(children, macroId) {
     for (const child of children) {
         if (macroId === '__any__' && child.macroRef) return true;
-        if (String(child.macroRef) === String(macroId)) return true;
+        if (macroRefMatches(child.macroRef, macroId)) return true;
         if (child.macroRef) {
             const macro = getMacroById(child.macroRef);
             if (macro && macroId !== '__any__' && checkConditionsForMacroRef(macro.conditions?.children || [], macroId)) return true;
@@ -23572,6 +23600,15 @@ function checkConditionsForMacroRef(children, macroId) {
 // 获取引用了某个宏的所有断语
 function getRulesReferencingMacro(macroId) {
     return (cache.rules || []).filter(rule => doesRuleReferenceMacro(rule, macroId));
+}
+
+// 获取引用了某个宏的所有条件宏
+function getMacrosReferencingMacro(macroId) {
+    return (cache.conditionMacros || []).filter(m => {
+        if (String(m.id) === String(macroId)) return false; // 排除自身
+        if (!m.conditions || !m.conditions.children) return false;
+        return checkConditionsForMacroRef(m.conditions.children, macroId);
+    });
 }
 
 // 检查断语规则是否包含任何宏引用
