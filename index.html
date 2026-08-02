@@ -1,4 +1,4 @@
-﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7479,34 +7479,37 @@
                 };
                 // 评估一组位置条件
                 const evalPositions = (positions) => {
+                    // 先收集合法位置键（排除元信息）
+                    const validKeys = [];
+                    for(const _k in positions){
+                        if(pbPathMap[_k] || pbColumnPathMap[_k]) validKeys.push(_k);
+                    }
+                    if(validKeys.length === 0) return false;
                     if(pbGanZhi === '通用'){
                         // 模板模式（未选取值维度）不应直接用于匹配
                         if(!pbQuZhi) return false;
-                        // 没有位置条件时不匹配
-                        let hasPos = false;
-                        for(const _k in positions){ hasPos = true; break; }
-                        if(!hasPos) return false;
                         const targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
-                        for(const posName in positions){
+                        let checkedCount = 0;
+                        for(const posName of validKeys){
                             const posCfg = positions[posName];
                             const colPaths = pbColumnPathMap[posName];
                             if(!colPaths){
                                 const directPath = pbPathMap[posName];
                                 if(!directPath) return false;
                                 if(directPath.indexOf(targetSuffix) < 0) continue;
+                                checkedCount++;
                                 if(!checkPos(directPath, posCfg, posName)) return false;
                             } else {
                                 const targetPath = (pbQuZhi === '地支') ? colPaths[1] : colPaths[0];
+                                checkedCount++;
                                 if(!checkPos(targetPath, posCfg, posName)) return false;
                             }
                         }
+                        if(checkedCount === 0) return false;
                         return true;
                     }
-                    // 天干/地支模式：没有位置条件时不匹配
-                    let hasPosTG = false;
-                    for(const _k2 in positions){ hasPosTG = true; break; }
-                    if(!hasPosTG) return false;
-                    for(const posName in positions){
+                    // 天干/地支模式
+                    for(const posName of validKeys){
                         const posCfg = positions[posName];
                         const path = pbPathMap[posName];
                         if(!path) return false;
@@ -13094,6 +13097,11 @@
         if (error) throw error;
     }
 
+    function normalizeConditionsForCompare(conditions) {
+        if (!conditions) return '';
+        try { return JSON.stringify(conditions); } catch(e) { return ''; }
+    }
+
     async function syncMacros() {
         if (!currentUser || !supabaseClient) return;
         try {
@@ -13103,51 +13111,61 @@
                 .select('*')
                 .or(`user_id.eq.${currentUser.id},permission.gte.1`);
             if (error) throw error;
-            if (!data || data.length === 0) return;
 
             // 读取ID映射
             const idMapping = getIdMapping();
+            cache.conditionMacros = cache.conditionMacros || [];
 
-            for (const cm of data) {
-                const localId = getLocalIdByCloudId(idMapping, 'macros', cm.id);
-                // 公开加密（permission=2）且非本人/非管理员的宏 → 剥离 conditions
-                var isMacroEncrypted = cm.permission === 2;
-                var isMacroOwner = cm.user_id === currentUser.id;
-                var isMacroAdmin = isAdmin(currentUser.email);
-                var stripMacroConditions = isMacroEncrypted && !isMacroOwner && !isMacroAdmin;
-                const macroData = {
-                    id: localId || String(cm.id),
-                    cloudId: cm.id,
-                    name: cm.name,
-                    description: cm.description || '',
-                    permission: cm.permission !== undefined ? cm.permission : 0,
-                    conditions: stripMacroConditions ? null : (cm.conditions || { logic: 'and', children: [] }),
-                    tags: cm.tags || [],
-                    pinned: cm.pinned || false,
-                    usageCount: cm.usage_count || 0,
-                    createdBy: cm.user_id || '',
-                    createTime: cm.create_time || new Date().toISOString(),
-                    updateTime: cm.update_time || cm.create_time || new Date().toISOString(),
-                    lastUsedAt: cm.last_used_at || null
-                };
+            // --- 阶段1：把云端数据合并到本地 ---
+            if (data && data.length > 0) {
+                for (const cm of data) {
+                    const localId = getLocalIdByCloudId(idMapping, 'macros', cm.id);
+                    // 公开加密（permission=2）且非本人/非管理员的宏 → 剥离 conditions
+                    var isMacroEncrypted = cm.permission === 2;
+                    var isMacroOwner = cm.user_id === currentUser.id;
+                    var isMacroAdmin = isAdmin(currentUser.email);
+                    var stripMacroConditions = isMacroEncrypted && !isMacroOwner && !isMacroAdmin;
+                    const cloudConditions = stripMacroConditions ? null : (cm.conditions || { logic: 'and', children: [] });
+                    const cloudCondStr = normalizeConditionsForCompare(cloudConditions);
+                    const macroData = {
+                        id: localId || String(cm.id),
+                        cloudId: cm.id,
+                        name: cm.name,
+                        description: cm.description || '',
+                        permission: cm.permission !== undefined ? cm.permission : 0,
+                        conditions: cloudConditions,
+                        tags: cm.tags || [],
+                        pinned: cm.pinned || false,
+                        usageCount: cm.usage_count || 0,
+                        createdBy: cm.user_id || '',
+                        createTime: cm.create_time || new Date().toISOString(),
+                        updateTime: cm.update_time || cm.create_time || new Date().toISOString(),
+                        lastUsedAt: cm.last_used_at || null
+                    };
 
-                if (localId) {
-                    // 本地已有映射，更新它
-                    const idx = (cache.conditionMacros || []).findIndex(r => r.id === localId);
-                    if (idx !== -1) {
-                        cache.conditionMacros[idx] = macroData;
-                    } else {
-                        cache.conditionMacros.push(macroData);
+                    let matchIdx = -1;
+                    if (localId) {
+                        matchIdx = cache.conditionMacros.findIndex(r => r.id === localId);
                     }
-                } else {
-                    // 无映射，检查本地是否有同名宏
-                    const existIdx = (cache.conditionMacros || []).findIndex(r => r.name === cm.name && r.createdBy === cm.user_id);
-                    if (existIdx !== -1) {
-                        const existing = cache.conditionMacros[existIdx];
+                    if (matchIdx === -1) {
+                        // 优先级2：name + createdBy + conditions 完全匹配（改名前的旧数据）
+                        matchIdx = cache.conditionMacros.findIndex(r =>
+                            r.name === cm.name &&
+                            r.createdBy === cm.user_id &&
+                            normalizeConditionsForCompare(r.conditions) === cloudCondStr
+                        );
+                    }
+                    if (matchIdx === -1) {
+                        // 优先级3：name + createdBy 匹配（允许conditions略有差异，用云端覆盖）
+                        matchIdx = cache.conditionMacros.findIndex(r =>
+                            r.name === cm.name && r.createdBy === cm.user_id && !r.cloudId
+                        );
+                    }
+
+                    if (matchIdx !== -1) {
+                        const existing = cache.conditionMacros[matchIdx];
                         setCloudId(idMapping, 'macros', existing.id, cm.id);
-                        cache.conditionMacros[existIdx] = macroData;
-                        cache.conditionMacros[existIdx].id = existing.id;
-                        setCloudId(idMapping, 'macros', existing.id, cm.id);
+                        cache.conditionMacros[matchIdx] = Object.assign({}, macroData, { id: existing.id });
                     } else {
                         cache.conditionMacros.push(macroData);
                         setCloudId(idMapping, 'macros', macroData.id, cm.id);
@@ -13155,7 +13173,76 @@
                 }
             }
 
-            // 保存ID映射
+            // --- 阶段2：把本地没有cloudId的宏（用户在多端新增且未上传）推送到云端 ---
+            for (const localMacro of cache.conditionMacros) {
+                if (!localMacro.cloudId && localMacro.createdBy === getCurrentUserId() && !localMacro._skipUpload) {
+                    try {
+                        const res = await supabaseClient
+                            .from('condition_macros')
+                            .insert({
+                                name: localMacro.name,
+                                description: localMacro.description || '',
+                                permission: localMacro.permission !== undefined ? localMacro.permission : 0,
+                                conditions: localMacro.conditions || { logic: 'and', children: [] },
+                                tags: localMacro.tags || [],
+                                pinned: localMacro.pinned || false,
+                                usage_count: localMacro.usageCount || 0,
+                                user_id: localMacro.createdBy || currentUser.id,
+                                create_time: localMacro.createTime || new Date().toISOString(),
+                                update_time: localMacro.updateTime || new Date().toISOString(),
+                                last_used_at: localMacro.lastUsedAt || null,
+                                owner_id: localMacro.createdBy || currentUser.id
+                            })
+                            .select('*');
+                        if (res && res.data && res.data[0]) {
+                            const cm = res.data[0];
+                            localMacro.cloudId = cm.id;
+                            setCloudId(idMapping, 'macros', localMacro.id, cm.id);
+                            localMacro.permission = cm.permission !== undefined ? cm.permission : localMacro.permission;
+                            localMacro.updateTime = cm.update_time || localMacro.updateTime;
+                        }
+                    } catch (upErr) {
+                        console.warn('上传本地宏到云端失败:', localMacro.name, upErr);
+                    }
+                }
+            }
+
+            // --- 阶段3：去重清理（同一createdBy下同名或同conditions保留有cloudId的） ---
+            const seenKeys = {};
+            const duplicates = [];
+            for (let i = cache.conditionMacros.length - 1; i >= 0; i--) {
+                const m = cache.conditionMacros[i];
+                const condStr = normalizeConditionsForCompare(m.conditions);
+                const nameKey = `${m.createdBy}::name::${m.name}`;
+                const condKey = `${m.createdBy}::cond::${condStr}`;
+                // 有cloudId / 有使用计数 / 更新时间较新 → 优先级更高，保留
+                const priority = (m.cloudId ? 4 : 0) + (m.usageCount > 0 ? 2 : 0) + (m.updateTime ? 1 : 0);
+                for (const k of [nameKey, condKey]) {
+                    if (m.createdBy && (k === nameKey ? m.name : condStr)) {
+                        if (seenKeys[k] !== undefined) {
+                            const otherIdx = seenKeys[k];
+                            const other = cache.conditionMacros[otherIdx];
+                            const otherPrio = (other.cloudId ? 4 : 0) + (other.usageCount > 0 ? 2 : 0) + (other.updateTime ? 1 : 0);
+                            if (priority < otherPrio) {
+                                duplicates.push(i);
+                                break;
+                            } else {
+                                if (!duplicates.includes(otherIdx)) duplicates.push(otherIdx);
+                                seenKeys[k] = i;
+                            }
+                        } else {
+                            seenKeys[k] = i;
+                        }
+                    }
+                }
+            }
+            // 移除重复项（从大到小删除，索引不偏移）
+            duplicates.sort((a,b) => b - a);
+            for (const di of duplicates) {
+                cache.conditionMacros.splice(di, 1);
+            }
+
+            // 保存ID映射和本地缓存
             saveIdMapping(idMapping);
             localStorage.setItem(MACRO_KEY, JSON.stringify(cache.conditionMacros || []));
         } catch (e) {
@@ -20642,6 +20729,11 @@ function renderMacroList() {
             ${tags ? `<div class="flex flex-wrap gap-1 mb-2">${tags}</div>` : ''}
             <div class="text-sm text-gray-600 mb-1">条件：${condText}</div>
             ${m.description && isOwnMacro ? `<div class="text-sm text-gray-700 mb-2 bg-yellow-50 border border-yellow-200 px-2 py-1 rounded">📝 描述：${escapeHtml(m.description)}</div>` : ''}
+            <div class="text-xs text-gray-400 mb-2 flex items-center gap-3 flex-wrap">
+                <span>📋 本地ID: <code class="bg-gray-50 px-1 rounded">${m.id}</code></span>
+                ${m.cloudId ? `<span>☁️ 云端ID: <code class="bg-blue-50 text-blue-600 px-1 rounded">${m.cloudId}</code>
+                <button onclick="navigator.clipboard.writeText('${m.cloudId}')" class="text-blue-500 hover:text-blue-700" title="复制云端ID">📋</button></span>` : '<span class="text-orange-500">⚠️ 未同步到云端（无cloudId）</span>'}
+            </div>
             <div class="flex items-center gap-2 flex-wrap">
                 ${refCount > 0 ? `<span class="text-xs text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">被 ${refCount} 条断语引用</span>` : '<span class="text-xs text-gray-400">未被引用</span>'}
                 ${m.usageCount > 0 ? `<span class="text-xs text-gray-400">已使用 ${m.usageCount} 次</span>` : ''}
@@ -20665,7 +20757,8 @@ function openMacroEditor(macroId) {
     if (macroId) {
         const macro = getMacroById(macroId);
         if (!macro) return;
-        title.textContent = `编辑条件宏：${macro.name}`;
+        const idInfo = macro.cloudId ? `  [☁️ ${macro.cloudId}]` : `  [📋 ${macro.id}]`;
+        title.textContent = `编辑条件宏：${macro.name}${idInfo}`;
         nameInput.value = macro.name || '';
         descInput.value = macro.description || '';
         if (permSelect) permSelect.value = macro.permission !== undefined ? macro.permission : 0;
@@ -23169,11 +23262,47 @@ async function saveMacro(macroData) {
         try {
             const idMapping = getIdMapping();
             if (isNew) {
-                const cloudMacro = await addSupabaseMacro(macroData);
-                if (cloudMacro && cloudMacro.id) {
+                // 新建时先查数据库：是否已有同名+同conditions的宏（防止跨设备重复创建）
+                let matchedCloudId = null;
+                try {
+                    const condStr = normalizeConditionsForCompare(macroData.conditions || null);
+                    const { data: existCloudData, error: existErr } = await supabaseClient
+                        .from('condition_macros')
+                        .select('id, name, user_id, conditions')
+                        .eq('user_id', macroData.createdBy || getCurrentUserId())
+                        .eq('name', macroData.name || '');
+                    if (!existErr && existCloudData && existCloudData.length > 0) {
+                        for (const ec of existCloudData) {
+                            if (normalizeConditionsForCompare(ec.conditions) === condStr) {
+                                matchedCloudId = ec.id;
+                                break;
+                            }
+                        }
+                        // conditions不完全匹配时，退化为按name匹配（用户改名后新建的场景）
+                        if (!matchedCloudId && existCloudData.length === 1) {
+                            matchedCloudId = existCloudData[0].id;
+                        }
+                    }
+                } catch (qErr) {
+                    console.warn('查询云端同名宏失败:', qErr);
+                }
+                if (matchedCloudId) {
+                    // 合并到云端已有记录：更新云端 + 写入本地映射
                     if (!idMapping.macros) idMapping.macros = {};
-                    idMapping.macros[macroData.id] = cloudMacro.id;
+                    idMapping.macros[macroData.id] = matchedCloudId;
                     saveIdMapping(idMapping);
+                    const updated = macros.find(m => String(m.id) === String(macroData.id));
+                    if (updated) updated.cloudId = matchedCloudId;
+                    cache.conditionMacros = macros;
+                    localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+                    try { await updateSupabaseMacro(matchedCloudId, macroData); } catch(uErr) {}
+                } else {
+                    const cloudMacro = await addSupabaseMacro(macroData);
+                    if (cloudMacro && cloudMacro.id) {
+                        if (!idMapping.macros) idMapping.macros = {};
+                        idMapping.macros[macroData.id] = cloudMacro.id;
+                        saveIdMapping(idMapping);
+                    }
                 }
             } else {
                 const cloudId = getCloudId(idMapping, 'macros', macroData.id);
