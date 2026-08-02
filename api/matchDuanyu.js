@@ -259,6 +259,230 @@ function evaluateConditionNode(data, condNode) {
 }
 
 /**
+ * 定位批量通用模式的位置路径映射（柱名 → [天干路径, 地支路径]）
+ */
+var PB_COLUMN_PATH_MAP = {
+  '年柱': ['nian.t', 'nian.d'],
+  '月柱': ['yue.t', 'yue.d'],
+  '日柱': ['ri.t', 'ri.d'],
+  '时柱': ['shi.t', 'shi.d'],
+  '大运柱': ['dayun.t', 'dayun.d'],
+  '流年柱': ['liunian.t', 'liunian.d'],
+  '流月柱': ['liuyue.t', 'liuyue.d']
+};
+
+/**
+ * 递归提取被继承条件宏中的所有"定位批量"排列
+ * @param {Object} data - 匹配数据（含 macros）
+ * @param {String} macroId - 被继承条件宏的 cloudId/id
+ * @param {Object} visited - 已访问的宏ID集合（防循环引用）
+ * @returns {Array<String>} 排列的编码值数组
+ */
+function extractInheritArrangements(data, macroId, visited) {
+  if (!macroId || visited[macroId]) return [];
+  visited[macroId] = true;
+  var macros = data && data.macros;
+  if (!macros || macros.length === 0) return [];
+  var macro = null;
+  for (var mi = 0; mi < macros.length; mi++) {
+    if (macros[mi] && (String(macros[mi].id) === String(macroId) || String(macros[mi].cloudId) === String(macroId))) {
+      macro = macros[mi];
+      break;
+    }
+  }
+  // 尝试通过 idMapping 解析
+  if (!macro && data.idMapping && data.idMapping.macros) {
+    var resolvedCloudId = data.idMapping.macros[macroId];
+    if (resolvedCloudId) {
+      for (var mi2 = 0; mi2 < macros.length; mi2++) {
+        if (macros[mi2] && (String(macros[mi2].id) === String(resolvedCloudId) || String(macros[mi2].cloudId) === String(resolvedCloudId))) {
+          macro = macros[mi2];
+          break;
+        }
+      }
+    }
+  }
+  if (!macro || !macro.conditions) return [];
+  var arrangements = [];
+  function walk(node) {
+    if (!node) return;
+    if (node.macroRef) {
+      // 递归引用其他宏
+      var subArr = extractInheritArrangements(data, node.macroRef, visited);
+      for (var si = 0; si < subArr.length; si++) arrangements.push(subArr[si]);
+      return;
+    }
+    if (node.field && node.field.indexOf('定位批量-') === 0 && node.val && node.val.indexOf('定位批量|') === 0) {
+      // 检查是否本身也是 inherit 节点
+      var subInheritId = '';
+      var subParts = node.val.split('|');
+      for (var spi = 0; spi < subParts.length; spi++) {
+        if (subParts[spi].indexOf('inherit=') === 0) {
+          subInheritId = subParts[spi].replace('inherit=', '');
+          break;
+        }
+      }
+      if (subInheritId) {
+        // 嵌套 inherit：递归展开被引用宏的排列，追加该节点的增量条件
+        var subArr2 = extractInheritArrangements(data, subInheritId, visited);
+        // 提取该节点的增量位置条件
+        var incPositions = {};
+        for (var spi2 = 0; spi2 < subParts.length; spi2++) {
+          var sp = subParts[spi2];
+          if (sp.indexOf('=') > 0 && sp.indexOf('type=') !== 0 && sp.indexOf('ganZhi=') !== 0 && sp.indexOf('scope=') !== 0 && sp.indexOf('取值=') !== 0 && sp.indexOf('inherit=') !== 0) {
+            var sop = 'eq';
+            var sval = sp;
+            if (sp.indexOf('!=') > 0) { sop = 'ne'; sval = sp.replace('!=','='); }
+            var skv = sval.split('=');
+            if (skv.length === 2 && skv[1]) {
+              incPositions[skv[0]] = { op: sop, val: skv[1] };
+            }
+          }
+        }
+        // 对每个子排列追加增量条件，生成新排列
+        for (var sai = 0; sai < subArr2.length; sai++) {
+          var newArr = mergeArrangementWithIncrement(subArr2[sai], incPositions);
+          arrangements.push(newArr);
+        }
+      } else {
+        // 普通定位批量排列，直接收集
+        arrangements.push(node.val);
+      }
+      return;
+    }
+    if (node.logic && node.children) {
+      for (var ci = 0; ci < node.children.length; ci++) {
+        walk(node.children[ci]);
+      }
+    }
+  }
+  walk(macro.conditions);
+  return arrangements;
+}
+
+/**
+ * 将一个排列的编码值与增量位置条件合并，生成新排列编码
+ */
+function mergeArrangementWithIncrement(baseVal, incPositions) {
+  if (!baseVal || baseVal.indexOf('定位批量|') !== 0) return baseVal;
+  var parts = baseVal.split('|');
+  var result = [];
+  var basePositions = {};
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    if (p === '定位批量') continue;
+    if (p.indexOf('scope=') === 0) continue; // 跳过 scope（继承后范围可能变化）
+    if (p.indexOf('=') > 0 && p.indexOf('type=') !== 0 && p.indexOf('ganZhi=') !== 0 && p.indexOf('取值=') !== 0 && p.indexOf('inherit=') !== 0) {
+      // 位置条件，记录下来（后续会被增量覆盖）
+      basePositions[p.split('=')[0].replace('!','')] = p;
+    } else {
+      result.push(p);
+    }
+  }
+  // 用增量位置覆盖基础位置
+  for (var incName in incPositions) {
+    var inc = incPositions[incName];
+    basePositions[incName] = (inc.op === 'ne' ? incName + '!=' : incName + '=') + inc.val;
+  }
+  // 重新组装
+  var header = ['定位批量'];
+  var mid = [];
+  var posArr = [];
+  for (var j = 0; j < result.length; j++) {
+    if (result[j].indexOf('type=') === 0 || result[j].indexOf('ganZhi=') === 0 || result[j].indexOf('取值=') === 0) {
+      mid.push(result[j]);
+    }
+  }
+  for (var bpName in basePositions) {
+    posArr.push(basePositions[bpName]);
+  }
+  return header.concat(mid).concat(posArr).join('|');
+}
+
+/**
+ * 判断一组定位批量位置条件是否满足
+ * @param {Object} data - 匹配数据
+ * @param {Object} positions - {年干: {op:'eq', val:'比劫'}, 年柱: {...}, ...}
+ * @param {String} pbType - 五行/十神/十神组
+ * @param {String} pbGanZhi - 天干/地支/通用
+ * @param {String} pbQuZhi - 取值维度（天干/地支），仅通用模式有效
+ * @returns {Boolean}
+ */
+function evaluateBatchPositions(data, positions, pbType, pbGanZhi, pbQuZhi) {
+  var pbPathMap = {
+    '年干': 'nian.t','月干': 'yue.t','日干': 'ri.t','时干': 'shi.t',
+    '大运干': 'dayun.t','流年干': 'liunian.t','流月干': 'liuyue.t',
+    '年支': 'nian.d','月支': 'yue.d','日支': 'ri.d','时支': 'shi.d',
+    '大运支': 'dayun.d','流年支': 'liunian.d','流月支': 'liuyue.d'
+  };
+  var rg = data.ri && data.ri.t ? data.ri.t : '';
+
+  // 通用模式：按取值维度只判断对应维度
+  if (pbGanZhi === '通用') {
+    // 通用模式下，位置名是"柱"（年柱/月柱等），需要展开为天干或地支
+    // 取值=天干 → 只判断天干维度；取值=地支 → 只判断地支维度
+    var targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
+    for (var posName in positions) {
+      var posCfg = positions[posName];
+      var colPaths = PB_COLUMN_PATH_MAP[posName];
+      if (!colPaths) {
+        // 可能是天干/地支命名的位置（兼容混用），按名称后缀判断
+        var directPath = pbPathMap[posName];
+        if (!directPath) return false;
+        // 只判断目标维度
+        if (directPath.indexOf(targetSuffix) < 0) continue; // 跳过非目标维度
+        if (!checkSinglePosition(data, directPath, posCfg, pbType, posName, rg)) return false;
+      } else {
+        // 柱名：取目标维度路径
+        var targetPath = (pbQuZhi === '地支') ? colPaths[1] : colPaths[0];
+        if (!checkSinglePosition(data, targetPath, posCfg, pbType, posName, rg)) return false;
+      }
+    }
+    return true;
+  }
+
+  // 天干/地支模式（现有逻辑）
+  for (var posName2 in positions) {
+    var posCfg2 = positions[posName2];
+    var path2 = pbPathMap[posName2];
+    if (!path2) return false;
+    if (!checkSinglePosition(data, path2, posCfg2, pbType, posName2, rg)) return false;
+  }
+  return true;
+}
+
+/**
+ * 检查单个位置是否满足条件
+ */
+function checkSinglePosition(data, path, posCfg, pbType, posName, rg) {
+  var keys = path.split('.');
+  var node = data;
+  for (var ki = 0; ki < keys.length; ki++) {
+    node = node ? node[keys[ki]] : null;
+  }
+  if (!node) return false;
+  var actualVal = '';
+  if (pbType === '五行') {
+    actualVal = WU_XING[node] || '';
+  } else if (pbType === '十神') {
+    if (posName.indexOf('支') >= 0 || path.indexOf('.d') > 0) {
+      actualVal = getDiShen(node, rg);
+    } else {
+      actualVal = getExactShen(node, rg);
+    }
+  } else if (pbType === '十神组') {
+    var shenTmp;
+    if (posName.indexOf('支') >= 0 || path.indexOf('.d') > 0) {
+      shenTmp = getDiShen(node, rg);
+    } else {
+      shenTmp = getExactShen(node, rg);
+    }
+    actualVal = SHEN_TO_GROUP[shenTmp] || '';
+  }
+  return (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
+}
+
+/**
  * 评估单个叶子条件
  */
 function evaluateLeafCondition(data, cond) {
@@ -393,13 +617,16 @@ function evaluateLeafCondition(data, cond) {
   if (field.indexOf('定位批量-') === 0 && val && val.indexOf('定位批量|') === 0) {
     // 解析编码值
     var parts = val.split('|');
-    var pbType = '十神', pbGanZhi = '天干', pbScope = '原局';
+    var pbType = '十神', pbGanZhi = '天干', pbScope = '原局', pbQuZhi = '';
+    var pbInheritId = '';
     var pbPositions = {}; // {年干: {op:'eq', val:'食伤'}, ...}
     for (var pi = 0; pi < parts.length; pi++) {
       var p = parts[pi];
       if (p.indexOf('type=') === 0) pbType = p.replace('type=','');
       else if (p.indexOf('ganZhi=') === 0) pbGanZhi = p.replace('ganZhi=','');
       else if (p.indexOf('scope=') === 0) pbScope = p.replace('scope=','');
+      else if (p.indexOf('取值=') === 0) pbQuZhi = p.replace('取值=','');
+      else if (p.indexOf('inherit=') === 0) pbInheritId = p.replace('inherit=','');
       else if (p.indexOf('=') > 0) {
         var pop = 'eq';
         var pval = p;
@@ -410,47 +637,52 @@ function evaluateLeafCondition(data, cond) {
         }
       }
     }
-    var pbPathMap = {
-      '年干': 'nian.t','月干': 'yue.t','日干': 'ri.t','时干': 'shi.t',
-      '大运干': 'dayun.t','流年干': 'liunian.t','流月干': 'liuyue.t',
-      '年支': 'nian.d','月支': 'yue.d','日支': 'ri.d','时支': 'shi.d',
-      '大运支': 'dayun.d','流年支': 'liunian.d','流月支': 'liuyue.d'
-    };
-    var rg = data.ri && data.ri.t ? data.ri.t : '';
-    var allMatch = true;
-    for (var posName in pbPositions) {
-      var posCfg = pbPositions[posName];
-      var path = pbPathMap[posName];
-      if (!path) { allMatch = false; break; }
-      var keys = path.split('.');
-      var node = data;
-      for (var ki = 0; ki < keys.length; ki++) {
-        node = node ? node[keys[ki]] : null;
-      }
-      if (!node) { allMatch = false; break; }
-      var actualVal = '';
-      if (pbType === '五行') {
-        actualVal = WU_XING[node] || '';
-      } else if (pbType === '十神') {
-        if (posName.indexOf('支') >= 0) {
-          actualVal = getDiShen(node, rg);
-        } else {
-          actualVal = getExactShen(node, rg);
+    // inherit 模式：递归展开被继承条件宏的排列 + 增量条件
+    if (pbInheritId) {
+      var visited = {};
+      var arrangements = extractInheritArrangements(data, pbInheritId, visited);
+      // 对每个排列追加增量位置条件，逐个判断，任一满足即 true
+      if (arrangements.length === 0) {
+        res = false;
+      } else {
+        res = false;
+        for (var ai = 0; ai < arrangements.length; ai++) {
+          // 合并：继承排列的位置 + 增量位置
+          var mergedPositions = {};
+          var baseArr = arrangements[ai];
+          // 解析基础排列
+          if (baseArr && baseArr.indexOf('定位批量|') === 0) {
+            var baseParts = baseArr.split('|');
+            for (var bi = 0; bi < baseParts.length; bi++) {
+              var bp = baseParts[bi];
+              if (bp.indexOf('=') > 0 && bp.indexOf('type=') !== 0 && bp.indexOf('ganZhi=') !== 0 && bp.indexOf('scope=') !== 0 && bp.indexOf('取值=') !== 0 && bp.indexOf('inherit=') !== 0) {
+                var bop = 'eq';
+                var bval = bp;
+                if (bp.indexOf('!=') > 0) { bop = 'ne'; bval = bp.replace('!=','='); }
+                var bkv = bval.split('=');
+                if (bkv.length === 2 && bkv[1]) {
+                  mergedPositions[bkv[0]] = { op: bop, val: bkv[1] };
+                }
+              }
+            }
+          }
+          // 追加增量位置（覆盖同名位置）
+          for (var incName in pbPositions) {
+            mergedPositions[incName] = pbPositions[incName];
+          }
+          // 判断该排列
+          if (evaluateBatchPositions(data, mergedPositions, pbType, pbGanZhi, pbQuZhi)) {
+            res = true;
+            break;
+          }
         }
-      } else if (pbType === '十神组') {
-        var shenTmp;
-        if (posName.indexOf('支') >= 0) {
-          shenTmp = getDiShen(node, rg);
-        } else {
-          shenTmp = getExactShen(node, rg);
-        }
-        actualVal = SHEN_TO_GROUP[shenTmp] || '';
       }
-      var posMatch = (posCfg.op === 'eq') ? (actualVal === posCfg.val) : (actualVal !== posCfg.val);
-      if (!posMatch) { allMatch = false; break; }
+      actual = val;
+    } else {
+      // 普通模式
+      res = evaluateBatchPositions(data, pbPositions, pbType, pbGanZhi, pbQuZhi);
+      actual = val;
     }
-    res = allMatch;
-    actual = val;
   }
 
   // ---- 天干/地支直接对比 ----
