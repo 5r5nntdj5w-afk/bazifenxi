@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -28088,10 +28088,11 @@ function getMappingRuleById(id) {
         const positions = getScopePositions(scope, ganzhi);
         const container = document.getElementById('pb-positions');
         container.innerHTML = '';
-        const inheritEnabled = document.getElementById('pb-inherit-enable')?.checked;
-        // 继承模式下原局位置只读
+        const currentRefMode = _currentRefTab || 'none';
+        // 继承或映射模式下原局位置只读（两种引用模式都跟随引用层排列）
+        const isRefMode = (currentRefMode === 'inherit' || currentRefMode === 'mapping');
         const isReadOnly = (posKey) => {
-            if(!inheritEnabled) return false;
+            if(!isRefMode) return false;
             // 原局位置（年/月/日/时）只读
             return ['年干','月干','日干','时干','年支','月支','日支','时支','年柱','月柱','日柱','时柱'].includes(posKey);
         };
@@ -28468,10 +28469,17 @@ function getMappingRuleById(id) {
         // 更新Tab按钮样式
         document.querySelectorAll('.pb-ref-tab').forEach(btn => {
             if(btn.dataset.refTab === tab){
-                btn.classList.add('border-purple-600', 'text-purple-600', tab === 'inherit' ? '!border-indigo-600' : tab === 'mapping' ? '!border-emerald-600' : '');
-                btn.classList.remove('border-transparent');
+                // 先移除所有激活样式，再按类型添加对应激活样式，避免空token
+                btn.classList.remove('border-purple-600', 'text-purple-600', '!border-indigo-600', '!border-emerald-600', 'border-transparent');
+                if(tab === 'none'){
+                    btn.classList.add('border-purple-600', 'text-purple-600');
+                } else if(tab === 'inherit'){
+                    btn.classList.add('!border-indigo-600', 'text-indigo-600');
+                } else if(tab === 'mapping'){
+                    btn.classList.add('!border-emerald-600', 'text-emerald-600');
+                }
             } else {
-                btn.classList.remove('border-purple-600', 'text-purple-600', 'border-indigo-600', 'text-indigo-600', 'border-emerald-600', 'text-emerald-600');
+                btn.classList.remove('border-purple-600', 'text-purple-600', '!border-indigo-600', 'text-indigo-600', '!border-emerald-600', 'text-emerald-600');
                 btn.classList.add('border-transparent');
             }
         });
