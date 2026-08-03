@@ -192,7 +192,9 @@ function countShenGroup(data, groupName, scope) {
 /**
  * 递归评估条件树
  */
-function evaluateConditionNode(data, condNode) {
+function evaluateConditionNode(data, condNode, context) {
+  context = context || {};
+  
   // macroRef 节点：查找宏定义并递归评估
   if (condNode && condNode.macroRef) {
     var macroId = String(condNode.macroRef);
@@ -202,7 +204,10 @@ function evaluateConditionNode(data, condNode) {
       for (var mi = 0; mi < macros.length; mi++) {
         var m = macros[mi];
         if (m && m.conditions && (String(m.id) === macroId || String(m.cloudId) === macroId)) {
-          return evaluateConditionNode(data, m.conditions);
+          // 传递宏的默认取值维度到上下文
+          var newContext = {};
+          if (m.defaultQuZhi) newContext.macroDefaultQuZhi = m.defaultQuZhi;
+          return evaluateConditionNode(data, m.conditions, newContext);
         }
       }
       // 未匹配到：尝试通过 idMapping 将本地 ID 转为 cloudId
@@ -212,7 +217,9 @@ function evaluateConditionNode(data, condNode) {
           for (var mi = 0; mi < macros.length; mi++) {
             var m = macros[mi];
             if (m && m.conditions && String(m.id) === String(resolvedCloudId)) {
-              return evaluateConditionNode(data, m.conditions);
+              var newContext2 = {};
+              if (m.defaultQuZhi) newContext2.macroDefaultQuZhi = m.defaultQuZhi;
+              return evaluateConditionNode(data, m.conditions, newContext2);
             }
           }
         }
@@ -229,7 +236,7 @@ function evaluateConditionNode(data, condNode) {
       for (var ri = 0; ri < rulesList.length; ri++) {
         var rr = rulesList[ri];
         if (rr && rr.conditions && (String(rr.id) === ruleRefId || String(rr.cloudId) === ruleRefId)) {
-          return evaluateConditionNode(data, rr.conditions);
+          return evaluateConditionNode(data, rr.conditions, context);
         }
       }
     }
@@ -238,7 +245,7 @@ function evaluateConditionNode(data, condNode) {
 
   // 叶子节点：包含 op, val, field
   if (condNode.op && condNode.field !== undefined) {
-    return evaluateLeafCondition(data, condNode);
+    return evaluateLeafCondition(data, condNode, context);
   }
 
   // 分支节点：包含 logic, children
@@ -248,7 +255,7 @@ function evaluateConditionNode(data, condNode) {
     // not_all 逻辑：全排除 — 所有子条件都不满足时才返回 true
     if (condNode.logic === 'not_all') {
       for (var i = 0; i < children.length; i++) {
-        var childResult = evaluateConditionNode(data, children[i]);
+        var childResult = evaluateConditionNode(data, children[i], context);
         if (children[i].exclude) childResult = !childResult; // 子条件自身的排除取反
         if (childResult) return false; // 任一条件满足 → 全排除失败
       }
@@ -257,14 +264,14 @@ function evaluateConditionNode(data, condNode) {
     
     if (condNode.logic === 'or') {
       for (var i = 0; i < children.length; i++) {
-        var childResult = evaluateConditionNode(data, children[i]);
+        var childResult = evaluateConditionNode(data, children[i], context);
         if (children[i].exclude) childResult = !childResult;
         if (childResult) return true;
       }
       return false;
     } else {
       for (var i = 0; i < children.length; i++) {
-        var childResult = evaluateConditionNode(data, children[i]);
+        var childResult = evaluateConditionNode(data, children[i], context);
         if (children[i].exclude) childResult = !childResult;
         if (!childResult) return false;
       }
@@ -621,13 +628,15 @@ function checkSinglePosition(data, path, posCfg, pbType, posName, rg) {
 /**
  * 评估单个叶子条件
  */
-function evaluateLeafCondition(data, cond) {
+function evaluateLeafCondition(data, cond, context) {
+  context = context || {};
   var field = cond.field;
   var op = cond.op;
   var val = cond.val;
 
   var actual = '';
   var res = false;
+  var macroDefaultQuZhi = context.macroDefaultQuZhi || '';
 
   // ---- 自定义字段（通过 template_type 判断） ----
   if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) {
@@ -779,6 +788,10 @@ function evaluateLeafCondition(data, cond) {
           pbPositions[kv[0]] = { op: pop, val: kv[1] };
         }
       }
+    }
+    // 如果字段本身没有设置取值维度，使用宏的默认值
+    if (!pbQuZhi && macroDefaultQuZhi) {
+      pbQuZhi = macroDefaultQuZhi;
     }
     // 判断一个排列段是否为元信息（非位置条件）
     var _isMetaSeg = function(s) {
