@@ -9279,6 +9279,7 @@
                             else if(p.startsWith('mappingBase=')) sMappingBase = p.replace('mappingBase=','');
                             else if(p.startsWith('mappingType=')) { /* 映射类型，匹配时使用 */ }
                             else if(p.startsWith('mappingOffset=')) { /* 映射偏移，匹配时使用 */ }
+                            else if(p.startsWith('customMap=')) { /* 自定义映射，匹配时使用 */ }
                             else if(p.includes('=')) sPositions.push(p);
                         });
                         var flipText = sFlip ? '·🔄翻转' : '';
@@ -22349,6 +22350,7 @@ function loadConditionsToEditor(container, conditions) {
                                 else if(p.startsWith('mappingBase=')) sMappingBase = p.replace('mappingBase=','');
                                 else if(p.startsWith('mappingType=')) { /* 映射类型，匹配时使用 */ }
                                 else if(p.startsWith('mappingOffset=')) { /* 映射偏移，匹配时使用 */ }
+                                else if(p.startsWith('customMap=')) { /* 自定义映射，匹配时使用 */ }
                                 else if(p.includes('=')) sPositions.push(p);
                             });
                             var flipText = sFlip ? '·🔄翻转' : '';
@@ -28044,8 +28046,13 @@ function saveMappingRules(rules) {
 }
 
 // 根据映射规则对值进行转换
-function applyMappingValue(val, ruleOrType, offsetOrCustom) {
+function applyMappingValue(val, ruleOrType, offsetOrCustom, customMapParam) {
     if (!val) return val;
+
+    // 自定义映射优先（通过4th参数传入）
+    if (customMapParam && typeof customMapParam === 'object') {
+        return customMapParam[val] || val;
+    }
 
     // 兼容旧调用方式：applyMappingValue(val, mappingType, mappingOffset)
     if (typeof ruleOrType === 'string' && typeof offsetOrCustom === 'number') {
@@ -28277,7 +28284,8 @@ function renderMappingRuleList() {
 function populateMappingRuleSelect(sel) {
     var rules = getMappingRules();
     sel.innerHTML = '<option value="">--请选择映射规则--</option>' + rules.map(function(r) {
-        return '<option value="' + r.id + '">' + escapeHtml(r.name) + ' [' + r.type + '·偏移' + r.offset + ']</option>';
+        var suffix = r.type.includes('自定义') ? '·自定义' : '·偏移' + r.offset;
+        return '<option value="' + r.id + '">' + escapeHtml(r.name) + ' [' + r.type + suffix + ']</option>';
     }).join('');
 }
 
@@ -28510,7 +28518,7 @@ function getMappingRuleById(id) {
             else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
             else if(p.startsWith('取值=')) sQz = p.replace('取值=','');
             else if(p.startsWith('flip=')) sFlip = p.replace('flip=','') === '1' ? '🔄' : '';
-            else if(p.startsWith('scope=') || p.startsWith('inherit=') || p.startsWith('mapping=') || p.startsWith('mappingBase=') || p.startsWith('mappingType=') || p.startsWith('mappingOffset=')) { /* 元信息，跳过 */ }
+            else if(p.startsWith('scope=') || p.startsWith('inherit=') || p.startsWith('mapping=') || p.startsWith('mappingBase=') || p.startsWith('mappingType=') || p.startsWith('mappingOffset=') || p.startsWith('customMap=')) { /* 元信息，跳过 */ }
             else if(p.includes('=')) positions.push(p);
         });
         let label = sType;
@@ -28674,7 +28682,7 @@ function getMappingRuleById(id) {
             return;
         }
         previewEl.innerHTML = arrangements.map((a, i) => {
-            const mapped = applyMappingToArrangement(a.val, rule.type, rule.offset);
+            const mapped = applyMappingToArrangement(a.val, rule.type, rule.offset, rule.customMap);
             const origText = arrangementToText(a.val);
             const mappedText = arrangementToText(mapped);
             return `<div class="py-0.5"><span class="text-gray-400">原:</span> ${escapeHtml(origText)}</div>
@@ -28683,12 +28691,12 @@ function getMappingRuleById(id) {
     }
 
     // 对排列编码值进行映射转换
-    function applyMappingToArrangement(val, mappingType, mappingOffset){
+    function applyMappingToArrangement(val, mappingType, mappingOffset, customMap){
         if(!val || !val.startsWith('定位批量|')) return val;
         const parts = val.split('|');
         const result = [];
         parts.forEach(p => {
-            if(p === '定位批量' || p.startsWith('type=') || p.startsWith('ganZhi=') || p.startsWith('scope=') || p.startsWith('取值=') || p.startsWith('inherit=') || p.startsWith('flip=') || p.startsWith('mapping=') || p.startsWith('mappingBase=') || p.startsWith('mappingType=') || p.startsWith('mappingOffset=')){
+            if(p === '定位批量' || p.startsWith('type=') || p.startsWith('ganZhi=') || p.startsWith('scope=') || p.startsWith('取值=') || p.startsWith('inherit=') || p.startsWith('flip=') || p.startsWith('mapping=') || p.startsWith('mappingBase=') || p.startsWith('mappingType=') || p.startsWith('mappingOffset=') || p.startsWith('customMap=')){
                 result.push(p);
             } else if(p.includes('=')){
                 let op = '';
@@ -28702,7 +28710,7 @@ function getMappingRuleById(id) {
                     const [pn, pv] = p.split('=');
                     posName = pn; posVal = pv;
                 }
-                const mappedVal = applyMappingValue(posVal, mappingType, mappingOffset);
+                const mappedVal = applyMappingValue(posVal, mappingType, mappingOffset, customMap);
                 result.push(posName + op + '=' + mappedVal);
             } else {
                 result.push(p);
@@ -28867,6 +28875,7 @@ function getMappingRuleById(id) {
                 else if(p.startsWith('mappingBase=')) mappingMacroId = p.replace('mappingBase=','');
                 else if(p.startsWith('mappingType=')) { /* 映射类型，匹配时使用，回显无需处理 */ }
                 else if(p.startsWith('mappingOffset=')) { /* 映射偏移，匹配时使用，回显无需处理 */ }
+                else if(p.startsWith('customMap=')) { /* 自定义映射，匹配时使用，回显无需处理 */ }
                 else if(p.includes('=')){
                     let op = 'eq';
                     let posVal = p;
