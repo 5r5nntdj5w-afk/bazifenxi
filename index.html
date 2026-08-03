@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -20755,6 +20755,7 @@ function openMacroEditor(macroId) {
     const tagsContainer = document.getElementById('macro-tags-container');
     const tagsInput = document.getElementById('macro-tags-input');
     const pinnedCheckbox = document.getElementById('macro-pinned-checkbox');
+    const defaultQuZhiSelect = document.getElementById('macro-default-quzhi');
     const root = document.getElementById('macro-condition-root');
     
     if (macroId) {
@@ -20765,6 +20766,8 @@ function openMacroEditor(macroId) {
         nameInput.value = macro.name || '';
         descInput.value = macro.description || '';
         if (permSelect) permSelect.value = macro.permission !== undefined ? macro.permission : 0;
+        // 加载默认取值维度
+        if (defaultQuZhiSelect) defaultQuZhiSelect.value = macro.defaultQuZhi || '';
         // 加载标签
         if (tagsContainer) {
             renderMacroEditorTags(macro.tags || []);
@@ -20782,6 +20785,7 @@ function openMacroEditor(macroId) {
         nameInput.value = '';
         descInput.value = '';
         if (permSelect) permSelect.value = '0';
+        if (defaultQuZhiSelect) defaultQuZhiSelect.value = '';
         if (tagsContainer) tagsContainer.innerHTML = '';
         if (tagsInput) tagsInput.value = '';
         if (pinnedCheckbox) pinnedCheckbox.checked = false;
@@ -20812,6 +20816,7 @@ async function saveMacroFromEditor() {
         : 0;
     const tags = getMacroEditorTags();
     const pinned = document.getElementById('macro-pinned-checkbox')?.checked || false;
+    const defaultQuZhi = document.getElementById('macro-default-quzhi')?.value || '';
     const root = document.getElementById('macro-condition-root');
     
     if (!name) {
@@ -20836,6 +20841,7 @@ async function saveMacroFromEditor() {
         permission: permission,
         tags: tags,
         pinned: pinned,
+        defaultQuZhi: defaultQuZhi,
         conditions: {
             logic: groupLogic,
             children: result.children || []
@@ -27420,6 +27426,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 <label class="block text-sm font-medium text-gray-700 mb-1">宏名称 <span class="text-red-500">*</span></label>
                 <input type="text" id="macro-editor-name" class="w-full p-2 border rounded" placeholder="例如：身强、正官格...">
             </div>
+            <div class="mb-3 p-2 border border-blue-200 rounded bg-blue-50">
+                <label class="block text-sm font-medium text-blue-700 mb-1">📊 默认取值维度 <span class="text-xs text-gray-500">（批量定位字段未单独设置时使用此默认值）</span></label>
+                <select id="macro-default-quzhi" class="w-full p-2 border rounded text-sm">
+                    <option value="">--不设置（各字段单独配置）--</option>
+                    <option value="天干">天干</option>
+                    <option value="地支">地支</option>
+                </select>
+            </div>
             <div class="mb-3">
                 <label class="block text-sm font-medium text-gray-700 mb-2">条件定义</label>
                 <div class="border-2 border-indigo-300 rounded-lg p-3 bg-indigo-50">
@@ -27676,13 +27690,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="text-xs text-gray-400">勾选后自动匹配原局正序和反序（年↔时、月↔日），大运/流年/流月不翻转</span>
                 <span id="pb-flip-locked" class="text-xs text-orange-500 hidden">🔒 翻转跟随基准条件宏</span>
             </div>
-            <!-- 继承引用区 -->
-            <div class="mb-4 p-3 border border-indigo-200 rounded bg-indigo-50">
-                <label class="flex items-center gap-2 mb-2">
-                    <input type="checkbox" id="pb-inherit-enable" class="pb-inherit-enable">
-                    <span class="text-sm font-medium text-indigo-800">启用继承引用（跨层复用上层条件宏的排列）</span>
-                </label>
-                <div id="pb-inherit-config" style="display:none;">
+            <!-- 引用方式切换 -->
+            <div class="mb-4">
+                <div class="flex border-b border-gray-200">
+                    <button type="button" data-ref-tab="none" class="pb-ref-tab flex-1 px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:text-purple-600">
+                        📝 直接设置
+                    </button>
+                    <button type="button" data-ref-tab="inherit" class="pb-ref-tab flex-1 px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:text-indigo-600">
+                        🔗 继承引用
+                    </button>
+                    <button type="button" data-ref-tab="mapping" class="pb-ref-tab flex-1 px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:text-emerald-600">
+                        🔁 映射引用
+                    </button>
+                </div>
+                <!-- 直接设置 -->
+                <div id="pb-ref-none" class="pb-ref-panel"></div>
+                <!-- 继承引用 -->
+                <div id="pb-ref-inherit" class="pb-ref-panel p-3 border border-indigo-200 rounded bg-indigo-50" style="display:none;">
+                    <div class="text-sm font-medium text-indigo-800 mb-2">🔗 继承引用（跨层复用上层条件宏的排列）</div>
                     <div class="flex items-center gap-2 mb-2">
                         <label class="text-xs text-gray-700 shrink-0">继承条件宏:</label>
                         <input type="text" id="pb-inherit-search" class="flex-1 p-1.5 border rounded text-sm" placeholder="搜索名称或标签...">
@@ -27699,14 +27724,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <p class="text-xs text-gray-400 mt-1">ℹ 引用层排列为只读，如需修改请进入引用层条件宏编辑</p>
                 </div>
-            </div>
-            <!-- 映射引用区 -->
-            <div class="mb-4 p-3 border border-emerald-200 rounded bg-emerald-50">
-                <label class="flex items-center gap-2 mb-2">
-                    <input type="checkbox" id="pb-mapping-enable" class="pb-mapping-enable">
-                    <span class="text-sm font-medium text-emerald-800">🔁 启用映射引用（基于基准条件宏，按五行/十神相生闭环偏移映射值）</span>
-                </label>
-                <div id="pb-mapping-config" style="display:none;">
+                <!-- 映射引用 -->
+                <div id="pb-ref-mapping" class="pb-ref-panel p-3 border border-emerald-200 rounded bg-emerald-50" style="display:none;">
+                    <div class="text-sm font-medium text-emerald-800 mb-2">🔁 映射引用（基于基准条件宏，按五行/十神相生闭环偏移映射值）</div>
                     <div class="flex items-center gap-2 mb-2">
                         <label class="text-xs text-gray-700 shrink-0">基准条件宏:</label>
                         <input type="text" id="pb-mapping-search" class="flex-1 p-1.5 border rounded text-sm" placeholder="搜索名称或标签...">
@@ -27757,8 +27777,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p>• <b>五行闭环</b>：金→水→木→火→土→金（5步循环）</p>
                 <p>• 偏移1=整体前进一步，偏移2=前进两步，以此类推</p>
             </div>
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="mapping-rule-name" class="flex-1 p-2 border rounded text-sm" placeholder="映射规则名称（如：食伤制官杀）">
+            <div class="flex gap-2 mb-3 flex-wrap">
+                <input type="text" id="mapping-rule-name" class="flex-1 p-2 border rounded text-sm min-w-[150px]" placeholder="映射规则名称（如：食伤制官杀）">
                 <select id="mapping-rule-type" class="p-2 border rounded text-sm">
                     <option value="十神组">十神组</option>
                     <option value="五行">五行</option>
@@ -27768,8 +27788,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="2">偏移2</option>
                     <option value="3">偏移3</option>
                     <option value="4">偏移4</option>
+                    <option value="5">偏移5</option>
+                    <option value="6">偏移6</option>
+                    <option value="7">偏移7</option>
+                    <option value="8">偏移8</option>
+                    <option value="9">偏移9</option>
+                    <option value="10">偏移10</option>
                 </select>
                 <button onclick="addMappingRule()" class="px-3 py-2 bg-emerald-600 text-white rounded text-sm shrink-0">➕ 添加</button>
+            </div>
+            <div class="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <p class="font-medium text-yellow-700 mb-1">📝 自定义映射规则：</p>
+                <p class="text-gray-600">在列表中点击「✏️ 编辑」可以修改规则名称和偏移值；使用自定义映射可指定任意值的映射关系。</p>
             </div>
             <div id="mapping-rule-list" class="space-y-2">
                 <p class="text-gray-400 text-center py-4">暂无映射规则</p>
@@ -27783,6 +27813,7 @@ document.addEventListener('DOMContentLoaded', function() {
 var MAPPING_RULES_KEY = 'pb_mapping_rules';
 var PB_SHEN_GROUP_CYCLE = ['比劫','食伤','财星','官杀','印星'];
 var PB_WU_CYCLE = ['金','水','木','火','土'];
+var _editingRuleId = null; // 当前编辑的规则ID
 
 function getMappingRules() {
     try {
@@ -27818,11 +27849,14 @@ function applyMappingValue(val, mappingType, mappingOffset) {
 
 window.openMappingRuleManager = function() {
     document.getElementById('mapping-rule-modal').classList.remove('hidden');
+    _editingRuleId = null;
+    document.getElementById('mapping-rule-name').value = '';
     renderMappingRuleList();
 };
 
 window.closeMappingRuleManager = function() {
     document.getElementById('mapping-rule-modal').classList.add('hidden');
+    _editingRuleId = null;
 };
 
 window.addMappingRule = function() {
@@ -27830,20 +27864,68 @@ window.addMappingRule = function() {
     var type = document.getElementById('mapping-rule-type').value;
     var offset = parseInt(document.getElementById('mapping-rule-offset').value);
     if (!name) { alert('请输入映射规则名称'); return; }
+    if (isNaN(offset)) { alert('请选择有效的偏移值'); return; }
+    
     var rules = getMappingRules();
-    rules.push({id: 'map_' + Date.now(), name: name, type: type, offset: offset});
+    
+    if (_editingRuleId) {
+        // 编辑模式
+        var idx = rules.findIndex(function(r) { return r.id === _editingRuleId; });
+        if (idx >= 0) {
+            rules[idx].name = name;
+            rules[idx].type = type;
+            rules[idx].offset = offset;
+        }
+        _editingRuleId = null;
+        document.getElementById('mapping-rule-name').value = '';
+    } else {
+        // 新增模式
+        rules.push({id: 'map_' + Date.now(), name: name, type: type, offset: offset});
+    }
+    
     saveMappingRules(rules);
-    document.getElementById('mapping-rule-name').value = '';
     renderMappingRuleList();
     // 刷新批量编辑器中的映射规则下拉框
     var sel = document.getElementById('pb-mapping-rule');
     if (sel) populateMappingRuleSelect(sel);
 };
 
+window.editMappingRule = function(id) {
+    var rules = getMappingRules();
+    var rule = rules.find(function(r) { return r.id === id; });
+    if (!rule) return;
+    
+    _editingRuleId = id;
+    document.getElementById('mapping-rule-name').value = rule.name;
+    document.getElementById('mapping-rule-type').value = rule.type;
+    document.getElementById('mapping-rule-offset').value = rule.offset;
+    
+    // 更新按钮文字
+    var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
+    if (btn) btn.textContent = '💾 保存修改';
+    
+    // 滚动到顶部
+    document.getElementById('mapping-rule-name').scrollIntoView({behavior: 'smooth', block: 'center'});
+};
+
+window.cancelEditMappingRule = function() {
+    _editingRuleId = null;
+    document.getElementById('mapping-rule-name').value = '';
+    var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
+    if (btn) btn.textContent = '➕ 添加';
+    renderMappingRuleList();
+};
+
 window.deleteMappingRule = function(id) {
     if (!confirm('确定删除此映射规则？')) return;
     var rules = getMappingRules().filter(function(r) { return r.id !== id; });
     saveMappingRules(rules);
+    if (_editingRuleId === id) {
+        _editingRuleId = null;
+        document.getElementById('mapping-rule-name').value = '';
+        var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
+        if (btn) btn.textContent = '➕ 添加';
+    }
     renderMappingRuleList();
     var sel = document.getElementById('pb-mapping-rule');
     if (sel) populateMappingRuleSelect(sel);
@@ -27861,13 +27943,28 @@ function renderMappingRuleList() {
         var preview = cycle.map(function(v, i) {
             return v + '→' + cycle[(i + r.offset) % cycle.length];
         }).join('，');
-        return '<div class="flex items-center justify-between p-2 border rounded hover:bg-emerald-50">' +
-            '<div><span class="font-medium text-sm">' + escapeHtml(r.name) + '</span>' +
+        var isEditing = (_editingRuleId === r.id);
+        return '<div class="flex items-center justify-between p-2 border rounded hover:bg-emerald-50 ' + (isEditing ? 'bg-yellow-50 border-yellow-300' : '') + '">' +
+            '<div class="flex-1">' +
+            '<span class="font-medium text-sm">' + escapeHtml(r.name) + '</span>' +
             '<span class="text-xs text-gray-400 ml-2">[' + r.type + '·偏移' + r.offset + ']</span>' +
-            '<div class="text-xs text-gray-500">' + preview + '</div></div>' +
-            '<button onclick="deleteMappingRule(\'' + r.id + '\')" class="px-2 py-1 bg-red-400 text-white rounded text-xs shrink-0">删除</button>' +
+            '<div class="text-xs text-gray-500">' + preview + '</div>' +
+            '</div>' +
+            '<div class="flex gap-1 shrink-0">' +
+            (isEditing ? 
+                '<button onclick="cancelEditMappingRule()" class="px-2 py-1 bg-gray-400 text-white rounded text-xs">取消</button>' :
+                '<button onclick="editMappingRule(\'' + r.id + '\')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️ 编辑</button>'
+            ) +
+            '<button onclick="deleteMappingRule(\'' + r.id + '\')" class="px-2 py-1 bg-red-400 text-white rounded text-xs">删除</button>' +
+            '</div>' +
             '</div>';
     }).join('');
+    
+    // 如果不在编辑模式，确保按钮文字正确
+    if (!_editingRuleId) {
+        var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
+        if (btn && btn.textContent.includes('保存修改')) btn.textContent = '➕ 添加';
+    }
 }
 
 function populateMappingRuleSelect(sel) {
@@ -27919,6 +28016,8 @@ function getMappingRuleById(id) {
     let _selectedInheritId = '';
     // 当前选中的映射基准宏ID
     let _selectedMappingMacroId = '';
+    // 当前选中的引用Tab：none/inherit/mapping
+    let _currentRefTab = 'none';
     // 原局位置键（用于翻转）
     const PB_YUANJU_KEYS = ['年干','月干','日干','时干'];
     // 原局翻转映射：正序→反序
@@ -28306,14 +28405,29 @@ function getMappingRuleById(id) {
 
     // 映射引用启用时，原局翻转跟随基准宏
     function updateMappingFlipLock(){
-        const mappingEnabled = document.getElementById('pb-mapping-enable')?.checked;
+        const isMappingTab = (_currentRefTab === 'mapping');
+        const isInheritTab = (_currentRefTab === 'inherit');
         const flipCheck = document.getElementById('pb-flip');
         const flipLocked = document.getElementById('pb-flip-locked');
-        if(mappingEnabled && _selectedMappingMacroId){
-            // 从基准宏的排列中读取 flip 设置
+        if((isMappingTab || isInheritTab) && _selectedMappingMacroId){
+            // 从基准宏的排列中读取 flip 设置（仅映射模式跟随）
             const macro = getMacroById(_selectedMappingMacroId);
             const arrangements = macro ? extractBatchArrangements(macro) : [];
             let baseFlip = true; // 默认勾选
+            if(arrangements.length > 0){
+                const firstVal = arrangements[0].val;
+                if(firstVal && firstVal.includes('flip=0')){
+                    baseFlip = false;
+                }
+            }
+            flipCheck.checked = baseFlip;
+            flipCheck.disabled = true;
+            flipLocked.classList.remove('hidden');
+        } else if(isInheritTab && _selectedInheritId){
+            // 继承模式：翻转跟随继承的宏
+            const macro = getMacroById(_selectedInheritId);
+            const arrangements = macro ? extractBatchArrangements(macro) : [];
+            let baseFlip = true;
             if(arrangements.length > 0){
                 const firstVal = arrangements[0].val;
                 if(firstVal && firstVal.includes('flip=0')){
@@ -28348,6 +28462,60 @@ function getMappingRuleById(id) {
         renderMappingMacroList();
     }
 
+    // Tab 切换处理
+    function switchRefTab(tab){
+        _currentRefTab = tab;
+        // 更新Tab按钮样式
+        document.querySelectorAll('.pb-ref-tab').forEach(btn => {
+            if(btn.dataset.refTab === tab){
+                btn.classList.add('border-purple-600', 'text-purple-600', tab === 'inherit' ? '!border-indigo-600' : tab === 'mapping' ? '!border-emerald-600' : '');
+                btn.classList.remove('border-transparent');
+            } else {
+                btn.classList.remove('border-purple-600', 'text-purple-600', 'border-indigo-600', 'text-indigo-600', 'border-emerald-600', 'text-emerald-600');
+                btn.classList.add('border-transparent');
+            }
+        });
+        // 显示对应的面板
+        document.querySelectorAll('.pb-ref-panel').forEach(panel => {
+            panel.style.display = 'none';
+        });
+        const panel = document.getElementById('pb-ref-' + tab);
+        if(panel) panel.style.display = '';
+        
+        // 根据Tab更新状态
+        if(tab === 'inherit'){
+            // 继承引用模式：原局位置只读
+            renderInheritMacroList();
+            renderInheritPreview(_selectedInheritId);
+            // 翻转跟随基准宏
+            updateMappingFlipLock();
+        } else if(tab === 'mapping'){
+            // 映射引用模式
+            renderMappingMacroList();
+            renderMappingPreview();
+            // 翻转跟随基准宏
+            updateMappingFlipLock();
+        } else {
+            // 直接设置模式：解锁翻转
+            const flipCheck = document.getElementById('pb-flip');
+            const flipLocked = document.getElementById('pb-flip-locked');
+            if(flipCheck) flipCheck.disabled = false;
+            if(flipLocked) flipLocked.classList.add('hidden');
+        }
+        // 重新渲染位置选项（继承模式下原局位置只读）
+        const scope = document.getElementById('pb-scope').value;
+        const judgeType = document.getElementById('pb-judge-type').value;
+        const ganzhi = document.getElementById('pb-ganzhi').value;
+        renderPositions(scope, judgeType, ganzhi);
+    }
+
+    // 绑定Tab按钮事件
+    document.querySelectorAll('.pb-ref-tab').forEach(btn => {
+        btn.onclick = function(){
+            switchRefTab(this.dataset.refTab);
+        };
+    });
+
     // 打开编辑器
     window.openPositionBatchEditor = function(item, field){
         _currentItem = item;
@@ -28363,7 +28531,7 @@ function getMappingRuleById(id) {
         const valSel = item.querySelector('.condition-val-select');
         const existingVal = valSel.value || '';
         let judgeType = field === '定位批量-五行' ? '五行' : '十神组';
-        let ganzhi = '天干';
+        let ganzhi = '通用';
         let scope = '原局';
         let quzhi = '';
         let inheritId = '';
@@ -28413,41 +28581,22 @@ function getMappingRuleById(id) {
         } else {
             quzhiCell.style.display = 'none';
         }
-        // 继承引用回显
-        const inheritCheck = document.getElementById('pb-inherit-enable');
-        const inheritConfig = document.getElementById('pb-inherit-config');
+        // 引用方式回显 - 根据已有编码确定Tab
         _selectedInheritId = inheritId || '';
-        if(inheritId){
-            inheritCheck.checked = true;
-            inheritConfig.style.display = '';
-            // 清空搜索框，渲染列表（列表会高亮选中的宏）
-            if(document.getElementById('pb-inherit-search'))
-                document.getElementById('pb-inherit-search').value = '';
-            renderInheritMacroList();
-            renderInheritPreview(inheritId);
-        } else {
-            inheritCheck.checked = false;
-            inheritConfig.style.display = 'none';
-        }
-        // 映射引用回显
-        const mappingCheck = document.getElementById('pb-mapping-enable');
-        const mappingConfig = document.getElementById('pb-mapping-config');
         _selectedMappingMacroId = mappingMacroId || '';
+        let initialTab = 'none';
         if(mappingId && mappingMacroId){
-            mappingCheck.checked = true;
-            mappingConfig.style.display = '';
+            initialTab = 'mapping';
             if(document.getElementById('pb-mapping-search'))
                 document.getElementById('pb-mapping-search').value = '';
             document.getElementById('pb-mapping-rule').value = mappingId;
-            renderMappingMacroList();
-            renderMappingPreview();
-            updateMappingFlipLock();
-        } else {
-            mappingCheck.checked = false;
-            mappingConfig.style.display = 'none';
-            document.getElementById('pb-flip').disabled = false;
-            document.getElementById('pb-flip-locked').classList.add('hidden');
+        } else if(inheritId){
+            initialTab = 'inherit';
+            if(document.getElementById('pb-inherit-search'))
+                document.getElementById('pb-inherit-search').value = '';
         }
+        // 切换到对应的Tab
+        switchRefTab(initialTab);
         renderPositions(scope, judgeType, ganzhi);
         document.getElementById('position-batch-modal').classList.remove('hidden');
     };
@@ -28459,6 +28608,7 @@ function getMappingRuleById(id) {
         _positionCache = {};
         _selectedInheritId = '';
         _selectedMappingMacroId = '';
+        _currentRefTab = 'none';
     };
 
     // 配置项变化时重新渲染
@@ -28483,44 +28633,6 @@ function getMappingRuleById(id) {
         const ganzhi = document.getElementById('pb-ganzhi').value;
         renderPositions(this.value, judgeType, ganzhi);
     };
-    // 继承引用 checkbox 事件
-    document.getElementById('pb-inherit-enable').onchange = function(){
-        const config = document.getElementById('pb-inherit-config');
-        config.style.display = this.checked ? '' : 'none';
-        if(this.checked){
-            // 启用时重新渲染列表
-            renderInheritMacroList();
-            if(!_selectedInheritId){
-                renderInheritPreview('');
-            }
-        }
-        const scope = document.getElementById('pb-scope').value;
-        const judgeType = document.getElementById('pb-judge-type').value;
-        const ganzhi = document.getElementById('pb-ganzhi').value;
-        renderPositions(scope, judgeType, ganzhi);
-    };
-    // 映射引用 checkbox 事件
-    document.getElementById('pb-mapping-enable').onchange = function(){
-        const config = document.getElementById('pb-mapping-config');
-        config.style.display = this.checked ? '' : 'none';
-        if(this.checked){
-            renderMappingMacroList();
-            if(!_selectedMappingMacroId){
-                renderMappingPreview();
-            } else {
-                updateMappingFlipLock();
-            }
-        } else {
-            // 取消映射引用时解锁原局翻转
-            document.getElementById('pb-flip').disabled = false;
-            document.getElementById('pb-flip-locked').classList.add('hidden');
-        }
-        const scope = document.getElementById('pb-scope').value;
-        const judgeType = document.getElementById('pb-judge-type').value;
-        const ganzhi = document.getElementById('pb-ganzhi').value;
-        renderPositions(scope, judgeType, ganzhi);
-    };
-
     // 保存按钮
     document.getElementById('pb-save-btn').onclick = function(){
         if(!_currentItem) return;
@@ -28529,11 +28641,26 @@ function getMappingRuleById(id) {
         const scope = document.getElementById('pb-scope').value;
         const quzhi = document.getElementById('pb-quzhi').value;
         const flip = document.getElementById('pb-flip').checked;
-        const inheritEnabled = document.getElementById('pb-inherit-enable').checked;
+        const currentTab = _currentRefTab;
         const inheritMacroId = _selectedInheritId;
-        const mappingEnabled = document.getElementById('pb-mapping-enable').checked;
         const mappingRuleId = document.getElementById('pb-mapping-rule').value;
         const mappingMacroId = _selectedMappingMacroId;
+        // 判断各模式是否启用
+        const mappingEnabled = (currentTab === 'mapping' && mappingMacroId && mappingRuleId);
+        const inheritEnabled = (currentTab === 'inherit' && inheritMacroId);
+        // 验证
+        if(currentTab === 'inherit' && !inheritMacroId){
+            alert('请选择继承的条件宏');
+            return;
+        }
+        if(currentTab === 'mapping' && !mappingMacroId){
+            alert('请选择基准条件宏');
+            return;
+        }
+        if(currentTab === 'mapping' && !mappingRuleId){
+            alert('请选择映射规则');
+            return;
+        }
         // 收集勾选的位置
         const checked = [];
         const positions = getScopePositions(scope, ganzhi);
