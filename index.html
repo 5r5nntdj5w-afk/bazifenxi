@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9205,23 +9205,38 @@
                     if(summarySpan && child.val && child.val.startsWith('定位批量|')){
                         var parts = child.val.split('|');
                         var sType = '', sGz = '', sScope = '', sQz = '', sInherit = '';
+                        var sMappingRule = '', sMappingBase = '', sFlip = false;
                         var sPositions = [];
                         parts.forEach(function(p){
+                            if(p === '定位批量') return;
                             if(p.startsWith('type=')) sType = p.replace('type=','');
                             else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
                             else if(p.startsWith('scope=')) sScope = p.replace('scope=','');
                             else if(p.startsWith('取值=')) sQz = p.replace('取值=','');
                             else if(p.startsWith('inherit=')) sInherit = p.replace('inherit=','');
+                            else if(p.startsWith('flip=')) sFlip = p.replace('flip=','') === '1';
+                            else if(p.startsWith('mapping=')) sMappingRule = p.replace('mapping=','');
+                            else if(p.startsWith('mappingBase=')) sMappingBase = p.replace('mappingBase=','');
+                            else if(p.startsWith('mappingType=')) { /* 映射类型，匹配时使用 */ }
+                            else if(p.startsWith('mappingOffset=')) { /* 映射偏移，匹配时使用 */ }
                             else if(p.includes('=')) sPositions.push(p);
                         });
+                        var flipText = sFlip ? '·🔄翻转' : '';
                         var summaryText;
-                        if(sInherit){
+                        if(sMappingBase && sMappingRule){
+                            var baseMacro = getMacroById(sMappingBase);
+                            var baseName = baseMacro ? baseMacro.name : '未知';
+                            var ruleObj = (typeof getMappingRuleById === 'function') ? getMappingRuleById(sMappingRule) : null;
+                            var ruleName = ruleObj ? ruleObj.name : '未知';
+                            var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
+                            summaryText = '映射[' + baseName + '→' + ruleName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + flipText + incText;
+                        } else if(sInherit){
                             var refMacro = getMacroById(sInherit);
                             var macroName = refMacro ? refMacro.name : '未知';
                             var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
-                            summaryText = '继承[' + macroName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + incText;
+                            summaryText = '继承[' + macroName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + flipText + incText;
                         } else {
-                            summaryText = sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + '·' + sScope + ': ' + sPositions.join(', ');
+                            summaryText = sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + '·' + sScope + flipText + ': ' + sPositions.join(', ');
                         }
                         summarySpan.textContent = summaryText;
                         summarySpan.title = summaryText;
@@ -22176,23 +22191,38 @@ function loadConditionsToEditor(container, conditions) {
                         if (summarySpan) {
                             var parts = child.val.split('|');
                             var sType = '', sGz = '', sScope = '', sQz = '', sInherit = '';
+                            var sMappingRule = '', sMappingBase = '', sFlip = false;
                             var sPositions = [];
                             parts.forEach(function(p){
+                                if(p === '定位批量') return;
                                 if(p.startsWith('type=')) sType = p.replace('type=','');
                                 else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
                                 else if(p.startsWith('scope=')) sScope = p.replace('scope=','');
                                 else if(p.startsWith('取值=')) sQz = p.replace('取值=','');
                                 else if(p.startsWith('inherit=')) sInherit = p.replace('inherit=','');
+                                else if(p.startsWith('flip=')) sFlip = p.replace('flip=','') === '1';
+                                else if(p.startsWith('mapping=')) sMappingRule = p.replace('mapping=','');
+                                else if(p.startsWith('mappingBase=')) sMappingBase = p.replace('mappingBase=','');
+                                else if(p.startsWith('mappingType=')) { /* 映射类型，匹配时使用 */ }
+                                else if(p.startsWith('mappingOffset=')) { /* 映射偏移，匹配时使用 */ }
                                 else if(p.includes('=')) sPositions.push(p);
                             });
+                            var flipText = sFlip ? '·🔄翻转' : '';
                             var summaryText;
-                            if(sInherit){
+                            if(sMappingBase && sMappingRule){
+                                var baseMacro = getMacroById(sMappingBase);
+                                var baseName = baseMacro ? baseMacro.name : '未知';
+                                var ruleObj = (typeof getMappingRuleById === 'function') ? getMappingRuleById(sMappingRule) : null;
+                                var ruleName = ruleObj ? ruleObj.name : '未知';
+                                var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
+                                summaryText = '映射[' + baseName + '→' + ruleName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + flipText + incText;
+                            } else if(sInherit){
                                 var refMacro = getMacroById(sInherit);
                                 var macroName = refMacro ? refMacro.name : '未知';
                                 var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
-                                summaryText = '继承[' + macroName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + incText;
+                                summaryText = '继承[' + macroName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + flipText + incText;
                             } else {
-                                summaryText = sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + '·' + sScope + ': ' + sPositions.join(', ');
+                                summaryText = sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + '·' + sScope + flipText + ': ' + sPositions.join(', ');
                             }
                             summarySpan.textContent = summaryText;
                             summarySpan.title = summaryText;
