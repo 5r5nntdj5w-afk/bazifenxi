@@ -20985,8 +20985,8 @@ function renderMacroList() {
     
     const PERM_LABELS = { 0:'🔒私有', 1:'🔓公开只读', 2:'🔐公开加密', 3:'🌍公开可转私有' };
     container.innerHTML = macros.map(m => {
-        const refCount = getRulesReferencingMacro(m.id).length;
-        const macroRefCount = getMacrosReferencingMacro(m.id).length;
+        const refCount = getRulesReferencingMacro(m.id);
+        const macroRefCount = getMacrosReferencingMacro(m.id);
         const effectivePerm = getEffectiveMacroPerm(m);
         const canView = canViewMacroConditions(m);
         const condText = canView ? macroConditionsToText(m.conditions) : '🔒 条件已隐藏（无权限）';
@@ -21193,8 +21193,8 @@ async function saveMacroFromEditor() {
 async function deleteMacroConfirm(macroId) {
     const macro = getMacroById(macroId);
     if (!macro) return;
-    const refCount = getRulesReferencingMacro(macroId).length;
-    const macroRefCount = getMacrosReferencingMacro(macroId).length;
+    const refCount = getRulesReferencingMacro(macroId);
+    const macroRefCount = getMacrosReferencingMacro(macroId);
     let msg = `确定要删除条件宏「${macro.name}」吗？`;
     if (refCount > 0) {
         msg += `\n\n⚠️ 该宏正在被 ${refCount} 条断语引用，删除后这些断语中的宏引用将失效！`;
@@ -23415,10 +23415,23 @@ function getAllMacros() {
     return cache.conditionMacros || [];
 }
 
+// 宏ID查找缓存
+let _macroIdMap = null;
+let _macroIdMapVersion = 0;
+
 function getMacroById(macroId) {
-    // 先按ID比较（兼容数字/字符串），再按 cloudId 比较（跨设备共享）
-    const idStr = String(macroId);
-    return (cache.conditionMacros || []).find(m => String(m.id) === idStr || String(m.cloudId) === idStr);
+    // 构建/刷新查找缓存
+    const macros = cache.conditionMacros || [];
+    const version = macros.length + ':' + (macros[0]?.id || '') + ':' + (macros[macros.length-1]?.id || '');
+    if (!_macroIdMap || _macroIdMapVersion !== version) {
+        _macroIdMap = {};
+        _macroIdMapVersion = version;
+        macros.forEach(m => {
+            if (m.id != null) _macroIdMap[String(m.id)] = m;
+            if (m.cloudId != null) _macroIdMap[String(m.cloudId)] = m;
+        });
+    }
+    return _macroIdMap[String(macroId)] || null;
 }
 
 // 从所有宏中提取所有标签（去重排序）
@@ -23552,6 +23565,8 @@ async function saveMacro(macroData) {
     }
     cache.conditionMacros = macros;
     localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+    _macroIdMap = null;
+    _macroRefCountCache = null;
     
     if (!isNew) {
         const macroId = String(macroData.id);
@@ -23689,6 +23704,8 @@ async function deleteMacro(macroId) {
     const macros = getAllMacros().filter(m => String(m.id) !== deletedIdStr);
     cache.conditionMacros = macros;
     localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+    _macroIdMap = null;
+    _macroRefCountCache = null;
     
     // 清理其他宏中对被删宏的引用名称
     let macrosUpdated = false;
@@ -23953,17 +23970,72 @@ function checkConditionsForMacroRef(children, macroId) {
 }
 
 // 获取引用了某个宏的所有断语
-function getRulesReferencingMacro(macroId) {
-    return (cache.rules || []).filter(rule => doesRuleReferenceMacro(rule, macroId));
+// 引用计数缓存（宏→引用它的断语数/宏数）
+var _macroRefCountCache = null;
+var _macroRefCountCacheVersion = '';
+
+function getMacroRefCounts() {
+    var macros = cache.conditionMacros || [];
+    var rules = cache.rules || [];
+    var version = macros.length + ':' + rules.length;
+    if (_macroRefCountCache && _macroRefCountCacheVersion === version) {
+        return _macroRefCountCache;
+    }
+    var countCache = {};
+    function addRef(macroId) {
+        if (!macroId) return;
+        var key = String(macroId);
+        if (!countCache[key]) countCache[key] = { rules: 0, macros: 0 };
+    }
+    function walkConditions(children, isRule) {
+        if (!children || !Array.isArray(children)) return;
+        children.forEach(function(c) {
+            if (c.macroRef) {
+                if (isRule) {
+                    var key = String(c.macroRef);
+                    if (!countCache[key]) countCache[key] = { rules: 0, macros: 0 };
+                    countCache[key].rules++;
+                } else {
+                    var key2 = String(c.macroRef);
+                    if (!countCache[key2]) countCache[key2] = { rules: 0, macros: 0 };
+                    countCache[key2].macros++;
+                }
+                // 递归查找引用的宏中的引用
+                var refMacro = getMacroById(c.macroRef);
+                if (refMacro && refMacro.conditions && refMacro.conditions.children) {
+                    walkConditions(refMacro.conditions.children, isRule);
+                }
+            }
+            if (c.children) walkConditions(c.children, isRule);
+        });
+    }
+    // 统计断语对宏的引用
+    rules.forEach(function(rule) {
+        if (rule.conditions && rule.conditions.children) {
+            walkConditions(rule.conditions.children, true);
+        }
+    });
+    // 统计宏对宏的引用
+    macros.forEach(function(m) {
+        if (m.conditions && m.conditions.children) {
+            walkConditions(m.conditions.children, false);
+        }
+    });
+    _macroRefCountCache = countCache;
+    _macroRefCountCacheVersion = version;
+    return countCache;
 }
 
-// 获取引用了某个宏的所有条件宏
+function getRulesReferencingMacro(macroId) {
+    var counts = getMacroRefCounts();
+    var entry = counts[String(macroId)];
+    return entry ? entry.rules : 0;
+}
+
 function getMacrosReferencingMacro(macroId) {
-    return (cache.conditionMacros || []).filter(m => {
-        if (String(m.id) === String(macroId)) return false; // 排除自身
-        if (!m.conditions || !m.conditions.children) return false;
-        return checkConditionsForMacroRef(m.conditions.children, macroId);
-    });
+    var counts = getMacroRefCounts();
+    var entry = counts[String(macroId)];
+    return entry ? entry.macros : 0;
 }
 
 // 检查断语规则是否包含任何宏引用
@@ -28170,10 +28242,19 @@ var PB_SHEN_GROUP_CYCLE = ['比劫','食伤','财星','官杀','印星'];
 var PB_WU_CYCLE = ['金','水','木','火','土'];
 var _editingRuleId = null; // 当前编辑的规则ID
 
+var _mappingRulesCache = null;
+var _mappingRulesCacheRaw = '';
+
 function getMappingRules() {
     try {
         var raw = localStorage.getItem(MAPPING_RULES_KEY);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+            if (_mappingRulesCacheRaw !== raw) {
+                _mappingRulesCacheRaw = raw;
+                _mappingRulesCache = JSON.parse(raw);
+            }
+            return _mappingRulesCache;
+        }
     } catch(e) {}
     // 默认预设规则
     return [
@@ -28436,12 +28517,21 @@ function populateMappingRuleSelect(sel) {
     }).join('');
 }
 
+// 映射规则ID查找缓存
+var _mappingRuleIdMap = null;
+var _mappingRuleCacheVersion = '';
+
 function getMappingRuleById(id) {
     var rules = getMappingRules();
-    for (var i = 0; i < rules.length; i++) {
-        if (rules[i].id === id) return rules[i];
+    var version = rules.length + ':' + (rules[0] ? rules[0].id : '') + ':' + (rules[rules.length-1] ? rules[rules.length-1].id : '');
+    if (!_mappingRuleIdMap || _mappingRuleCacheVersion !== version) {
+        _mappingRuleIdMap = {};
+        _mappingRuleCacheVersion = version;
+        for (var i = 0; i < rules.length; i++) {
+            if (rules[i].id != null) _mappingRuleIdMap[rules[i].id] = rules[i];
+        }
     }
-    return null;
+    return _mappingRuleIdMap[id] || null;
 }
 </script>
 
