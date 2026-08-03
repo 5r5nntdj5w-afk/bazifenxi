@@ -461,15 +461,24 @@ function mergeArrangementWithIncrement(baseVal, incPositions) {
 }
 
 /**
- * 根据映射规则对单个值进行闭环偏移转换
+ * 根据映射规则对单个值进行闭环偏移转换或自定义映射
  * @param {String} val - 原值（如 '比劫' 或 '金'）
- * @param {String} mappingType - '十神组' 或 '五行'
+ * @param {String} mappingType - '十神组' 或 '五行' 或 '十神组自定义' 或 '五行自定义'
  * @param {Number} mappingOffset - 偏移步数（1-4）
- * @returns {String} 映射后的值；不在闭环中则原样返回
+ * @param {Object} customMap - 自定义映射关系对象 {原值: 目标值}
+ * @returns {String} 映射后的值；不在映射范围则原样返回
  */
-function applyMappingValue(val, mappingType, mappingOffset) {
-  if (!val || !mappingType || !mappingOffset) return val;
-  var cycle = (mappingType === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+function applyMappingValue(val, mappingType, mappingOffset, customMap) {
+  if (!val) return val;
+
+  // 自定义映射优先
+  if (customMap && typeof customMap === 'object') {
+    return customMap[val] || val;
+  }
+
+  // 偏移映射
+  if (!mappingType || !mappingOffset) return val;
+  var cycle = (mappingType.indexOf('五行') >= 0) ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
   var idx = cycle.indexOf(val);
   if (idx < 0) return val; // 不在闭环中，不映射
   var offset = Number(mappingOffset) || 0;
@@ -480,11 +489,12 @@ function applyMappingValue(val, mappingType, mappingOffset) {
 /**
  * 对一个定位批量排列编码值进行映射转换（仅转换位置条件的值，元信息保留）
  * @param {String} val - 排列编码（以 '定位批量|' 开头）
- * @param {String} mappingType - '十神组' 或 '五行'
+ * @param {String} mappingType - '十神组' 或 '五行' 或自定义类型
  * @param {Number} mappingOffset - 偏移步数
+ * @param {Object} customMap - 自定义映射关系对象
  * @returns {String} 映射后的排列编码
  */
-function applyMappingToArrangement(val, mappingType, mappingOffset) {
+function applyMappingToArrangement(val, mappingType, mappingOffset, customMap) {
   if (!val || val.indexOf('定位批量|') !== 0) return val;
   var parts = val.split('|');
   var result = [];
@@ -496,7 +506,8 @@ function applyMappingToArrangement(val, mappingType, mappingOffset) {
         p.indexOf('scope=') === 0 || p.indexOf('取值=') === 0 ||
         p.indexOf('inherit=') === 0 || p.indexOf('flip=') === 0 ||
         p.indexOf('mapping=') === 0 || p.indexOf('mappingBase=') === 0 ||
-        p.indexOf('mappingType=') === 0 || p.indexOf('mappingOffset=') === 0) {
+        p.indexOf('mappingType=') === 0 || p.indexOf('mappingOffset=') === 0 ||
+        p.indexOf('customMap=') === 0) {
       result.push(p);
     } else if (p.indexOf('=') > 0) {
       // 位置条件段：解析 op / posName / posVal，对 posVal 做映射
@@ -511,7 +522,7 @@ function applyMappingToArrangement(val, mappingType, mappingOffset) {
         var kv = p.split('=');
         posName = kv[0]; posVal = kv[1];
       }
-      var mappedVal = applyMappingValue(posVal, mappingType, mappingOffset);
+      var mappedVal = applyMappingValue(posVal, mappingType, mappingOffset, customMap);
       result.push(posName + op + '=' + mappedVal);
     } else {
       result.push(p);
@@ -804,6 +815,7 @@ function evaluateLeafCondition(data, cond, context) {
     var pbInheritId = '';
     var pbFlip = false; // 原局翻转（由编码 flip= 决定）
     var pbMappingId = '', pbMappingBaseId = '', pbMappingType = '', pbMappingOffset = '';
+    var pbCustomMap = null; // 自定义映射关系
     var pbPositions = {}; // {年干: {op:'eq', val:'食伤'}, ...}
     for (var pi = 0; pi < parts.length; pi++) {
       var p = parts[pi];
@@ -817,6 +829,11 @@ function evaluateLeafCondition(data, cond, context) {
       else if (p.indexOf('mappingBase=') === 0) pbMappingBaseId = p.replace('mappingBase=','');
       else if (p.indexOf('mappingType=') === 0) pbMappingType = p.replace('mappingType=','');
       else if (p.indexOf('mappingOffset=') === 0) pbMappingOffset = p.replace('mappingOffset=','');
+      else if (p.indexOf('customMap=') === 0) {
+        try {
+          pbCustomMap = JSON.parse(decodeURIComponent(p.replace('customMap=','')));
+        } catch(e) { pbCustomMap = null; }
+      }
       else if (p.indexOf('=') > 0) {
         var pop = 'eq';
         var pval = p;
@@ -876,7 +893,7 @@ function evaluateLeafCondition(data, cond, context) {
         res = false;
         for (var mai = 0; mai < mArrangements.length; mai++) {
           // 对基准排列应用映射转换（仅转换位置条件的值）
-          var mappedArr = applyMappingToArrangement(mArrangements[mai], pbMappingType, pbMappingOffset);
+          var mappedArr = applyMappingToArrangement(mArrangements[mai], pbMappingType, pbMappingOffset, pbCustomMap);
           // 解析映射后的排列得到 positions
           var mappedPositions = _parseArrangementToPositions(mappedArr);
           // 追加增量位置（覆盖同名位置）
