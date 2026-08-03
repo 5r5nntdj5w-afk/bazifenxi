@@ -956,6 +956,90 @@ function evaluateLeafCondition(data, cond, context) {
     }
   }
 
+  // ---- 批量包含判断 ----
+  else if (field.indexOf('批量包含-') === 0 && val && val.indexOf('批量包含|') === 0) {
+    var biParts = val.split('|');
+    var biType = '十神组', biGanZhi = '通用', biScope = '原局';
+    var biInclude = [], biExclude = [];
+    for (var bipi = 0; bipi < biParts.length; bipi++) {
+      var bp = biParts[bipi];
+      if (bp === '批量包含') continue;
+      if (bp.indexOf('type=') === 0) biType = bp.replace('type=','');
+      else if (bp.indexOf('ganZhi=') === 0) biGanZhi = bp.replace('ganZhi=','');
+      else if (bp.indexOf('scope=') === 0) biScope = bp.replace('scope=','');
+      else if (bp.indexOf('包含=') === 0) {
+        var incStr = bp.replace('包含=','');
+        if (incStr) biInclude = incStr.split(',');
+      }
+      else if (bp.indexOf('排除=') === 0) {
+        var excStr = bp.replace('排除=','');
+        if (excStr) biExclude = excStr.split(',');
+      }
+    }
+
+    // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+    var biQuZhi = '';
+    if (ruleDefaultQuZhi) biQuZhi = ruleDefaultQuZhi;
+    if (!biQuZhi && biGanZhi !== '通用') biQuZhi = biGanZhi;
+    if (!biQuZhi && macroDefaultQuZhi) biQuZhi = macroDefaultQuZhi;
+
+    // 通用模式且未指定取值维度 → 不判断
+    if (biGanZhi === '通用' && !biQuZhi) {
+      res = false;
+      actual = val;
+    } else {
+      // 确定实际取值维度
+      var actualBiGz = biQuZhi || biGanZhi; // 天干 or 地支
+      if (actualBiGz === '通用') actualBiGz = '天干'; // 后备默认
+
+      // 确定要收集的柱位
+      var biPillars = [];
+      if (biScope === '原局') biPillars = ['nian','yue','ri','shi'];
+      else if (biScope === '原局+大运') biPillars = ['nian','yue','ri','shi','dayun'];
+      else if (biScope === '原局+大运+流年') biPillars = ['nian','yue','ri','shi','dayun','liunian'];
+      else biPillars = ['nian','yue','ri','shi'];
+
+      // 收集实际值
+      var biActualVals = [];
+      var biRg = data.ri ? data.ri.t : '';
+      for (var bpi = 0; bpi < biPillars.length; bpi++) {
+        var biPillar = data[biPillars[bpi]];
+        if (!biPillar) continue;
+        var biNode = (actualBiGz === '地支') ? biPillar.d : biPillar.t;
+        if (!biNode) continue;
+        var biVal = '';
+        if (biType === '五行') {
+          biVal = WU_XING[biNode] || '';
+        } else if (biType === '十神') {
+          biVal = (actualBiGz === '地支') ? getDiShen(biNode, biRg) : getExactShen(biNode, biRg);
+        } else if (biType === '十神组') {
+          var biShenTmp = (actualBiGz === '地支') ? getDiShen(biNode, biRg) : getExactShen(biNode, biRg);
+          biVal = SHEN_TO_GROUP[biShenTmp] || '';
+        }
+        if (biVal && biActualVals.indexOf(biVal) < 0) biActualVals.push(biVal);
+      }
+
+      // 包含检查：所有 include 值都必须在实际值集合中出现
+      var biIncludeOk = true;
+      for (var bii = 0; bii < biInclude.length; bii++) {
+        if (biActualVals.indexOf(biInclude[bii]) < 0) {
+          biIncludeOk = false;
+          break;
+        }
+      }
+      // 排除检查：所有 exclude 值都不能在实际值集合中出现
+      var biExcludeOk = true;
+      for (var bei = 0; bei < biExclude.length; bei++) {
+        if (biActualVals.indexOf(biExclude[bei]) >= 0) {
+          biExcludeOk = false;
+          break;
+        }
+      }
+      res = biIncludeOk && biExcludeOk;
+      actual = val;
+    }
+  }
+
   // ---- 天干/地支直接对比 ----
   else if (['年干','月干','日干','时干','大运干','流年干','流月干'].indexOf(field) >= 0) {
     actual = getFieldValue(data, field);
