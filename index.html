@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -2084,6 +2084,17 @@
                         <optgroup label="【批量判断】定位批量判断">
                         <option value="定位批量-五行">定位批量-五行</option>
                         <option value="定位批量-十神">定位批量-十神</option>
+                        </optgroup>
+                        <optgroup label="【批量判断】批量包含判断">
+                        <option value="批量包含-五行">批量包含-五行</option>
+                        <option value="批量包含-五行(原局+大运)">批量包含-五行(原局+大运)</option>
+                        <option value="批量包含-五行(原局+大运+流年)">批量包含-五行(原局+大运+流年)</option>
+                        <option value="批量包含-十神">批量包含-十神</option>
+                        <option value="批量包含-十神(原局+大运)">批量包含-十神(原局+大运)</option>
+                        <option value="批量包含-十神(原局+大运+流年)">批量包含-十神(原局+大运+流年)</option>
+                        <option value="批量包含-十神组">批量包含-十神组</option>
+                        <option value="批量包含-十神组(原局+大运)">批量包含-十神组(原局+大运)</option>
+                        <option value="批量包含-十神组(原局+大运+流年)">批量包含-十神组(原局+大运+流年)</option>
                         </optgroup>
                     </select>
                         <div class="custom-field-trigger" tabindex="0" role="combobox" aria-haspopup="listbox">
@@ -7598,6 +7609,47 @@
                 }
                 actual = c.val;
             }
+            // 批量包含判断
+            else if(c.field.startsWith('批量包含-') && c.val && c.val.startsWith('批量包含|')){
+                const biParts = c.val.split('|');
+                let biType = '十神组', biGz = '通用', biSc = '原局', biInc = [], biExc = [];
+                biParts.forEach(p => {
+                    if(p === '批量包含') return;
+                    if(p.startsWith('type=')) biType = p.replace('type=','');
+                    else if(p.startsWith('ganZhi=')) biGz = p.replace('ganZhi=','');
+                    else if(p.startsWith('scope=')) biSc = p.replace('scope=','');
+                    else if(p.startsWith('包含=')) { const s = p.replace('包含=',''); if(s) biInc = s.split(','); }
+                    else if(p.startsWith('排除=')) { const s = p.replace('排除=',''); if(s) biExc = s.split(','); }
+                });
+                // 通用模式不判断（需要取值维度）
+                if(biGz === '通用'){
+                    res = false;
+                } else {
+                    const biPillars = biSc === '原局' ? ['nian','yue','ri','shi']
+                        : biSc === '原局+大运' ? ['nian','yue','ri','shi','dayun']
+                        : biSc === '原局+大运+流年' ? ['nian','yue','ri','shi','dayun','liunian']
+                        : ['nian','yue','ri','shi'];
+                    const biRg = data.ri?.t || '';
+                    const biActual = [];
+                    biPillars.forEach(k => {
+                        const pillar = data[k];
+                        if(!pillar) return;
+                        const node = (biGz === '地支') ? pillar.d : pillar.t;
+                        if(!node) return;
+                        let v = '';
+                        if(biType === '五行') v = WU_XING[node] || '';
+                        else if(biType === '十神') v = (biGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg);
+                        else if(biType === '十神组') { const s = (biGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg); v = SHEN_TO_GROUP[s] || ''; }
+                        if(v && !biActual.includes(v)) biActual.push(v);
+                    });
+                    // 包含：所有 include 值都必须出现
+                    let incOk = biInc.every(v => biActual.includes(v));
+                    // 排除：所有 exclude 值都不能出现
+                    let excOk = biExc.every(v => !biActual.includes(v));
+                    res = incOk && excOk;
+                }
+                actual = c.val;
+            }
             else if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(c.field)){
                 const map = {年干:'nian',月干:'yue',日干:'ri',时干:'shi',大运干:'dayun',流年干:'liunian',流月干:'liuyue'};
                 actual = data[map[c.field]]?.t || '';
@@ -9203,8 +9255,8 @@
                         }
                         cb.checked = shouldCheck;
                     });
-                } else if ((child.field || '').startsWith('定位批量-')) {
-                    // 定位批量字段：添加对应的 option 确保值能正确保存和读取
+                } else if ((child.field || '').startsWith('定位批量-') || (child.field || '').startsWith('批量包含-')) {
+                    // 定位批量/批量包含字段：添加对应的 option 确保值能正确保存和读取
                     if(child.val){
                         valSel.innerHTML = `<option value="${child.val}">${child.val}</option>`;
                         valSel.value = child.val;
@@ -9248,6 +9300,25 @@
                         }
                         summarySpan.textContent = summaryText;
                         summarySpan.title = summaryText;
+                    }
+                    // 批量包含字段摘要
+                    if(summarySpan && child.val && child.val.startsWith('批量包含|')){
+                        var biParts2 = child.val.split('|');
+                        var biS2Type = '', biS2Gz = '通用', biS2Scope = '', biS2Inc = [], biS2Exc = [];
+                        biParts2.forEach(function(p){
+                            if(p === '批量包含') return;
+                            if(p.startsWith('type=')) biS2Type = p.replace('type=','');
+                            else if(p.startsWith('ganZhi=')) biS2Gz = p.replace('ganZhi=','');
+                            else if(p.startsWith('scope=')) biS2Scope = p.replace('scope=','');
+                            else if(p.startsWith('包含=')) { var s = p.replace('包含=',''); if(s) biS2Inc = s.split(','); }
+                            else if(p.startsWith('排除=')) { var s = p.replace('排除=',''); if(s) biS2Exc = s.split(','); }
+                        });
+                        var biIncTxt = biS2Inc.length > 0 ? '✅' + biS2Inc.join(',') : '';
+                        var biExcTxt = biS2Exc.length > 0 ? ' ❌' + biS2Exc.join(',') : '';
+                        var biGzTxt = biS2Gz !== '通用' ? '·' + biS2Gz : '';
+                        var biSummary = biS2Type + '·' + biS2Scope + biGzTxt + ': ' + biIncTxt + biExcTxt;
+                        summarySpan.textContent = biSummary;
+                        summarySpan.title = biSummary;
                     }
                 } else {
                     if (!valSel.classList.contains('hidden')) {
@@ -9332,7 +9403,7 @@
             valCheckbox.innerHTML = '';
             // 移除可能存在的定位批量容器（避免字段切换后残留）
             const oldBatchContainer = item.querySelector('.position-batch-container');
-            if(oldBatchContainer && !field.startsWith('定位批量-')){
+            if(oldBatchContainer && !field.startsWith('定位批量-') && !field.startsWith('批量包含-')){
                 oldBatchContainer.remove();
             }
 
@@ -9361,6 +9432,32 @@
                 valSel.value = '';
                 valInput.value = '';
                 return; // 提前返回，不执行后续判断
+            }
+
+            // 批量包含判断字段：类似定位批量，但使用包含/排除逻辑
+            if(field.startsWith('批量包含-')){
+                opSel.innerHTML = '<option value="eq">等于</option>';
+                opSel.value = 'eq';
+                opSel.classList.add('hidden');
+                valSel.classList.add('hidden');
+                valInput.classList.add('hidden');
+                valCheckbox.classList.add('hidden');
+                let batchContainer = item.querySelector('.position-batch-container');
+                if(!batchContainer){
+                    batchContainer = document.createElement('div');
+                    batchContainer.className = 'position-batch-container flex items-center gap-2';
+                    batchContainer.innerHTML = `
+                        <button type="button" class="position-batch-btn px-3 py-1 bg-teal-100 text-teal-700 border border-teal-300 rounded text-sm hover:bg-teal-200">⚙ 批量包含设置</button>
+                        <span class="position-batch-summary text-sm text-gray-600"></span>
+                    `;
+                    valCheckbox.parentNode.appendChild(batchContainer);
+                    batchContainer.querySelector('.position-batch-btn').onclick = () => {
+                        openBatchIncludeEditor(item, field);
+                    };
+                }
+                valSel.value = '';
+                valInput.value = '';
+                return;
             }
 
             if(['年干','月干','日干','时干','大运干','流年干','流月干'].includes(field)){
@@ -9925,7 +10022,7 @@
                 valCheckbox.innerHTML = '';
                 // 移除可能存在的定位批量容器（避免字段切换后残留）
                 const oldBatchContainer = item.querySelector('.position-batch-container');
-                if(oldBatchContainer && !field.startsWith('定位批量-')){
+                if(oldBatchContainer && !field.startsWith('定位批量-') && !field.startsWith('批量包含-')){
                     oldBatchContainer.remove();
                 }
 
@@ -9948,6 +10045,32 @@
                         valCheckbox.parentNode.appendChild(batchContainer);
                         batchContainer.querySelector('.position-batch-btn').onclick = () => {
                             openPositionBatchEditor(item, field);
+                        };
+                    }
+                    valSel.value = '';
+                    valInput.value = '';
+                    return;
+                }
+
+                // 批量包含判断字段
+                if(field.startsWith('批量包含-')){
+                    opSel.innerHTML = '<option value="eq">等于</option>';
+                    opSel.value = 'eq';
+                    opSel.classList.add('hidden');
+                    valSel.classList.add('hidden');
+                    valInput.classList.add('hidden');
+                    valCheckbox.classList.add('hidden');
+                    let batchContainer = item.querySelector('.position-batch-container');
+                    if(!batchContainer){
+                        batchContainer = document.createElement('div');
+                        batchContainer.className = 'position-batch-container flex items-center gap-2';
+                        batchContainer.innerHTML = `
+                            <button type="button" class="position-batch-btn px-3 py-1 bg-teal-100 text-teal-700 border border-teal-300 rounded text-sm hover:bg-teal-200">⚙ 批量包含设置</button>
+                            <span class="position-batch-summary text-sm text-gray-600"></span>
+                        `;
+                        valCheckbox.parentNode.appendChild(batchContainer);
+                        batchContainer.querySelector('.position-batch-btn').onclick = () => {
+                            openBatchIncludeEditor(item, field);
                         };
                     }
                     valSel.value = '';
@@ -10178,8 +10301,8 @@
                         return { error: '请至少选择一个值！' };
                     }
                     val = Array.from(checkedBoxes).map(cb => cb.value).join(',');
-                } else if (field.startsWith('定位批量-')) {
-                    // 定位批量字段：值存储在 valSel.value 中（即使 valSel 是隐藏的）
+                } else if (field.startsWith('定位批量-') || field.startsWith('批量包含-')) {
+                    // 定位批量/批量包含字段：值存储在 valSel.value 中（即使 valSel 是隐藏的）
                     val = valSel.value;
                 } else {
                     val = valSel.classList.contains('hidden') ? valInput.value.trim() : valSel.value;
@@ -22249,6 +22372,32 @@ function loadConditionsToEditor(container, conditions) {
                             summarySpan.title = summaryText;
                         }
                     }
+                    // 批量包含字段：同样需要单独解析和回显
+                    if ((child.field || '').startsWith('批量包含-') && child.val && child.val.startsWith('批量包含|')) {
+                        if (valSelect) {
+                            valSelect.innerHTML = '<option value="' + escapeHtml(child.val) + '">' + escapeHtml(child.val) + '</option>';
+                            valSelect.value = child.val;
+                        }
+                        var biSummarySpan = item.querySelector('.position-batch-summary');
+                        if (biSummarySpan) {
+                            var biP2 = child.val.split('|');
+                            var biT2 = '', biG2 = '通用', biSc2 = '', biI2 = [], biE2 = [];
+                            biP2.forEach(function(p){
+                                if(p === '批量包含') return;
+                                if(p.startsWith('type=')) biT2 = p.replace('type=','');
+                                else if(p.startsWith('ganZhi=')) biG2 = p.replace('ganZhi=','');
+                                else if(p.startsWith('scope=')) biSc2 = p.replace('scope=','');
+                                else if(p.startsWith('包含=')) { var s = p.replace('包含=',''); if(s) biI2 = s.split(','); }
+                                else if(p.startsWith('排除=')) { var s = p.replace('排除=',''); if(s) biE2 = s.split(','); }
+                            });
+                            var biI2Txt = biI2.length > 0 ? '✅' + biI2.join(',') : '';
+                            var biE2Txt = biE2.length > 0 ? ' ❌' + biE2.join(',') : '';
+                            var biG2Txt = biG2 !== '通用' ? '·' + biG2 : '';
+                            var biSm2 = biT2 + '·' + biSc2 + biG2Txt + ': ' + biI2Txt + biE2Txt;
+                            biSummarySpan.textContent = biSm2;
+                            biSummarySpan.title = biSm2;
+                        }
+                    }
                 }, 0);
             }
         }
@@ -28820,6 +28969,175 @@ function getMappingRuleById(id) {
             summary.title = summaryText;
         }
         closePositionBatchEditor();
+    };
+})();
+</script>
+
+<!-- 批量包含判断设置模态框 -->
+<div id="batch-include-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-teal-800">⚙ 批量包含设置</h3>
+            <button type="button" onclick="closeBatchIncludeEditor()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">📊 取值维度 <span class="text-xs text-gray-500">（通用=基础宏不取值，应用时由条件宏/断语指定天干或地支）</span></label>
+            <select id="bi-ganzhi" class="w-full p-2 border rounded text-sm">
+                <option value="通用">通用（不指定天干/地支）</option>
+                <option value="天干">天干</option>
+                <option value="地支">地支</option>
+            </select>
+        </div>
+        <div id="bi-checkbox-area" class="mb-4">
+            <!-- 双列勾选框由JS动态渲染 -->
+        </div>
+        <div class="flex gap-3 justify-end">
+            <button type="button" onclick="closeBatchIncludeEditor()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded">取消</button>
+            <button type="button" onclick="saveBatchInclude()" class="px-4 py-2 bg-teal-600 text-white rounded">💾 保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 批量包含判断编辑器逻辑
+(function(){
+    let _biCurrentItem = null;
+    let _biCurrentField = '';
+
+    // 从字段名解析类型和范围
+    function parseBiField(field){
+        let type = '', scope = '原局';
+        if(field.startsWith('批量包含-五行')){
+            type = '五行';
+        } else if(field.startsWith('批量包含-十神组')){
+            type = '十神组';
+        } else if(field.startsWith('批量包含-十神')){
+            type = '十神';
+        }
+        if(field.includes('(原局+大运+流年)')){
+            scope = '原局+大运+流年';
+        } else if(field.includes('(原局+大运)')){
+            scope = '原局+大运';
+        }
+        return { type, scope };
+    }
+
+    // 获取值选项列表
+    function getBiValueOptions(type){
+        if(type === '五行'){
+            return ['金','木','水','火','土'];
+        } else if(type === '十神'){
+            return ['比肩','劫财','食神','伤官','偏财','正财','七杀','正官','偏印','正印'];
+        } else if(type === '十神组'){
+            return ['比劫','食伤','财星','官杀','印星'];
+        }
+        return [];
+    }
+
+    // 渲染双列勾选框
+    function renderBiCheckboxes(type, includeVals, excludeVals){
+        const options = getBiValueOptions(type);
+        const container = document.getElementById('bi-checkbox-area');
+        let html = '<div class="grid grid-cols-2 gap-4">';
+        // 包含列
+        html += '<div class="border border-green-300 rounded p-3 bg-green-50">';
+        html += '<div class="font-bold text-green-700 mb-2 text-sm">✅ 必须包含</div>';
+        options.forEach(v => {
+            const checked = includeVals.includes(v) ? 'checked' : '';
+            html += `<label class="flex items-center gap-2 py-1 text-sm cursor-pointer hover:bg-green-100 rounded px-2">
+                <input type="checkbox" class="bi-include" value="${v}" ${checked} onchange="onBiIncludeChange('${v}', this.checked)">
+                <span>${v}</span>
+            </label>`;
+        });
+        html += '</div>';
+        // 排除列
+        html += '<div class="border border-red-300 rounded p-3 bg-red-50">';
+        html += '<div class="font-bold text-red-700 mb-2 text-sm">❌ 必须排除</div>';
+        options.forEach(v => {
+            const checked = excludeVals.includes(v) ? 'checked' : '';
+            html += `<label class="flex items-center gap-2 py-1 text-sm cursor-pointer hover:bg-red-100 rounded px-2">
+                <input type="checkbox" class="bi-exclude" value="${v}" ${checked} onchange="onBiExcludeChange('${v}', this.checked)">
+                <span>${v}</span>
+            </label>`;
+        });
+        html += '</div>';
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // 互斥处理：包含和排除不能同时勾选
+    window.onBiIncludeChange = function(val, checked){
+        if(checked){
+            // 取消对应的排除勾选
+            const exCb = document.querySelector(`.bi-exclude[value="${val}"]`);
+            if(exCb) exCb.checked = false;
+        }
+    };
+    window.onBiExcludeChange = function(val, checked){
+        if(checked){
+            // 取消对应的包含勾选
+            const inCb = document.querySelector(`.bi-include[value="${val}"]`);
+            if(inCb) inCb.checked = false;
+        }
+    };
+
+    window.openBatchIncludeEditor = function(item, field){
+        _biCurrentItem = item;
+        _biCurrentField = field;
+        const { type, scope } = parseBiField(field);
+
+        // 读取已有值
+        const valSel = item.querySelector('.condition-val-select');
+        let existingGanzhi = '通用';
+        let existingInclude = [];
+        let existingExclude = [];
+        if(valSel && valSel.value && valSel.value.startsWith('批量包含|')){
+            const parts = valSel.value.split('|');
+            parts.forEach(p => {
+                if(p.startsWith('ganZhi=')) existingGanzhi = p.replace('ganZhi=','');
+                else if(p.startsWith('包含=')) existingInclude = p.replace('包含=','').split(',').filter(v => v);
+                else if(p.startsWith('排除=')) existingExclude = p.replace('排除=','').split(',').filter(v => v);
+            });
+        }
+
+        document.getElementById('bi-ganzhi').value = existingGanzhi;
+        renderBiCheckboxes(type, existingInclude, existingExclude);
+        document.getElementById('batch-include-modal').classList.remove('hidden');
+    };
+
+    window.closeBatchIncludeEditor = function(){
+        document.getElementById('batch-include-modal').classList.add('hidden');
+        _biCurrentItem = null;
+        _biCurrentField = '';
+    };
+
+    window.saveBatchInclude = function(){
+        if(!_biCurrentItem) return;
+        const { type, scope } = parseBiField(_biCurrentField);
+        const ganzhi = document.getElementById('bi-ganzhi').value;
+        const includeCbs = document.querySelectorAll('.bi-include:checked');
+        const excludeCbs = document.querySelectorAll('.bi-exclude:checked');
+        const includeVals = Array.from(includeCbs).map(cb => cb.value);
+        const excludeVals = Array.from(excludeCbs).map(cb => cb.value);
+
+        // 编码值
+        const encoded = `批量包含|type=${type}|ganZhi=${ganzhi}|scope=${scope}|包含=${includeVals.join(',')}|排除=${excludeVals.join(',')}`;
+
+        // 写入 valSel
+        const valSel = _biCurrentItem.querySelector('.condition-val-select');
+        valSel.innerHTML = `<option value="${encoded}">${encoded}</option>`;
+        valSel.value = encoded;
+
+        // 更新摘要
+        const summary = _biCurrentItem.querySelector('.position-batch-summary');
+        if(summary){
+            const incText = includeVals.length > 0 ? `✅${includeVals.join(',')}` : '';
+            const excText = excludeVals.length > 0 ? ` ❌${excludeVals.join(',')}` : '';
+            const quzhiText = ganzhi !== '通用' ? `·${ganzhi}` : '';
+            summary.textContent = `${type}·${scope}${quzhiText}: ${incText}${excText}`;
+            summary.title = summary.textContent;
+        }
+        closeBatchIncludeEditor();
     };
 })();
 </script>
