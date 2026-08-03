@@ -7613,6 +7613,8 @@
             else if(c.field.startsWith('批量包含-') && c.val && c.val.startsWith('批量包含|')){
                 const biParts = c.val.split('|');
                 let biType = '十神组', biGz = '通用', biSc = '原局', biInc = [], biExc = [];
+                let biMappingBase = '', biMappingRule = '', biMappingType = '', biMappingOffset = '';
+                let biCustomMap = null, biInc2 = [], biExc2 = [];
                 biParts.forEach(p => {
                     if(p === '批量包含') return;
                     if(p.startsWith('type=')) biType = p.replace('type=','');
@@ -7620,7 +7622,35 @@
                     else if(p.startsWith('scope=')) biSc = p.replace('scope=','');
                     else if(p.startsWith('包含=')) { const s = p.replace('包含=',''); if(s) biInc = s.split(','); }
                     else if(p.startsWith('排除=')) { const s = p.replace('排除=',''); if(s) biExc = s.split(','); }
+                    else if(p.startsWith('mappingBase=')) biMappingBase = p.replace('mappingBase=','');
+                    else if(p.startsWith('mapping=')) biMappingRule = p.replace('mapping=','');
+                    else if(p.startsWith('mappingType=')) biMappingType = p.replace('mappingType=','');
+                    else if(p.startsWith('mappingOffset=')) biMappingOffset = p.replace('mappingOffset=','');
+                    else if(p.startsWith('customMap=')) { try { biCustomMap = JSON.parse(decodeURIComponent(p.replace('customMap=',''))); } catch(e){} }
+                    else if(p.startsWith('inc包含=')) { const s = p.replace('inc包含=',''); if(s) biInc2 = s.split(','); }
+                    else if(p.startsWith('inc排除=')) { const s = p.replace('inc排除=',''); if(s) biExc2 = s.split(','); }
                 });
+
+                // 如果是映射模式，从基准宏获取配置并应用映射
+                if(biMappingBase && biMappingRule){
+                    const biMacros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
+                    const baseMacro = biMacros.find(m => String(m.id) === String(biMappingBase) || String(m.cloudId) === String(biMappingBase));
+                    if(baseMacro){
+                        const configs = extractBiConfigsFromMacro(baseMacro, biType);
+                        configs.forEach(cfg => {
+                            if(cfg.ganZhi === biGz && cfg.scope === biSc){
+                                const ruleObj = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
+                                const mapped = mapBiConfigValues(cfg, ruleObj);
+                                biInc = biInc.concat(mapped.include);
+                                biExc = biExc.concat(mapped.exclude);
+                            }
+                        });
+                    }
+                    // 合并增量
+                    biInc = biInc.concat(biInc2);
+                    biExc = biExc.concat(biExc2);
+                }
+
                 // 通用模式不判断（需要取值维度）
                 if(biGz === '通用'){
                     res = false;
@@ -9306,6 +9336,7 @@
                     if(summarySpan && child.val && child.val.startsWith('批量包含|')){
                         var biParts2 = child.val.split('|');
                         var biS2Type = '', biS2Gz = '通用', biS2Scope = '', biS2Inc = [], biS2Exc = [];
+                        var biS2MappingBase = '', biS2MappingRule = '', biS2Inc2 = [], biS2Exc2 = [];
                         biParts2.forEach(function(p){
                             if(p === '批量包含') return;
                             if(p.startsWith('type=')) biS2Type = p.replace('type=','');
@@ -9313,11 +9344,26 @@
                             else if(p.startsWith('scope=')) biS2Scope = p.replace('scope=','');
                             else if(p.startsWith('包含=')) { var s = p.replace('包含=',''); if(s) biS2Inc = s.split(','); }
                             else if(p.startsWith('排除=')) { var s = p.replace('排除=',''); if(s) biS2Exc = s.split(','); }
+                            else if(p.startsWith('mappingBase=')) biS2MappingBase = p.replace('mappingBase=','');
+                            else if(p.startsWith('mapping=')) biS2MappingRule = p.replace('mapping=','');
+                            else if(p.startsWith('inc包含=')) { var s2 = p.replace('inc包含=',''); if(s2) biS2Inc2 = s2.split(','); }
+                            else if(p.startsWith('inc排除=')) { var s3 = p.replace('inc排除=',''); if(s3) biS2Exc2 = s3.split(','); }
                         });
-                        var biIncTxt = biS2Inc.length > 0 ? '✅' + biS2Inc.join(',') : '';
-                        var biExcTxt = biS2Exc.length > 0 ? ' ❌' + biS2Exc.join(',') : '';
-                        var biGzTxt = biS2Gz !== '通用' ? '·' + biS2Gz : '';
-                        var biSummary = biS2Type + '·' + biS2Scope + biGzTxt + ': ' + biIncTxt + biExcTxt;
+                        var biIncTxt, biExcTxt;
+                        if(biS2MappingBase && biS2MappingRule){
+                            var biBaseMacro = getMacroById(biS2MappingBase);
+                            var biBaseName = biBaseMacro ? biBaseMacro.name : '未知';
+                            var biRuleObj = (typeof getMappingRuleById === 'function') ? getMappingRuleById(biS2MappingRule) : null;
+                            var biRuleName = biRuleObj ? biRuleObj.name : '未知';
+                            var biIncTxt = biS2Inc2.length > 0 ? '·增量✅' + biS2Inc2.join(',') : '';
+                            var biExcTxt = biS2Exc2.length > 0 ? '·增量❌' + biS2Exc2.join(',') : '';
+                            var biSummary = '映射[' + biBaseName + '→' + biRuleName + ']·' + biS2Type + '·' + biS2Scope + biIncTxt + biExcTxt;
+                        } else {
+                            biIncTxt = biS2Inc.length > 0 ? '✅' + biS2Inc.join(',') : '';
+                            biExcTxt = biS2Exc.length > 0 ? ' ❌' + biS2Exc.join(',') : '';
+                            var biGzTxt = biS2Gz !== '通用' ? '·' + biS2Gz : '';
+                            var biSummary = biS2Type + '·' + biS2Scope + biGzTxt + ': ' + biIncTxt + biExcTxt;
+                        }
                         summarySpan.textContent = biSummary;
                         summarySpan.title = biSummary;
                     }
@@ -22384,6 +22430,7 @@ function loadConditionsToEditor(container, conditions) {
                         if (biSummarySpan) {
                             var biP2 = child.val.split('|');
                             var biT2 = '', biG2 = '通用', biSc2 = '', biI2 = [], biE2 = [];
+                            var biMB2 = '', biMR2 = '', biInc2 = [], biExc2 = [];
                             biP2.forEach(function(p){
                                 if(p === '批量包含') return;
                                 if(p.startsWith('type=')) biT2 = p.replace('type=','');
@@ -22391,11 +22438,26 @@ function loadConditionsToEditor(container, conditions) {
                                 else if(p.startsWith('scope=')) biSc2 = p.replace('scope=','');
                                 else if(p.startsWith('包含=')) { var s = p.replace('包含=',''); if(s) biI2 = s.split(','); }
                                 else if(p.startsWith('排除=')) { var s = p.replace('排除=',''); if(s) biE2 = s.split(','); }
+                                else if(p.startsWith('mappingBase=')) biMB2 = p.replace('mappingBase=','');
+                                else if(p.startsWith('mapping=')) biMR2 = p.replace('mapping=','');
+                                else if(p.startsWith('inc包含=')) { var si = p.replace('inc包含=',''); if(si) biInc2 = si.split(','); }
+                                else if(p.startsWith('inc排除=')) { var se = p.replace('inc排除=',''); if(se) biExc2 = se.split(','); }
                             });
-                            var biI2Txt = biI2.length > 0 ? '✅' + biI2.join(',') : '';
-                            var biE2Txt = biE2.length > 0 ? ' ❌' + biE2.join(',') : '';
-                            var biG2Txt = biG2 !== '通用' ? '·' + biG2 : '';
-                            var biSm2 = biT2 + '·' + biSc2 + biG2Txt + ': ' + biI2Txt + biE2Txt;
+                            var biSm2;
+                            if(biMB2 && biMR2){
+                                var biBM = getMacroById(biMB2);
+                                var biBN = biBM ? biBM.name : '未知';
+                                var biRO = (typeof getMappingRuleById === 'function') ? getMappingRuleById(biMR2) : null;
+                                var biRN = biRO ? biRO.name : '未知';
+                                var biIT = biInc2.length > 0 ? '·增量✅' + biInc2.join(',') : '';
+                                var biET = biExc2.length > 0 ? '·增量❌' + biExc2.join(',') : '';
+                                biSm2 = '映射[' + biBN + '→' + biRN + ']·' + biT2 + '·' + biSc2 + biIT + biET;
+                            } else {
+                                var biI2Txt = biI2.length > 0 ? '✅' + biI2.join(',') : '';
+                                var biE2Txt = biE2.length > 0 ? ' ❌' + biE2.join(',') : '';
+                                var biG2Txt = biG2 !== '通用' ? '·' + biG2 : '';
+                                biSm2 = biT2 + '·' + biSc2 + biG2Txt + ': ' + biI2Txt + biE2Txt;
+                            }
                             biSummarySpan.textContent = biSm2;
                             biSummarySpan.title = biSm2;
                         }
@@ -29110,6 +29172,49 @@ function getMappingRuleById(id) {
                 <option value="地支">地支</option>
             </select>
         </div>
+        <!-- Tab切换 -->
+        <div class="mb-4">
+            <div class="flex border-b border-gray-200">
+                <button type="button" data-bi-tab="none" class="bi-ref-tab flex-1 px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:text-teal-600">
+                    📝 直接设置
+                </button>
+                <button type="button" data-bi-tab="mapping" class="bi-ref-tab flex-1 px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:text-emerald-600">
+                    🔁 映射引用
+                </button>
+            </div>
+            <!-- 直接设置 -->
+            <div id="bi-ref-none" class="bi-ref-panel"></div>
+            <!-- 映射引用 -->
+            <div id="bi-ref-mapping" class="bi-ref-panel p-3 border border-emerald-200 rounded bg-emerald-50" style="display:none;">
+                <div class="text-sm font-medium text-emerald-800 mb-2">🔁 映射引用（基于基准条件宏的批量包含配置，通过映射规则转换值）</div>
+                <div class="flex items-center gap-2 mb-2">
+                    <label class="text-xs text-gray-700 shrink-0">基准条件宏:</label>
+                    <input type="text" id="bi-mapping-search" class="flex-1 p-1.5 border rounded text-sm" placeholder="搜索名称或标签...">
+                </div>
+                <div id="bi-mapping-list" class="border rounded max-h-32 overflow-y-auto bg-white mb-2">
+                    <p class="text-gray-400 text-xs text-center py-2">请选择基准条件宏</p>
+                </div>
+                <div class="flex items-center gap-2 mb-2">
+                    <label class="text-xs text-gray-700 shrink-0">映射规则:</label>
+                    <select id="bi-mapping-rule" class="flex-1 p-1.5 border rounded text-sm">
+                        <option value="">--请选择映射规则--</option>
+                    </select>
+                    <button onclick="openMappingRuleManager()" class="px-2 py-1 bg-emerald-600 text-white rounded text-xs shrink-0">⚙️ 管理</button>
+                </div>
+                <div id="bi-mapping-preview" class="text-xs text-gray-600 bg-white border rounded p-2 max-h-32 overflow-y-auto mb-2">
+                    <span class="text-gray-400">选择基准条件宏和映射规则后将显示映射预览</span>
+                </div>
+                <div class="mb-2">
+                    <label class="text-xs font-medium text-gray-700">增量包含（映射后额外添加的值，勾选=覆盖映射结果）</label>
+                    <div id="bi-increment-include" class="flex flex-wrap gap-1 mt-1"></div>
+                </div>
+                <div class="mb-2">
+                    <label class="text-xs font-medium text-gray-700">增量排除（映射后额外排除的值）</label>
+                    <div id="bi-increment-exclude" class="flex flex-wrap gap-1 mt-1"></div>
+                </div>
+                <p class="text-xs text-gray-400">ℹ 映射引用会自动继承基准条件宏的包含/排除配置</p>
+            </div>
+        </div>
         <div id="bi-checkbox-area" class="mb-4">
             <!-- 双列勾选框由JS动态渲染 -->
         </div>
@@ -29125,6 +29230,12 @@ function getMappingRuleById(id) {
 (function(){
     let _biCurrentItem = null;
     let _biCurrentField = '';
+    let _biCurrentTab = 'none';
+    let _biSelectedMappingMacroId = '';
+    let _biIncrementInclude = [];
+    let _biIncrementExclude = [];
+    let _biExistingInclude = [];
+    let _biExistingExclude = [];
 
     // 从字段名解析类型和范围
     function parseBiField(field){
@@ -29197,33 +29308,310 @@ function getMappingRuleById(id) {
     };
     window.onBiExcludeChange = function(val, checked){
         if(checked){
-            // 取消对应的包含勾选
             const inCb = document.querySelector(`.bi-include[value="${val}"]`);
             if(inCb) inCb.checked = false;
         }
     };
+    window.onBiIncIncludeChange = function(val, checked){
+        if(checked){
+            if(!_biIncrementInclude.includes(val)) _biIncrementInclude.push(val);
+            const exCb = document.querySelector(`.bi-inc-exclude[value="${val}"]`);
+            if(exCb) exCb.checked = false;
+        } else {
+            _biIncrementInclude = _biIncrementInclude.filter(v => v !== val);
+        }
+        renderBiMappingPreview();
+    };
+    window.onBiIncExcludeChange = function(val, checked){
+        if(checked){
+            if(!_biIncrementExclude.includes(val)) _biIncrementExclude.push(val);
+            const inCb = document.querySelector(`.bi-inc-include[value="${val}"]`);
+            if(inCb) inCb.checked = false;
+        } else {
+            _biIncrementExclude = _biIncrementExclude.filter(v => v !== val);
+        }
+        renderBiMappingPreview();
+    };
+
+    // 从条件宏中提取批量包含配置
+    function extractBiConfigsFromMacro(macro, filterType){
+        const configs = [];
+        if(!macro || !macro.conditions) return configs;
+        function walk(node){
+            if(!node) return;
+            if(node.macroRef){
+                const refMacro = getMacroById(node.macroRef);
+                if(refMacro) walk(refMacro.conditions);
+                return;
+            }
+            if(node.field && node.field.startsWith('批量包含-') && node.val && node.val.startsWith('批量包含|')){
+                const parsed = parseBiEncoded(node.val);
+                if(parsed && (!filterType || parsed.type === filterType)){
+                    configs.push(parsed);
+                }
+                return;
+            }
+            if(node.logic && node.children){
+                node.children.forEach(walk);
+            }
+        }
+        walk(macro.conditions);
+        return configs;
+    }
+
+    // 解析批量包含编码为对象
+    function parseBiEncoded(val){
+        if(!val || !val.startsWith('批量包含|')) return null;
+        const parts = val.split('|');
+        const result = { type: '', ganZhi: '通用', scope: '原局', include: [], exclude: [] };
+        for(const p of parts){
+            if(p === '批量包含') continue;
+            if(p.startsWith('type=')) result.type = p.replace('type=','');
+            else if(p.startsWith('ganZhi=')) result.ganZhi = p.replace('ganZhi=','');
+            else if(p.startsWith('scope=')) result.scope = p.replace('scope=','');
+            else if(p.startsWith('包含=')) { const s = p.replace('包含=',''); if(s) result.include = s.split(',').filter(v => v); }
+            else if(p.startsWith('排除=')) { const s = p.replace('排除=',''); if(s) result.exclude = s.split(',').filter(v => v); }
+        }
+        return result;
+    }
+
+    // 对批量包含的包含/排除值应用映射
+    function mapBiConfigValues(config, rule){
+        if(!config || !rule) return config;
+        const mappingType = rule.type || '';
+        const customMap = rule.customMap || null;
+        const mappedInclude = config.include.map(v => applyMappingValue(v, mappingType, rule.offset, customMap));
+        const mappedExclude = config.exclude.map(v => applyMappingValue(v, mappingType, rule.offset, customMap));
+        return { ...config, include: mappedInclude, exclude: mappedExclude };
+    }
+
+    // 合并增量值
+    function mergeBiWithIncrement(mappedConfig){
+        const inc = _biIncrementInclude || [];
+        const exc = _biIncrementExclude || [];
+        const include = [...(mappedConfig.include || [])];
+        const exclude = [...(mappedConfig.exclude || [])];
+        inc.forEach(v => { if(!include.includes(v)) include.push(v); });
+        exc.forEach(v => { if(!exclude.includes(v)) exclude.push(v); });
+        exc.forEach(v => { const idx = include.indexOf(v); if(idx >= 0) include.splice(idx, 1); });
+        return { ...mappedConfig, include, exclude };
+    }
+
+    // 暴露到全局供后端匹配使用
+    window.extractBiConfigsFromMacro = extractBiConfigsFromMacro;
+    window.parseBiEncoded = parseBiEncoded;
+    window.mapBiConfigValues = mapBiConfigValues;
+
+    // 渲染增量包含/排除勾选框
+    function renderBiIncrementCheckboxes(type){
+        const options = getBiValueOptions(type);
+        const incContainer = document.getElementById('bi-increment-include');
+        const excContainer = document.getElementById('bi-increment-exclude');
+        if(!incContainer || !excContainer) return;
+        let incHtml = '';
+        options.forEach(v => {
+            const checked = _biIncrementInclude.includes(v) ? 'checked' : '';
+            incHtml += `<label class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded text-xs cursor-pointer">
+                <input type="checkbox" class="bi-inc-include" value="${v}" ${checked} onchange="onBiIncIncludeChange('${v}', this.checked)">
+                <span>${v}</span>
+            </label>`;
+        });
+        incContainer.innerHTML = incHtml;
+        let excHtml = '';
+        options.forEach(v => {
+            const checked = _biIncrementExclude.includes(v) ? 'checked' : '';
+            excHtml += `<label class="inline-flex items-center gap-1 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs cursor-pointer">
+                <input type="checkbox" class="bi-inc-exclude" value="${v}" ${checked} onchange="onBiIncExcludeChange('${v}', this.checked)">
+                <span>${v}</span>
+            </label>`;
+        });
+        excContainer.innerHTML = excHtml;
+    }
+
+    // 渲染映射基准条件宏列表
+    function renderBiMappingMacroList(){
+        const listEl = document.getElementById('bi-mapping-list');
+        if(!listEl) return;
+        const searchQuery = (document.getElementById('bi-mapping-search')?.value || '').toLowerCase();
+        let macros = (cache.conditionMacros || []).filter(m => m.name);
+        if(searchQuery){
+            macros = macros.filter(m => {
+                if(m.name.toLowerCase().includes(searchQuery)) return true;
+                if(m.tags && m.tags.some(t => t.toLowerCase().includes(searchQuery))) return true;
+                return false;
+            });
+        }
+        if(macros.length === 0){
+            listEl.innerHTML = '<p class="text-gray-400 text-xs text-center py-2">无匹配条件宏</p>';
+            return;
+        }
+        listEl.innerHTML = macros.map(m => {
+            const id = m.cloudId || m.id;
+            const isSelected = id === _biSelectedMappingMacroId;
+            const tags = (m.tags || []).map(t => `<span class="inline-block px-1 bg-emerald-50 text-emerald-600 rounded text-xs">${escapeHtml(t)}</span>`).join(' ');
+            return `<div class="px-2 py-1.5 border-b last:border-b-0 cursor-pointer ${isSelected ? 'bg-emerald-100' : 'hover:bg-emerald-50'}" data-macro-id="${id}">
+                <div class="text-sm font-medium ${isSelected ? 'text-emerald-800' : ''}">🧩 ${escapeHtml(m.name)}${isSelected ? ' ✓' : ''}</div>
+                ${tags ? `<div class="mt-0.5">${tags}</div>` : ''}
+            </div>`;
+        }).join('');
+        listEl.querySelectorAll('[data-macro-id]').forEach(el => {
+            el.onclick = function(){
+                _biSelectedMappingMacroId = this.dataset.macroId;
+                renderBiMappingMacroList();
+                const { type } = parseBiField(_biCurrentField);
+                renderBiIncrementCheckboxes(type);
+                renderBiMappingPreview();
+            };
+        });
+    }
+
+    // 渲染映射预览
+    function renderBiMappingPreview(){
+        const previewEl = document.getElementById('bi-mapping-preview');
+        if(!previewEl) return;
+        const ruleId = document.getElementById('bi-mapping-rule')?.value || '';
+        if(!_biSelectedMappingMacroId || !ruleId){
+            previewEl.innerHTML = '<span class="text-gray-400">选择基准条件宏和映射规则后将显示映射预览</span>';
+            return;
+        }
+        const macro = getMacroById(_biSelectedMappingMacroId);
+        if(!macro){
+            previewEl.innerHTML = '<span class="text-red-400">未找到基准条件宏</span>';
+            return;
+        }
+        const rule = getMappingRuleById(ruleId);
+        if(!rule){
+            previewEl.innerHTML = '<span class="text-red-400">未找到映射规则</span>';
+            return;
+        }
+        const configs = extractBiConfigsFromMacro(macro);
+        if(configs.length === 0){
+            previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无批量包含配置</span>';
+            return;
+        }
+        const { type: fieldType } = parseBiField(_biCurrentField);
+        let html = '';
+        configs.forEach((cfg) => {
+            if(fieldType && cfg.type !== fieldType) return;
+            const mapped = mapBiConfigValues(cfg, rule);
+            const finalCfg = mergeBiWithIncrement(mapped);
+            const origIncText = cfg.include.length > 0 ? `✅${cfg.include.join(',')}` : '（无）';
+            const origExcText = cfg.exclude.length > 0 ? `❌${cfg.exclude.join(',')}` : '（无）';
+            const mappedIncText = mapped.include.length > 0 ? `✅${mapped.include.join(',')}` : '（无）';
+            const mappedExcText = mapped.exclude.length > 0 ? `❌${mapped.exclude.join(',')}` : '（无）';
+            const finalIncText = finalCfg.include.length > 0 ? `✅${finalCfg.include.join(',')}` : '（无）';
+            const finalExcText = finalCfg.exclude.length > 0 ? `❌${finalCfg.exclude.join(',')}` : '（无）';
+            html += `<div class="py-0.5">
+                <div><span class="text-gray-400">原:</span> ${cfg.type}·${cfg.scope}: ${origIncText} ${origExcText}</div>
+                <div><span class="text-emerald-600">映:</span> ${cfg.type}·${cfg.scope}: ${mappedIncText} ${mappedExcText}</div>
+                ${(_biIncrementInclude.length > 0 || _biIncrementExclude.length > 0) ? `<div><span class="text-orange-600">最终:</span> ${finalIncText} ${finalExcText}</div>` : ''}
+            </div>`;
+        });
+        if(!html){
+            previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无匹配类型的批量包含配置</span>';
+            return;
+        }
+        previewEl.innerHTML = html;
+    }
+
+    // 渲染映射规则下拉框
+    function renderBiMappingRuleSelect(){
+        const sel = document.getElementById('bi-mapping-rule');
+        if(!sel) return;
+        populateMappingRuleSelect(sel);
+        sel.onchange = function(){ renderBiMappingPreview(); };
+    }
+
+    // Tab切换
+    function switchBiTab(tab){
+        _biCurrentTab = tab;
+        document.querySelectorAll('.bi-ref-tab').forEach(btn => {
+            if(btn.dataset.biTab === tab){
+                btn.classList.remove('border-transparent');
+                btn.classList.add('border-teal-600', 'text-teal-600');
+            } else {
+                btn.classList.remove('border-teal-600', 'text-teal-600');
+                btn.classList.add('border-transparent');
+            }
+        });
+        document.querySelectorAll('.bi-ref-panel').forEach(panel => {
+            panel.style.display = 'none';
+        });
+        const panel = document.getElementById('bi-ref-' + tab);
+        if(panel) panel.style.display = '';
+        const checkboxArea = document.getElementById('bi-checkbox-area');
+        if(tab === 'mapping'){
+            if(checkboxArea) checkboxArea.style.display = 'none';
+            renderBiMappingMacroList();
+            renderBiMappingRuleSelect();
+            renderBiMappingPreview();
+        } else {
+            if(checkboxArea) checkboxArea.style.display = '';
+            const { type } = parseBiField(_biCurrentField);
+            renderBiCheckboxes(type, _biExistingInclude, _biExistingExclude);
+        }
+    }
 
     window.openBatchIncludeEditor = function(item, field){
         _biCurrentItem = item;
         _biCurrentField = field;
+        _biSelectedMappingMacroId = '';
+        _biIncrementInclude = [];
+        _biIncrementExclude = [];
+        _biCurrentTab = 'none';
         const { type, scope } = parseBiField(field);
 
         // 读取已有值
         const valSel = item.querySelector('.condition-val-select');
         let existingGanzhi = '通用';
-        let existingInclude = [];
-        let existingExclude = [];
+        _biExistingInclude = [];
+        _biExistingExclude = [];
+        let isMappingMode = false;
+        let existingMappingBase = '';
+        let existingMappingRule = '';
+        let existingIncrementInclude = [];
+        let existingIncrementExclude = [];
+
         if(valSel && valSel.value && valSel.value.startsWith('批量包含|')){
             const parts = valSel.value.split('|');
-            parts.forEach(p => {
+            for(const p of parts){
                 if(p.startsWith('ganZhi=')) existingGanzhi = p.replace('ganZhi=','');
-                else if(p.startsWith('包含=')) existingInclude = p.replace('包含=','').split(',').filter(v => v);
-                else if(p.startsWith('排除=')) existingExclude = p.replace('排除=','').split(',').filter(v => v);
-            });
+                else if(p.startsWith('包含=')) _biExistingInclude = p.replace('包含=','').split(',').filter(v => v);
+                else if(p.startsWith('排除=')) _biExistingExclude = p.replace('排除=','').split(',').filter(v => v);
+                else if(p.startsWith('mappingBase=')) { isMappingMode = true; existingMappingBase = p.replace('mappingBase=',''); }
+                else if(p.startsWith('mapping=')) existingMappingRule = p.replace('mapping=','');
+                else if(p.startsWith('inc包含=')) existingIncrementInclude = p.replace('inc包含=','').split(',').filter(v => v);
+                else if(p.startsWith('inc排除=')) existingIncrementExclude = p.replace('inc排除=','').split(',').filter(v => v);
+            }
         }
 
         document.getElementById('bi-ganzhi').value = existingGanzhi;
-        renderBiCheckboxes(type, existingInclude, existingExclude);
+
+        // 绑定Tab按钮事件
+        document.querySelectorAll('.bi-ref-tab').forEach(btn => {
+            btn.onclick = function(){ switchBiTab(this.dataset.biTab); };
+        });
+
+        if(isMappingMode){
+            _biCurrentTab = 'mapping';
+            _biSelectedMappingMacroId = existingMappingBase;
+            _biIncrementInclude = existingIncrementInclude;
+            _biIncrementExclude = existingIncrementExclude;
+            switchBiTab('mapping');
+            setTimeout(() => {
+                renderBiMappingRuleSelect();
+                const ruleSel = document.getElementById('bi-mapping-rule');
+                if(ruleSel && existingMappingRule){
+                    ruleSel.value = existingMappingRule;
+                    renderBiMappingPreview();
+                }
+                renderBiIncrementCheckboxes(type);
+            }, 10);
+        } else {
+            switchBiTab('none');
+            renderBiCheckboxes(type, _biExistingInclude, _biExistingExclude);
+        }
+
         document.getElementById('batch-include-modal').classList.remove('hidden');
     };
 
@@ -29231,33 +29619,70 @@ function getMappingRuleById(id) {
         document.getElementById('batch-include-modal').classList.add('hidden');
         _biCurrentItem = null;
         _biCurrentField = '';
+        _biSelectedMappingMacroId = '';
+        _biIncrementInclude = [];
+        _biIncrementExclude = [];
     };
 
     window.saveBatchInclude = function(){
         if(!_biCurrentItem) return;
         const { type, scope } = parseBiField(_biCurrentField);
         const ganzhi = document.getElementById('bi-ganzhi').value;
-        const includeCbs = document.querySelectorAll('.bi-include:checked');
-        const excludeCbs = document.querySelectorAll('.bi-exclude:checked');
-        const includeVals = Array.from(includeCbs).map(cb => cb.value);
-        const excludeVals = Array.from(excludeCbs).map(cb => cb.value);
+        const currentTab = _biCurrentTab;
 
-        // 编码值
-        const encoded = `批量包含|type=${type}|ganZhi=${ganzhi}|scope=${scope}|包含=${includeVals.join(',')}|排除=${excludeVals.join(',')}`;
+        if(currentTab === 'mapping'){
+            const mappingRuleId = document.getElementById('bi-mapping-rule').value;
+            const mappingMacroId = _biSelectedMappingMacroId;
+            if(!mappingMacroId){ alert('请选择基准条件宏'); return; }
+            if(!mappingRuleId){ alert('请选择映射规则'); return; }
+            const mappingRule = getMappingRuleById(mappingRuleId);
+            const mappingType = mappingRule ? mappingRule.type : '';
+            const mappingOffset = mappingRule ? mappingRule.offset : '';
 
-        // 写入 valSel
-        const valSel = _biCurrentItem.querySelector('.condition-val-select');
-        valSel.innerHTML = `<option value="${encoded}">${encoded}</option>`;
-        valSel.value = encoded;
+            const parts = ['批量包含', `mappingBase=${mappingMacroId}`, `mapping=${mappingRuleId}`, `mappingType=${mappingType}`, `mappingOffset=${mappingOffset}`, `type=${type}`, `ganZhi=${ganzhi}`, `scope=${scope}`];
+            if(mappingRule && mappingRule.customMap && mappingType.includes('自定义')){
+                try {
+                    parts.push(`customMap=${encodeURIComponent(JSON.stringify(mappingRule.customMap))}`);
+                } catch(e) {}
+            }
+            if(_biIncrementInclude.length > 0) parts.push(`inc包含=${_biIncrementInclude.join(',')}`);
+            if(_biIncrementExclude.length > 0) parts.push(`inc排除=${_biIncrementExclude.join(',')}`);
+            const encoded = parts.join('|');
 
-        // 更新摘要
-        const summary = _biCurrentItem.querySelector('.position-batch-summary');
-        if(summary){
-            const incText = includeVals.length > 0 ? `✅${includeVals.join(',')}` : '';
-            const excText = excludeVals.length > 0 ? ` ❌${excludeVals.join(',')}` : '';
-            const quzhiText = ganzhi !== '通用' ? `·${ganzhi}` : '';
-            summary.textContent = `${type}·${scope}${quzhiText}: ${incText}${excText}`;
-            summary.title = summary.textContent;
+            const valSel = _biCurrentItem.querySelector('.condition-val-select');
+            valSel.innerHTML = `<option value="${encoded}">${encoded}</option>`;
+            valSel.value = encoded;
+
+            const summary = _biCurrentItem.querySelector('.position-batch-summary');
+            if(summary){
+                const baseMacro = getMacroById(mappingMacroId);
+                const baseName = baseMacro ? baseMacro.name : '未知';
+                const ruleName = mappingRule ? mappingRule.name : '未知';
+                const incText = _biIncrementInclude.length > 0 ? `·增量✅${_biIncrementInclude.join(',')}` : '';
+                const excText = _biIncrementExclude.length > 0 ? `·增量❌${_biIncrementExclude.join(',')}` : '';
+                summary.textContent = `映射[${baseName}→${ruleName}]·${type}·${scope}${incText}${excText}`;
+                summary.title = summary.textContent;
+            }
+        } else {
+            const includeCbs = document.querySelectorAll('.bi-include:checked');
+            const excludeCbs = document.querySelectorAll('.bi-exclude:checked');
+            const includeVals = Array.from(includeCbs).map(cb => cb.value);
+            const excludeVals = Array.from(excludeCbs).map(cb => cb.value);
+
+            const encoded = `批量包含|type=${type}|ganZhi=${ganzhi}|scope=${scope}|包含=${includeVals.join(',')}|排除=${excludeVals.join(',')}`;
+
+            const valSel = _biCurrentItem.querySelector('.condition-val-select');
+            valSel.innerHTML = `<option value="${encoded}">${encoded}</option>`;
+            valSel.value = encoded;
+
+            const summary = _biCurrentItem.querySelector('.position-batch-summary');
+            if(summary){
+                const incText = includeVals.length > 0 ? `✅${includeVals.join(',')}` : '';
+                const excText = excludeVals.length > 0 ? ` ❌${excludeVals.join(',')}` : '';
+                const quzhiText = ganzhi !== '通用' ? `·${ganzhi}` : '';
+                summary.textContent = `${type}·${scope}${quzhiText}: ${incText}${excText}`;
+                summary.title = summary.textContent;
+            }
         }
         closeBatchIncludeEditor();
     };

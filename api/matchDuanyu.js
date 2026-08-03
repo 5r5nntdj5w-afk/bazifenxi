@@ -486,6 +486,71 @@ function applyMappingValue(val, mappingType, mappingOffset, customMap) {
   return cycle[newIdx];
 }
 
+// ---- 批量包含映射辅助函数 ----
+// 从条件宏中提取批量包含配置
+function _extractBiConfigsFromMacro(macro, filterType, macros) {
+  var configs = [];
+  if (!macro || !macro.conditions) return configs;
+  function walk(node) {
+    if (!node) return;
+    if (node.macroRef) {
+      var macroList = macros || [];
+      for (var mi = 0; mi < macroList.length; mi++) {
+        if (macroList[mi].id === node.macroRef || macroList[mi].cloudId === node.macroRef) {
+          walk(macroList[mi].conditions);
+          break;
+        }
+      }
+      return;
+    }
+    if (node.field && node.field.indexOf('批量包含-') === 0 && node.val && node.val.indexOf('批量包含|') === 0) {
+      var parsed = _parseBiEncoded(node.val);
+      if (parsed && (!filterType || parsed.type === filterType)) {
+        configs.push(parsed);
+      }
+      return;
+    }
+    if (node.logic && node.children) {
+      for (var ci = 0; ci < node.children.length; ci++) walk(node.children[ci]);
+    }
+  }
+  walk(macro.conditions);
+  return configs;
+}
+
+// 解析批量包含编码为对象
+function _parseBiEncoded(val) {
+  if (!val || val.indexOf('批量包含|') !== 0) return null;
+  var parts = val.split('|');
+  var result = { type: '', ganZhi: '通用', scope: '原局', include: [], exclude: [] };
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    if (p === '批量包含') continue;
+    if (p.indexOf('type=') === 0) result.type = p.replace('type=','');
+    else if (p.indexOf('ganZhi=') === 0) result.ganZhi = p.replace('ganZhi=','');
+    else if (p.indexOf('scope=') === 0) result.scope = p.replace('scope=','');
+    else if (p.indexOf('包含=') === 0) { var s = p.replace('包含=',''); if (s) result.include = s.split(','); }
+    else if (p.indexOf('排除=') === 0) { var s = p.replace('排除=',''); if (s) result.exclude = s.split(','); }
+  }
+  return result;
+}
+
+// 对批量包含的包含/排除值应用映射
+function _mapBiConfigValues(config, rule) {
+  if (!config || !rule) return config;
+  var mappingType = rule.type || '';
+  var customMap = rule.customMap || null;
+  var mappedInclude = [];
+  var mappedExclude = [];
+  for (var i = 0; i < config.include.length; i++) {
+    mappedInclude.push(applyMappingValue(config.include[i], mappingType, rule.offset, customMap));
+  }
+  for (var j = 0; j < config.exclude.length; j++) {
+    mappedExclude.push(applyMappingValue(config.exclude[j], mappingType, rule.offset, customMap));
+  }
+  return { type: config.type, ganZhi: config.ganZhi, scope: config.scope, include: mappedInclude, exclude: mappedExclude };
+}
+
 /**
  * 对一个定位批量排列编码值进行映射转换（仅转换位置条件的值，元信息保留）
  * @param {String} val - 排列编码（以 '定位批量|' 开头）
@@ -859,7 +924,8 @@ function evaluateLeafCondition(data, cond, context) {
         s.indexOf('inherit=') === 0 || s.indexOf('flip=') === 0 ||
         s.indexOf('mapping=') === 0 || s.indexOf('mappingBase=') === 0 ||
         s.indexOf('mappingType=') === 0 || s.indexOf('mappingOffset=') === 0 ||
-        s.indexOf('customMap=') === 0;
+        s.indexOf('customMap=') === 0 ||
+        s.indexOf('inc包含=') === 0 || s.indexOf('inc排除=') === 0;
     };
     // 把一个排列编码解析为 positions 对象
     var _parseArrangementToPositions = function(arrVal) {
@@ -979,6 +1045,8 @@ function evaluateLeafCondition(data, cond, context) {
     var biParts = val.split('|');
     var biType = '十神组', biGanZhi = '通用', biScope = '原局';
     var biInclude = [], biExclude = [];
+    var biMappingBase = '', biMappingRule = '', biMappingType = '', biMappingOffset = '';
+    var biCustomMap = null, biInc2 = [], biExc2 = [];
     for (var bipi = 0; bipi < biParts.length; bipi++) {
       var bp = biParts[bipi];
       if (bp === '批量包含') continue;
@@ -993,6 +1061,45 @@ function evaluateLeafCondition(data, cond, context) {
         var excStr = bp.replace('排除=','');
         if (excStr) biExclude = excStr.split(',');
       }
+      else if (bp.indexOf('mappingBase=') === 0) biMappingBase = bp.replace('mappingBase=','');
+      else if (bp.indexOf('mapping=') === 0) biMappingRule = bp.replace('mapping=','');
+      else if (bp.indexOf('mappingType=') === 0) biMappingType = bp.replace('mappingType=','');
+      else if (bp.indexOf('mappingOffset=') === 0) biMappingOffset = bp.replace('mappingOffset=','');
+      else if (bp.indexOf('customMap=') === 0) {
+        try { biCustomMap = JSON.parse(decodeURIComponent(bp.replace('customMap=',''))); } catch(e) {}
+      }
+      else if (bp.indexOf('inc包含=') === 0) {
+        var inc2Str = bp.replace('inc包含=','');
+        if (inc2Str) biInc2 = inc2Str.split(',');
+      }
+      else if (bp.indexOf('inc排除=') === 0) {
+        var exc2Str = bp.replace('inc排除=','');
+        if (exc2Str) biExc2 = exc2Str.split(',');
+      }
+    }
+
+    // 如果是映射模式，从基准宏获取配置并应用映射
+    if (biMappingBase && biMappingRule) {
+      var biMacros = data && data.macros ? data.macros : [];
+      var biBaseMacro = null;
+      for (var mi = 0; mi < biMacros.length; mi++) {
+        if (String(biMacros[mi].id) === biMappingBase || String(biMacros[mi].cloudId) === biMappingBase) { biBaseMacro = biMacros[mi]; break; }
+      }
+      if (biBaseMacro) {
+        var biConfigs = _extractBiConfigsFromMacro(biBaseMacro, biType, biMacros);
+        for (var bci = 0; bci < biConfigs.length; bci++) {
+          var bc = biConfigs[bci];
+          if (bc.ganZhi === biGanZhi && bc.scope === biScope) {
+            var bcRule = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
+            var bcMapped = _mapBiConfigValues(bc, bcRule);
+            biInclude = biInclude.concat(bcMapped.include);
+            biExclude = biExclude.concat(bcMapped.exclude);
+          }
+        }
+      }
+      // 合并增量
+      biInclude = biInclude.concat(biInc2);
+      biExclude = biExclude.concat(biExc2);
     }
 
     // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
