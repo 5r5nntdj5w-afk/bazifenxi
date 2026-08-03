@@ -29190,6 +29190,9 @@ function getMappingRuleById(id) {
                 <div class="flex items-center gap-2 mb-2">
                     <label class="text-xs text-gray-700 shrink-0">基准条件宏:</label>
                     <input type="text" id="bi-mapping-search" class="flex-1 p-1.5 border rounded text-sm" placeholder="搜索名称或标签...">
+                    <select id="bi-mapping-tag-filter" class="p-1.5 border rounded text-sm min-w-[90px]">
+                        <option value="">全部标签</option>
+                    </select>
                 </div>
                 <div id="bi-mapping-list" class="border rounded max-h-32 overflow-y-auto bg-white mb-2">
                     <p class="text-gray-400 text-xs text-center py-2">请选择基准条件宏</p>
@@ -29433,6 +29436,7 @@ function getMappingRuleById(id) {
         const listEl = document.getElementById('bi-mapping-list');
         if(!listEl) return;
         const searchQuery = (document.getElementById('bi-mapping-search')?.value || '').toLowerCase();
+        const tagFilter = document.getElementById('bi-mapping-tag-filter')?.value || '';
         let macros = (cache.conditionMacros || []).filter(m => m.name);
         if(searchQuery){
             macros = macros.filter(m => {
@@ -29440,6 +29444,9 @@ function getMappingRuleById(id) {
                 if(m.tags && m.tags.some(t => t.toLowerCase().includes(searchQuery))) return true;
                 return false;
             });
+        }
+        if(tagFilter){
+            macros = macros.filter(m => (m.tags || []).includes(tagFilter));
         }
         if(macros.length === 0){
             listEl.innerHTML = '<p class="text-gray-400 text-xs text-center py-2">无匹配条件宏</p>';
@@ -29463,6 +29470,24 @@ function getMappingRuleById(id) {
                 renderBiMappingPreview();
             };
         });
+    }
+
+    // 初始化标签过滤下拉框和搜索事件
+    function initBiMappingArea(){
+        // 填充标签过滤下拉框
+        const tagSelect = document.getElementById('bi-mapping-tag-filter');
+        if(tagSelect){
+            const allTags = getAllMacroTags();
+            tagSelect.innerHTML = '<option value="">全部标签</option>' + allTags.map(t =>
+                `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`
+            ).join('');
+            tagSelect.onchange = function(){ renderBiMappingMacroList(); };
+        }
+        // 绑定搜索事件
+        const searchInput = document.getElementById('bi-mapping-search');
+        if(searchInput){
+            searchInput.oninput = function(){ renderBiMappingMacroList(); };
+        }
     }
 
     // 渲染映射预览
@@ -29542,6 +29567,7 @@ function getMappingRuleById(id) {
         const checkboxArea = document.getElementById('bi-checkbox-area');
         if(tab === 'mapping'){
             if(checkboxArea) checkboxArea.style.display = 'none';
+            initBiMappingArea();
             renderBiMappingMacroList();
             renderBiMappingRuleSelect();
             renderBiMappingPreview();
@@ -29559,6 +29585,13 @@ function getMappingRuleById(id) {
         _biIncrementInclude = [];
         _biIncrementExclude = [];
         _biCurrentTab = 'none';
+
+        // 重置搜索和标签过滤
+        const searchInput = document.getElementById('bi-mapping-search');
+        if(searchInput) searchInput.value = '';
+        const tagFilter = document.getElementById('bi-mapping-tag-filter');
+        if(tagFilter) tagFilter.value = '';
+
         const { type, scope } = parseBiField(field);
 
         // 读取已有值
