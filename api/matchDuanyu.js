@@ -840,8 +840,21 @@ function evaluateLeafCondition(data, cond, context) {
           for (var incNameM in pbPositions) {
             mappedPositions[incNameM] = pbPositions[incNameM];
           }
+          // 从基准排列中提取 ganZhi 和取值维度（当前字段未设置时使用基准排列的值）
+          var mapGanZhi = pbGanZhi;
+          var mapQuZhi = pbQuZhi;
+          if (!mapQuZhi && macroDefaultQuZhi) mapQuZhi = macroDefaultQuZhi;
+          var mapParts = mArrangements[mai].split('|');
+          for (var mpi = 0; mpi < mapParts.length; mpi++) {
+            if (mapParts[mpi].indexOf('ganZhi=') === 0) {
+              var mArrGz = mapParts[mpi].replace('ganZhi=','');
+              if (mapGanZhi === '通用' && mArrGz !== '通用') mapGanZhi = mArrGz;
+            } else if (mapParts[mpi].indexOf('取值=') === 0) {
+              if (!mapQuZhi) mapQuZhi = mapParts[mpi].replace('取值=','');
+            }
+          }
           // 判断（含原局翻转）
-          if (evaluateBatchPositionsFlip(data, mappedPositions, pbType, pbGanZhi, pbQuZhi, pbFlip)) {
+          if (evaluateBatchPositionsFlip(data, mappedPositions, pbType, mapGanZhi, mapQuZhi, pbFlip)) {
             res = true;
             break;
           }
@@ -864,8 +877,23 @@ function evaluateLeafCondition(data, cond, context) {
           for (var incName in pbPositions) {
             mergedPositions[incName] = pbPositions[incName];
           }
+          // 从被引用排列中提取 ganZhi 和取值维度（当前字段未设置时使用被引用排列的值）
+          var inhGanZhi = pbGanZhi;
+          var inhQuZhi = pbQuZhi;
+          // 宏级默认取值维度也可作为后备
+          if (!inhQuZhi && macroDefaultQuZhi) inhQuZhi = macroDefaultQuZhi;
+          var inhParts = arrangements[ai].split('|');
+          for (var ipi = 0; ipi < inhParts.length; ipi++) {
+            if (inhParts[ipi].indexOf('ganZhi=') === 0) {
+              var arrGz = inhParts[ipi].replace('ganZhi=','');
+              // 如果当前字段是"通用"但被引用排列有具体的干支模式，使用被引用排列的模式
+              if (inhGanZhi === '通用' && arrGz !== '通用') inhGanZhi = arrGz;
+            } else if (inhParts[ipi].indexOf('取值=') === 0) {
+              if (!inhQuZhi) inhQuZhi = inhParts[ipi].replace('取值=','');
+            }
+          }
           // 判断（含原局翻转）
-          if (evaluateBatchPositionsFlip(data, mergedPositions, pbType, pbGanZhi, pbQuZhi, pbFlip)) {
+          if (evaluateBatchPositionsFlip(data, mergedPositions, pbType, inhGanZhi, inhQuZhi, pbFlip)) {
             res = true;
             break;
           }
