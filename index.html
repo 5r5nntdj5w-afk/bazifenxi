@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -27667,6 +27667,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     </select>
                 </div>
             </div>
+            <!-- 原局翻转 -->
+            <div class="mb-3 flex items-center gap-2">
+                <label class="flex items-center gap-1">
+                    <input type="checkbox" id="pb-flip" checked class="pb-flip-check">
+                    <span class="text-sm font-medium text-purple-700">🔄 原局翻转</span>
+                </label>
+                <span class="text-xs text-gray-400">勾选后自动匹配原局正序和反序（年↔时、月↔日），大运/流年/流月不翻转</span>
+                <span id="pb-flip-locked" class="text-xs text-orange-500 hidden">🔒 翻转跟随基准条件宏</span>
+            </div>
             <!-- 继承引用区 -->
             <div class="mb-4 p-3 border border-indigo-200 rounded bg-indigo-50">
                 <label class="flex items-center gap-2 mb-2">
@@ -27691,6 +27700,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p class="text-xs text-gray-400 mt-1">ℹ 引用层排列为只读，如需修改请进入引用层条件宏编辑</p>
                 </div>
             </div>
+            <!-- 映射引用区 -->
+            <div class="mb-4 p-3 border border-emerald-200 rounded bg-emerald-50">
+                <label class="flex items-center gap-2 mb-2">
+                    <input type="checkbox" id="pb-mapping-enable" class="pb-mapping-enable">
+                    <span class="text-sm font-medium text-emerald-800">🔁 启用映射引用（基于基准条件宏，按五行/十神相生闭环偏移映射值）</span>
+                </label>
+                <div id="pb-mapping-config" style="display:none;">
+                    <div class="flex items-center gap-2 mb-2">
+                        <label class="text-xs text-gray-700 shrink-0">基准条件宏:</label>
+                        <input type="text" id="pb-mapping-search" class="flex-1 p-1.5 border rounded text-sm" placeholder="搜索名称或标签...">
+                        <select id="pb-mapping-tag-filter" class="p-1.5 border rounded text-sm min-w-[90px]">
+                            <option value="">全部标签</option>
+                        </select>
+                    </div>
+                    <div id="pb-mapping-list" class="border rounded max-h-32 overflow-y-auto bg-white mb-2">
+                        <p class="text-gray-400 text-xs text-center py-2">请选择基准条件宏</p>
+                    </div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <label class="text-xs text-gray-700 shrink-0">映射规则:</label>
+                        <select id="pb-mapping-rule" class="flex-1 p-1.5 border rounded text-sm">
+                            <option value="">--请选择映射规则--</option>
+                        </select>
+                        <button onclick="openMappingRuleManager()" class="px-2 py-1 bg-emerald-600 text-white rounded text-xs shrink-0">⚙️ 管理映射规则</button>
+                    </div>
+                    <div id="pb-mapping-preview" class="text-xs text-gray-600 bg-white border rounded p-2 max-h-32 overflow-y-auto">
+                        <span class="text-gray-400">选择基准条件宏和映射规则后将显示映射预览</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">ℹ 映射引用会自动继承基准条件宏的原局翻转设置</p>
+                </div>
+            </div>
             <p class="text-xs text-gray-500 mb-2">提示：未勾选的位置表示"不限"；每个位置可独立选择"等于/不等于"。</p>
             <!-- 位置勾选区 -->
             <div id="pb-positions" class="space-y-2">
@@ -27703,6 +27742,149 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+
+<!-- 映射规则管理弹窗 -->
+<div id="mapping-rule-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[600px] max-h-[80vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-lg font-bold text-emerald-800">🔁 五行/十神映射规则管理</h3>
+            <button onclick="closeMappingRuleManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto">
+            <div class="mb-4 p-3 bg-emerald-50 rounded text-sm text-gray-600">
+                <p class="font-medium text-emerald-700 mb-1">映射规则说明：</p>
+                <p>• <b>十神组闭环</b>：比劫→食伤→财星→官杀→印星→比劫（5步循环）</p>
+                <p>• <b>五行闭环</b>：金→水→木→火→土→金（5步循环）</p>
+                <p>• 偏移1=整体前进一步，偏移2=前进两步，以此类推</p>
+            </div>
+            <div class="flex gap-2 mb-3">
+                <input type="text" id="mapping-rule-name" class="flex-1 p-2 border rounded text-sm" placeholder="映射规则名称（如：食伤制官杀）">
+                <select id="mapping-rule-type" class="p-2 border rounded text-sm">
+                    <option value="十神组">十神组</option>
+                    <option value="五行">五行</option>
+                </select>
+                <select id="mapping-rule-offset" class="p-2 border rounded text-sm">
+                    <option value="1">偏移1</option>
+                    <option value="2">偏移2</option>
+                    <option value="3">偏移3</option>
+                    <option value="4">偏移4</option>
+                </select>
+                <button onclick="addMappingRule()" class="px-3 py-2 bg-emerald-600 text-white rounded text-sm shrink-0">➕ 添加</button>
+            </div>
+            <div id="mapping-rule-list" class="space-y-2">
+                <p class="text-gray-400 text-center py-4">暂无映射规则</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 映射规则管理逻辑（全局函数）
+var MAPPING_RULES_KEY = 'pb_mapping_rules';
+var PB_SHEN_GROUP_CYCLE = ['比劫','食伤','财星','官杀','印星'];
+var PB_WU_CYCLE = ['金','水','木','火','土'];
+
+function getMappingRules() {
+    try {
+        var raw = localStorage.getItem(MAPPING_RULES_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    // 默认预设规则
+    return [
+        {id: 'map_sg_1', name: '食伤制官杀', type: '十神组', offset: 1},
+        {id: 'map_sg_2', name: '财星制印星', type: '十神组', offset: 2},
+        {id: 'map_sg_3', name: '官杀制比劫', type: '十神组', offset: 3},
+        {id: 'map_sg_4', name: '印星制食伤', type: '十神组', offset: 4},
+        {id: 'map_wx_1', name: '水克火', type: '五行', offset: 1},
+        {id: 'map_wx_2', name: '木克土', type: '五行', offset: 2},
+        {id: 'map_wx_3', name: '火克金', type: '五行', offset: 3},
+        {id: 'map_wx_4', name: '土克水', type: '五行', offset: 4}
+    ];
+}
+
+function saveMappingRules(rules) {
+    try { localStorage.setItem(MAPPING_RULES_KEY, JSON.stringify(rules)); } catch(e) {}
+}
+
+// 根据映射规则对值进行转换
+function applyMappingValue(val, mappingType, mappingOffset) {
+    if (!val || !mappingType || !mappingOffset) return val;
+    var cycle = (mappingType === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+    var idx = cycle.indexOf(val);
+    if (idx < 0) return val; // 不在闭环中，不映射
+    var newIdx = (idx + mappingOffset) % cycle.length;
+    return cycle[newIdx];
+}
+
+window.openMappingRuleManager = function() {
+    document.getElementById('mapping-rule-modal').classList.remove('hidden');
+    renderMappingRuleList();
+};
+
+window.closeMappingRuleManager = function() {
+    document.getElementById('mapping-rule-modal').classList.add('hidden');
+};
+
+window.addMappingRule = function() {
+    var name = document.getElementById('mapping-rule-name').value.trim();
+    var type = document.getElementById('mapping-rule-type').value;
+    var offset = parseInt(document.getElementById('mapping-rule-offset').value);
+    if (!name) { alert('请输入映射规则名称'); return; }
+    var rules = getMappingRules();
+    rules.push({id: 'map_' + Date.now(), name: name, type: type, offset: offset});
+    saveMappingRules(rules);
+    document.getElementById('mapping-rule-name').value = '';
+    renderMappingRuleList();
+    // 刷新批量编辑器中的映射规则下拉框
+    var sel = document.getElementById('pb-mapping-rule');
+    if (sel) populateMappingRuleSelect(sel);
+};
+
+window.deleteMappingRule = function(id) {
+    if (!confirm('确定删除此映射规则？')) return;
+    var rules = getMappingRules().filter(function(r) { return r.id !== id; });
+    saveMappingRules(rules);
+    renderMappingRuleList();
+    var sel = document.getElementById('pb-mapping-rule');
+    if (sel) populateMappingRuleSelect(sel);
+};
+
+function renderMappingRuleList() {
+    var listEl = document.getElementById('mapping-rule-list');
+    var rules = getMappingRules();
+    if (rules.length === 0) {
+        listEl.innerHTML = '<p class="text-gray-400 text-center py-4">暂无映射规则</p>';
+        return;
+    }
+    listEl.innerHTML = rules.map(function(r) {
+        var cycle = (r.type === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+        var preview = cycle.map(function(v, i) {
+            return v + '→' + cycle[(i + r.offset) % cycle.length];
+        }).join('，');
+        return '<div class="flex items-center justify-between p-2 border rounded hover:bg-emerald-50">' +
+            '<div><span class="font-medium text-sm">' + escapeHtml(r.name) + '</span>' +
+            '<span class="text-xs text-gray-400 ml-2">[' + r.type + '·偏移' + r.offset + ']</span>' +
+            '<div class="text-xs text-gray-500">' + preview + '</div></div>' +
+            '<button onclick="deleteMappingRule(\'' + r.id + '\')" class="px-2 py-1 bg-red-400 text-white rounded text-xs shrink-0">删除</button>' +
+            '</div>';
+    }).join('');
+}
+
+function populateMappingRuleSelect(sel) {
+    var rules = getMappingRules();
+    sel.innerHTML = '<option value="">--请选择映射规则--</option>' + rules.map(function(r) {
+        return '<option value="' + r.id + '">' + escapeHtml(r.name) + ' [' + r.type + '·偏移' + r.offset + ']</option>';
+    }).join('');
+}
+
+function getMappingRuleById(id) {
+    var rules = getMappingRules();
+    for (var i = 0; i < rules.length; i++) {
+        if (rules[i].id === id) return rules[i];
+    }
+    return null;
+}
+</script>
 
 <script>
 // 定位批量判断编辑器逻辑
@@ -27735,6 +27917,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let _positionCache = {};
     // 当前选中的继承宏ID
     let _selectedInheritId = '';
+    // 当前选中的映射基准宏ID
+    let _selectedMappingMacroId = '';
+    // 原局位置键（用于翻转）
+    const PB_YUANJU_KEYS = ['年干','月干','日干','时干'];
+    // 原局翻转映射：正序→反序
+    const PB_FLIP_MAP = {'年干':'时干','月干':'日干','日干':'月干','时干':'年干'};
+    const PB_FLIP_MAP_COL = {'年柱':'时柱','月柱':'日柱','日柱':'月柱','时柱':'年柱'};
 
     // 根据干支类型获取显示位置名
     function getPositionDisplayName(posKey, ganzhi){
@@ -27908,16 +28097,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if(!val || !val.startsWith('定位批量|')) return '';
         const parts = val.split('|');
         const positions = [];
-        let sType = '', sGz = '', sQz = '';
+        let sType = '', sGz = '', sQz = '', sFlip = '';
         parts.forEach(p => {
             if(p.startsWith('type=')) sType = p.replace('type=','');
             else if(p.startsWith('ganZhi=')) sGz = p.replace('ganZhi=','');
             else if(p.startsWith('取值=')) sQz = p.replace('取值=','');
+            else if(p.startsWith('flip=')) sFlip = p.replace('flip=','') === '1' ? '🔄' : '';
+            else if(p.startsWith('scope=') || p.startsWith('inherit=') || p.startsWith('mapping=') || p.startsWith('mappingBase=') || p.startsWith('mappingType=') || p.startsWith('mappingOffset=')) { /* 元信息，跳过 */ }
             else if(p.includes('=')) positions.push(p);
         });
         let label = sType;
         if(sGz === '通用' && sQz) label += '·通用·取值' + sQz;
         else label += '·' + sGz;
+        if(sFlip) label += '·' + sFlip;
         return label + ': ' + positions.join(', ');
     }
 
@@ -28010,6 +28202,152 @@ document.addEventListener('DOMContentLoaded', function() {
         renderInheritMacroList();
     }
 
+    // === 映射引用区域 ===
+
+    // 渲染映射基准条件宏列表（带搜索过滤）
+    function renderMappingMacroList(){
+        const listEl = document.getElementById('pb-mapping-list');
+        const searchQuery = (document.getElementById('pb-mapping-search')?.value || '').toLowerCase();
+        const tagFilter = document.getElementById('pb-mapping-tag-filter')?.value || '';
+        let macros = (cache.conditionMacros || []).filter(m => m.name);
+        if(searchQuery){
+            macros = macros.filter(m => {
+                if(m.name.toLowerCase().includes(searchQuery)) return true;
+                if(m.tags && m.tags.some(t => t.toLowerCase().includes(searchQuery))) return true;
+                return false;
+            });
+        }
+        if(tagFilter){
+            macros = macros.filter(m => (m.tags || []).includes(tagFilter));
+        }
+        if(macros.length === 0){
+            listEl.innerHTML = '<p class="text-gray-400 text-xs text-center py-2">无匹配条件宏</p>';
+            return;
+        }
+        listEl.innerHTML = macros.map(m => {
+            const id = m.cloudId || m.id;
+            const isSelected = id === _selectedMappingMacroId;
+            const tags = (m.tags || []).map(t => `<span class="inline-block px-1 bg-emerald-50 text-emerald-600 rounded text-xs">${escapeHtml(t)}</span>`).join(' ');
+            return `<div class="px-2 py-1.5 border-b last:border-b-0 cursor-pointer ${isSelected ? 'bg-emerald-100' : 'hover:bg-emerald-50'}" data-macro-id="${id}">
+                <div class="text-sm font-medium ${isSelected ? 'text-emerald-800' : ''}">🧩 ${escapeHtml(m.name)}${isSelected ? ' ✓' : ''}</div>
+                ${tags ? `<div class="mt-0.5">${tags}</div>` : ''}
+            </div>`;
+        }).join('');
+        listEl.querySelectorAll('[data-macro-id]').forEach(el => {
+            el.onclick = function(){
+                _selectedMappingMacroId = this.dataset.macroId;
+                renderMappingMacroList();
+                renderMappingPreview();
+                updateMappingFlipLock();
+            };
+        });
+    }
+
+    // 渲染映射预览
+    function renderMappingPreview(){
+        const previewEl = document.getElementById('pb-mapping-preview');
+        const ruleId = document.getElementById('pb-mapping-rule')?.value || '';
+        if(!_selectedMappingMacroId || !ruleId){
+            previewEl.innerHTML = '<span class="text-gray-400">选择基准条件宏和映射规则后将显示映射预览</span>';
+            return;
+        }
+        const macro = getMacroById(_selectedMappingMacroId);
+        if(!macro){
+            previewEl.innerHTML = '<span class="text-red-400">未找到基准条件宏</span>';
+            return;
+        }
+        const rule = getMappingRuleById(ruleId);
+        if(!rule){
+            previewEl.innerHTML = '<span class="text-red-400">未找到映射规则</span>';
+            return;
+        }
+        const arrangements = extractBatchArrangements(macro);
+        if(arrangements.length === 0){
+            previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无定位批量排列</span>';
+            return;
+        }
+        previewEl.innerHTML = arrangements.map((a, i) => {
+            const mapped = applyMappingToArrangement(a.val, rule.type, rule.offset);
+            const origText = arrangementToText(a.val);
+            const mappedText = arrangementToText(mapped);
+            return `<div class="py-0.5"><span class="text-gray-400">原:</span> ${escapeHtml(origText)}</div>
+                     <div class="py-0.5"><span class="text-emerald-600">映:</span> ${escapeHtml(mappedText)}</div>`;
+        }).join('');
+    }
+
+    // 对排列编码值进行映射转换
+    function applyMappingToArrangement(val, mappingType, mappingOffset){
+        if(!val || !val.startsWith('定位批量|')) return val;
+        const parts = val.split('|');
+        const result = [];
+        parts.forEach(p => {
+            if(p === '定位批量' || p.startsWith('type=') || p.startsWith('ganZhi=') || p.startsWith('scope=') || p.startsWith('取值=') || p.startsWith('inherit=') || p.startsWith('flip=') || p.startsWith('mapping=') || p.startsWith('mappingBase=') || p.startsWith('mappingType=') || p.startsWith('mappingOffset=')){
+                result.push(p);
+            } else if(p.includes('=')){
+                let op = '';
+                let posName = '';
+                let posVal = '';
+                if(p.includes('!=')){
+                    op = '!=';
+                    const [pn, pv] = p.replace('!=','=').split('=');
+                    posName = pn; posVal = pv;
+                } else {
+                    const [pn, pv] = p.split('=');
+                    posName = pn; posVal = pv;
+                }
+                const mappedVal = applyMappingValue(posVal, mappingType, mappingOffset);
+                result.push(posName + op + '=' + mappedVal);
+            } else {
+                result.push(p);
+            }
+        });
+        return result.join('|');
+    }
+
+    // 映射引用启用时，原局翻转跟随基准宏
+    function updateMappingFlipLock(){
+        const mappingEnabled = document.getElementById('pb-mapping-enable')?.checked;
+        const flipCheck = document.getElementById('pb-flip');
+        const flipLocked = document.getElementById('pb-flip-locked');
+        if(mappingEnabled && _selectedMappingMacroId){
+            // 从基准宏的排列中读取 flip 设置
+            const macro = getMacroById(_selectedMappingMacroId);
+            const arrangements = macro ? extractBatchArrangements(macro) : [];
+            let baseFlip = true; // 默认勾选
+            if(arrangements.length > 0){
+                const firstVal = arrangements[0].val;
+                if(firstVal && firstVal.includes('flip=0')){
+                    baseFlip = false;
+                }
+            }
+            flipCheck.checked = baseFlip;
+            flipCheck.disabled = true;
+            flipLocked.classList.remove('hidden');
+        } else {
+            flipCheck.disabled = false;
+            flipLocked.classList.add('hidden');
+        }
+    }
+
+    // 初始化映射引用区域
+    function initMappingArea(){
+        // 填充标签过滤下拉框
+        const tagSelect = document.getElementById('pb-mapping-tag-filter');
+        const allTags = getAllMacroTags();
+        tagSelect.innerHTML = '<option value="">全部标签</option>' + allTags.map(t =>
+            `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`
+        ).join('');
+        // 填充映射规则下拉框
+        const ruleSelect = document.getElementById('pb-mapping-rule');
+        populateMappingRuleSelect(ruleSelect);
+        // 绑定搜索事件
+        const searchInput = document.getElementById('pb-mapping-search');
+        searchInput.oninput = function(){ renderMappingMacroList(); };
+        tagSelect.onchange = function(){ renderMappingMacroList(); };
+        ruleSelect.onchange = function(){ renderMappingPreview(); };
+        renderMappingMacroList();
+    }
+
     // 打开编辑器
     window.openPositionBatchEditor = function(item, field){
         _currentItem = item;
@@ -28019,6 +28357,8 @@ document.addEventListener('DOMContentLoaded', function() {
         setJudgeTypeOptions(field);
         // 初始化继承引用区域
         initInheritArea();
+        // 初始化映射引用区域
+        initMappingArea();
         // 从 item 中读取已有值
         const valSel = item.querySelector('.condition-val-select');
         const existingVal = valSel.value || '';
@@ -28027,6 +28367,9 @@ document.addEventListener('DOMContentLoaded', function() {
         let scope = '原局';
         let quzhi = '';
         let inheritId = '';
+        let flip = true; // 默认勾选原局翻转
+        let mappingId = '';
+        let mappingMacroId = '';
         // 解析已有值
         if(existingVal.startsWith('定位批量|')){
             const parts = existingVal.split('|');
@@ -28036,6 +28379,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 else if(p.startsWith('scope=')) scope = p.replace('scope=','');
                 else if(p.startsWith('取值=')) quzhi = p.replace('取值=','');
                 else if(p.startsWith('inherit=')) inheritId = p.replace('inherit=','');
+                else if(p.startsWith('flip=')) flip = p.replace('flip=','') === '1';
+                else if(p.startsWith('mapping=')) mappingId = p.replace('mapping=','');
+                else if(p.startsWith('mappingBase=')) mappingMacroId = p.replace('mappingBase=','');
+                else if(p.startsWith('mappingType=')) { /* 映射类型，匹配时使用，回显无需处理 */ }
+                else if(p.startsWith('mappingOffset=')) { /* 映射偏移，匹配时使用，回显无需处理 */ }
                 else if(p.includes('=')){
                     let op = 'eq';
                     let posVal = p;
@@ -28055,6 +28403,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pb-judge-type').value = judgeType;
         document.getElementById('pb-ganzhi').value = ganzhi;
         document.getElementById('pb-scope').value = scope;
+        document.getElementById('pb-flip').checked = flip;
         // 取值维度下拉框
         const quzhiCell = document.getElementById('pb-quzhi-cell');
         const scopeCell = document.getElementById('pb-scope-cell');
@@ -28080,6 +28429,25 @@ document.addEventListener('DOMContentLoaded', function() {
             inheritCheck.checked = false;
             inheritConfig.style.display = 'none';
         }
+        // 映射引用回显
+        const mappingCheck = document.getElementById('pb-mapping-enable');
+        const mappingConfig = document.getElementById('pb-mapping-config');
+        _selectedMappingMacroId = mappingMacroId || '';
+        if(mappingId && mappingMacroId){
+            mappingCheck.checked = true;
+            mappingConfig.style.display = '';
+            if(document.getElementById('pb-mapping-search'))
+                document.getElementById('pb-mapping-search').value = '';
+            document.getElementById('pb-mapping-rule').value = mappingId;
+            renderMappingMacroList();
+            renderMappingPreview();
+            updateMappingFlipLock();
+        } else {
+            mappingCheck.checked = false;
+            mappingConfig.style.display = 'none';
+            document.getElementById('pb-flip').disabled = false;
+            document.getElementById('pb-flip-locked').classList.add('hidden');
+        }
         renderPositions(scope, judgeType, ganzhi);
         document.getElementById('position-batch-modal').classList.remove('hidden');
     };
@@ -28090,6 +28458,7 @@ document.addEventListener('DOMContentLoaded', function() {
         _currentField = '';
         _positionCache = {};
         _selectedInheritId = '';
+        _selectedMappingMacroId = '';
     };
 
     // 配置项变化时重新渲染
@@ -28130,6 +28499,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const ganzhi = document.getElementById('pb-ganzhi').value;
         renderPositions(scope, judgeType, ganzhi);
     };
+    // 映射引用 checkbox 事件
+    document.getElementById('pb-mapping-enable').onchange = function(){
+        const config = document.getElementById('pb-mapping-config');
+        config.style.display = this.checked ? '' : 'none';
+        if(this.checked){
+            renderMappingMacroList();
+            if(!_selectedMappingMacroId){
+                renderMappingPreview();
+            } else {
+                updateMappingFlipLock();
+            }
+        } else {
+            // 取消映射引用时解锁原局翻转
+            document.getElementById('pb-flip').disabled = false;
+            document.getElementById('pb-flip-locked').classList.add('hidden');
+        }
+        const scope = document.getElementById('pb-scope').value;
+        const judgeType = document.getElementById('pb-judge-type').value;
+        const ganzhi = document.getElementById('pb-ganzhi').value;
+        renderPositions(scope, judgeType, ganzhi);
+    };
 
     // 保存按钮
     document.getElementById('pb-save-btn').onclick = function(){
@@ -28138,8 +28528,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const ganzhi = document.getElementById('pb-ganzhi').value;
         const scope = document.getElementById('pb-scope').value;
         const quzhi = document.getElementById('pb-quzhi').value;
+        const flip = document.getElementById('pb-flip').checked;
         const inheritEnabled = document.getElementById('pb-inherit-enable').checked;
         const inheritMacroId = _selectedInheritId;
+        const mappingEnabled = document.getElementById('pb-mapping-enable').checked;
+        const mappingRuleId = document.getElementById('pb-mapping-rule').value;
+        const mappingMacroId = _selectedMappingMacroId;
         // 收集勾选的位置
         const checked = [];
         const positions = getScopePositions(scope, ganzhi);
@@ -28154,27 +28548,46 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         // 构建编码
         let encoded;
-        if(inheritEnabled && inheritMacroId){
-            // inherit 模式：只编码增量位置条件（不含原局位置）
-            // 过滤出非原局位置（大运柱/流年柱/流月柱等）
+        if(mappingEnabled && mappingMacroId && mappingRuleId){
+            // 映射引用模式：基于基准宏 + 映射规则（编码自包含 type/offset，便于服务端匹配）
+            const mappingRule = getMappingRuleById(mappingRuleId);
+            const mappingType = mappingRule ? mappingRule.type : '';
+            const mappingOffset = mappingRule ? mappingRule.offset : '';
+            const parts = [`定位批量`, `mappingBase=${mappingMacroId}`, `mapping=${mappingRuleId}`, `mappingType=${mappingType}`, `mappingOffset=${mappingOffset}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
+            if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
+            parts.push(`flip=${flip ? '1' : '0'}`);
+            // 增量位置（非原局）
             const incrementChecked = [];
             positions.forEach(posKey => {
                 const cacheKey = posNameToKey(posKey, ganzhi);
                 const cache = _positionCache[cacheKey];
                 if(cache && cache.checked && cache.val){
                     const displayName = getPositionDisplayName(posKey, ganzhi);
-                    // 排除原局位置（年/月/日/时）
                     if(!['年干','月干','日干','时干'].includes(cacheKey)){
                         incrementChecked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
                     }
                 }
             });
-            // inherit 编码
-            const parts = [`定位批量`, `inherit=${inheritMacroId}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
-            if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
             if(incrementChecked.length > 0) parts.push(incrementChecked.join('|'));
             encoded = parts.join('|');
-            // inherit 模式允许无增量位置（纯继承原局）
+        } else if(inheritEnabled && inheritMacroId){
+            // inherit 模式：只编码增量位置条件（不含原局位置）
+            const incrementChecked = [];
+            positions.forEach(posKey => {
+                const cacheKey = posNameToKey(posKey, ganzhi);
+                const cache = _positionCache[cacheKey];
+                if(cache && cache.checked && cache.val){
+                    const displayName = getPositionDisplayName(posKey, ganzhi);
+                    if(!['年干','月干','日干','时干'].includes(cacheKey)){
+                        incrementChecked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
+                    }
+                }
+            });
+            const parts = [`定位批量`, `inherit=${inheritMacroId}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
+            if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
+            parts.push(`flip=${flip ? '1' : '0'}`);
+            if(incrementChecked.length > 0) parts.push(incrementChecked.join('|'));
+            encoded = parts.join('|');
         } else {
             // 普通模式
             if(checked.length === 0){
@@ -28183,6 +28596,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const parts = [`定位批量`, `type=${judgeType}`, `ganZhi=${ganzhi}`, `scope=${scope}`];
             if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
+            parts.push(`flip=${flip ? '1' : '0'}`);
             parts.push(checked.join('|'));
             encoded = parts.join('|');
         }
@@ -28194,17 +28608,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const summary = _currentItem.querySelector('.position-batch-summary');
         if(summary){
             let summaryText;
-            if(inheritEnabled && inheritMacroId){
-                const macro = getMacroById(inheritMacroId);
+            const flipText = flip ? '·🔄翻转' : '';
+            if(mappingEnabled && mappingMacroId && mappingRuleId){
+                const macro = getMacroById(mappingMacroId);
                 const macroName = macro ? macro.name : '未知';
+                const rule = getMappingRuleById(mappingRuleId);
+                const ruleName = rule ? rule.name : '未知';
                 const increment = checked.filter(c => {
-                    // 过滤出增量位置
                     return !c.startsWith('年') && !c.startsWith('月') || c.startsWith('大运') || c.startsWith('流年') || c.startsWith('流月');
                 });
                 const incText = increment.length > 0 ? `·增量: ${increment.join(', ')}` : '';
-                summaryText = `继承[${macroName}]·${judgeType}·${ganzhi}${ganzhi === '通用' && quzhi ? '·取值' + quzhi : ''}${incText}`;
+                summaryText = `映射[${macroName}→${ruleName}]·${judgeType}·${ganzhi}${ganzhi === '通用' && quzhi ? '·取值' + quzhi : ''}${flipText}${incText}`;
+            } else if(inheritEnabled && inheritMacroId){
+                const macro = getMacroById(inheritMacroId);
+                const macroName = macro ? macro.name : '未知';
+                const increment = checked.filter(c => {
+                    return !c.startsWith('年') && !c.startsWith('月') || c.startsWith('大运') || c.startsWith('流年') || c.startsWith('流月');
+                });
+                const incText = increment.length > 0 ? `·增量: ${increment.join(', ')}` : '';
+                summaryText = `继承[${macroName}]·${judgeType}·${ganzhi}${ganzhi === '通用' && quzhi ? '·取值' + quzhi : ''}${flipText}${incText}`;
             } else {
-                summaryText = `${judgeType}·${ganzhi}${ganzhi === '通用' && quzhi ? '·取值' + quzhi : ''}·${scope}: ${checked.join(', ')}`;
+                summaryText = `${judgeType}·${ganzhi}${ganzhi === '通用' && quzhi ? '·取值' + quzhi : ''}·${scope}${flipText}: ${checked.join(', ')}`;
             }
             summary.textContent = summaryText;
             summary.title = summaryText;

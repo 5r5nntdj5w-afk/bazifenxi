@@ -47,6 +47,23 @@ var SHEN_TO_GROUP = {
 var WU_LIST = ['木','火','土','金','水'];
 var FULL_SHEN = ['比肩','劫财','食神','伤官','偏财','正财','七杀','正官','偏印','正印'];
 
+// 原局位置翻转映射（年↔时、月↔日），大运/流年/流月不翻转
+var PB_FLIP_MAP = {
+  '年干':'时干','时干':'年干',
+  '月干':'日干','日干':'月干',
+  '年支':'时支','时支':'年支',
+  '月支':'日支','日支':'月支'
+};
+// 通用模式柱名翻转（年柱↔时柱、月柱↔日柱）
+var PB_FLIP_MAP_COL = {
+  '年柱':'时柱','时柱':'年柱',
+  '月柱':'日柱','日柱':'月柱'
+};
+
+// 映射闭环（相生顺序）
+var PB_SHEN_GROUP_CYCLE = ['比劫','食伤','财星','官杀','印星'];
+var PB_WU_CYCLE = ['金','水','木','火','土'];
+
 // ===================== 核心函数 =====================
 
 /** 精确十神（天干） */
@@ -400,7 +417,90 @@ function mergeArrangementWithIncrement(baseVal, incPositions) {
 }
 
 /**
- * 判断一组定位批量位置条件是否满足
+ * 根据映射规则对单个值进行闭环偏移转换
+ * @param {String} val - 原值（如 '比劫' 或 '金'）
+ * @param {String} mappingType - '十神组' 或 '五行'
+ * @param {Number} mappingOffset - 偏移步数（1-4）
+ * @returns {String} 映射后的值；不在闭环中则原样返回
+ */
+function applyMappingValue(val, mappingType, mappingOffset) {
+  if (!val || !mappingType || !mappingOffset) return val;
+  var cycle = (mappingType === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+  var idx = cycle.indexOf(val);
+  if (idx < 0) return val; // 不在闭环中，不映射
+  var offset = Number(mappingOffset) || 0;
+  var newIdx = ((idx + offset) % cycle.length + cycle.length) % cycle.length;
+  return cycle[newIdx];
+}
+
+/**
+ * 对一个定位批量排列编码值进行映射转换（仅转换位置条件的值，元信息保留）
+ * @param {String} val - 排列编码（以 '定位批量|' 开头）
+ * @param {String} mappingType - '十神组' 或 '五行'
+ * @param {Number} mappingOffset - 偏移步数
+ * @returns {String} 映射后的排列编码
+ */
+function applyMappingToArrangement(val, mappingType, mappingOffset) {
+  if (!val || val.indexOf('定位批量|') !== 0) return val;
+  var parts = val.split('|');
+  var result = [];
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    // 元信息段直接保留
+    if (p === '定位批量' ||
+        p.indexOf('type=') === 0 || p.indexOf('ganZhi=') === 0 ||
+        p.indexOf('scope=') === 0 || p.indexOf('取值=') === 0 ||
+        p.indexOf('inherit=') === 0 || p.indexOf('flip=') === 0 ||
+        p.indexOf('mapping=') === 0 || p.indexOf('mappingBase=') === 0 ||
+        p.indexOf('mappingType=') === 0 || p.indexOf('mappingOffset=') === 0) {
+      result.push(p);
+    } else if (p.indexOf('=') > 0) {
+      // 位置条件段：解析 op / posName / posVal，对 posVal 做映射
+      var op = '';
+      var posName = '';
+      var posVal = '';
+      if (p.indexOf('!=') > 0) {
+        op = '!=';
+        var tmp = p.replace('!=', '=').split('=');
+        posName = tmp[0]; posVal = tmp[1];
+      } else {
+        var kv = p.split('=');
+        posName = kv[0]; posVal = kv[1];
+      }
+      var mappedVal = applyMappingValue(posVal, mappingType, mappingOffset);
+      result.push(posName + op + '=' + mappedVal);
+    } else {
+      result.push(p);
+    }
+  }
+  return result.join('|');
+}
+
+/**
+ * 生成原局位置翻转后的 positions 副本（年↔时、月↔日），大运/流年/流月位置保持不变
+ * @param {Object} positions - 原位置条件 {年干: {op,val}, ...}
+ * @param {String} pbGanZhi - '天干'/'地支'/'通用'，决定用柱名还是干支名翻转表
+ * @returns {Object} 翻转后的 positions
+ */
+function flipPositions(positions, pbGanZhi) {
+  var flipMap = (pbGanZhi === '通用') ? PB_FLIP_MAP_COL : PB_FLIP_MAP;
+  var flipped = {};
+  for (var pos in positions) {
+    if (!Object.prototype.hasOwnProperty.call(positions, pos)) continue;
+    var flippedPos = flipMap[pos];
+    if (flippedPos) {
+      // 原局位置：翻转到对应位置
+      flipped[flippedPos] = positions[pos];
+    } else {
+      // 非原局位置（大运/流年/流月）不翻转，保留原样
+      flipped[pos] = positions[pos];
+    }
+  }
+  return flipped;
+}
+
+/**
+ * 判断一组定位批量位置条件是否满足（核心判断，不含翻转）
  * @param {Object} data - 匹配数据
  * @param {Object} positions - {年干: {op:'eq', val:'比劫'}, 年柱: {...}, ...}
  * @param {String} pbType - 五行/十神/十神组
@@ -464,6 +564,27 @@ function evaluateBatchPositions(data, positions, pbType, pbGanZhi, pbQuZhi) {
     if (!checkSinglePosition(data, path2, posCfg2, pbType, posName2, rg)) return false;
   }
   return true;
+}
+
+/**
+ * 判断定位批量位置条件（支持原局翻转：原 positions 或翻转后 positions 任一满足即 true）
+ * 仅翻转原局位置（年↔时、月↔日），大运/流年/流月位置保持不变
+ * @param {Boolean} pbFlip - 是否启用原局翻转
+ */
+function evaluateBatchPositionsFlip(data, positions, pbType, pbGanZhi, pbQuZhi, pbFlip) {
+  // 先判断原 positions
+  if (evaluateBatchPositions(data, positions, pbType, pbGanZhi, pbQuZhi)) return true;
+  if (!pbFlip) return false;
+  // 检查是否存在可翻转的原局位置，避免无意义重复判断
+  var flipMap = (pbGanZhi === '通用') ? PB_FLIP_MAP_COL : PB_FLIP_MAP;
+  var hasFlipPos = false;
+  for (var pos in positions) {
+    if (Object.prototype.hasOwnProperty.call(positions, pos) && flipMap[pos]) { hasFlipPos = true; break; }
+  }
+  if (!hasFlipPos) return false;
+  // 判断翻转后的 positions
+  var flipped = flipPositions(positions, pbGanZhi);
+  return evaluateBatchPositions(data, flipped, pbType, pbGanZhi, pbQuZhi);
 }
 
 /**
@@ -634,6 +755,8 @@ function evaluateLeafCondition(data, cond) {
     var parts = val.split('|');
     var pbType = '十神', pbGanZhi = '天干', pbScope = '原局', pbQuZhi = '';
     var pbInheritId = '';
+    var pbFlip = false; // 原局翻转（由编码 flip= 决定）
+    var pbMappingId = '', pbMappingBaseId = '', pbMappingType = '', pbMappingOffset = '';
     var pbPositions = {}; // {年干: {op:'eq', val:'食伤'}, ...}
     for (var pi = 0; pi < parts.length; pi++) {
       var p = parts[pi];
@@ -642,6 +765,11 @@ function evaluateLeafCondition(data, cond) {
       else if (p.indexOf('scope=') === 0) pbScope = p.replace('scope=','');
       else if (p.indexOf('取值=') === 0) pbQuZhi = p.replace('取值=','');
       else if (p.indexOf('inherit=') === 0) pbInheritId = p.replace('inherit=','');
+      else if (p.indexOf('flip=') === 0) pbFlip = p.replace('flip=','') === '1';
+      else if (p.indexOf('mapping=') === 0) pbMappingId = p.replace('mapping=','');
+      else if (p.indexOf('mappingBase=') === 0) pbMappingBaseId = p.replace('mappingBase=','');
+      else if (p.indexOf('mappingType=') === 0) pbMappingType = p.replace('mappingType=','');
+      else if (p.indexOf('mappingOffset=') === 0) pbMappingOffset = p.replace('mappingOffset=','');
       else if (p.indexOf('=') > 0) {
         var pop = 'eq';
         var pval = p;
@@ -652,8 +780,63 @@ function evaluateLeafCondition(data, cond) {
         }
       }
     }
-    // inherit 模式：递归展开被继承条件宏的排列 + 增量条件
-    if (pbInheritId) {
+    // 判断一个排列段是否为元信息（非位置条件）
+    var _isMetaSeg = function(s) {
+      return s === '定位批量' ||
+        s.indexOf('type=') === 0 || s.indexOf('ganZhi=') === 0 ||
+        s.indexOf('scope=') === 0 || s.indexOf('取值=') === 0 ||
+        s.indexOf('inherit=') === 0 || s.indexOf('flip=') === 0 ||
+        s.indexOf('mapping=') === 0 || s.indexOf('mappingBase=') === 0 ||
+        s.indexOf('mappingType=') === 0 || s.indexOf('mappingOffset=') === 0;
+    };
+    // 把一个排列编码解析为 positions 对象
+    var _parseArrangementToPositions = function(arrVal) {
+      var posObj = {};
+      if (!arrVal || arrVal.indexOf('定位批量|') !== 0) return posObj;
+      var aParts = arrVal.split('|');
+      for (var ai2 = 0; ai2 < aParts.length; ai2++) {
+        var ap = aParts[ai2];
+        if (_isMetaSeg(ap)) continue;
+        if (ap.indexOf('=') > 0) {
+          var aop = 'eq';
+          var aval = ap;
+          if (ap.indexOf('!=') > 0) { aop = 'ne'; aval = ap.replace('!=','='); }
+          var akv = aval.split('=');
+          if (akv.length === 2 && akv[1]) {
+            posObj[akv[0]] = { op: aop, val: akv[1] };
+          }
+        }
+      }
+      return posObj;
+    };
+
+    if (pbMappingBaseId) {
+      // mapping 模式：基于基准条件宏的排列 + 映射转换 + 增量条件
+      var mVisited = {};
+      var mArrangements = extractInheritArrangements(data, pbMappingBaseId, mVisited);
+      if (mArrangements.length === 0) {
+        res = false;
+      } else {
+        res = false;
+        for (var mai = 0; mai < mArrangements.length; mai++) {
+          // 对基准排列应用映射转换（仅转换位置条件的值）
+          var mappedArr = applyMappingToArrangement(mArrangements[mai], pbMappingType, pbMappingOffset);
+          // 解析映射后的排列得到 positions
+          var mappedPositions = _parseArrangementToPositions(mappedArr);
+          // 追加增量位置（覆盖同名位置）
+          for (var incNameM in pbPositions) {
+            mappedPositions[incNameM] = pbPositions[incNameM];
+          }
+          // 判断（含原局翻转）
+          if (evaluateBatchPositionsFlip(data, mappedPositions, pbType, pbGanZhi, pbQuZhi, pbFlip)) {
+            res = true;
+            break;
+          }
+        }
+      }
+      actual = val;
+    } else if (pbInheritId) {
+      // inherit 模式：递归展开被继承条件宏的排列 + 增量条件
       var visited = {};
       var arrangements = extractInheritArrangements(data, pbInheritId, visited);
       // 对每个排列追加增量位置条件，逐个判断，任一满足即 true
@@ -663,30 +846,13 @@ function evaluateLeafCondition(data, cond) {
         res = false;
         for (var ai = 0; ai < arrangements.length; ai++) {
           // 合并：继承排列的位置 + 增量位置
-          var mergedPositions = {};
-          var baseArr = arrangements[ai];
-          // 解析基础排列
-          if (baseArr && baseArr.indexOf('定位批量|') === 0) {
-            var baseParts = baseArr.split('|');
-            for (var bi = 0; bi < baseParts.length; bi++) {
-              var bp = baseParts[bi];
-              if (bp.indexOf('=') > 0 && bp.indexOf('type=') !== 0 && bp.indexOf('ganZhi=') !== 0 && bp.indexOf('scope=') !== 0 && bp.indexOf('取值=') !== 0 && bp.indexOf('inherit=') !== 0) {
-                var bop = 'eq';
-                var bval = bp;
-                if (bp.indexOf('!=') > 0) { bop = 'ne'; bval = bp.replace('!=','='); }
-                var bkv = bval.split('=');
-                if (bkv.length === 2 && bkv[1]) {
-                  mergedPositions[bkv[0]] = { op: bop, val: bkv[1] };
-                }
-              }
-            }
-          }
+          var mergedPositions = _parseArrangementToPositions(arrangements[ai]);
           // 追加增量位置（覆盖同名位置）
           for (var incName in pbPositions) {
             mergedPositions[incName] = pbPositions[incName];
           }
-          // 判断该排列
-          if (evaluateBatchPositions(data, mergedPositions, pbType, pbGanZhi, pbQuZhi)) {
+          // 判断（含原局翻转）
+          if (evaluateBatchPositionsFlip(data, mergedPositions, pbType, pbGanZhi, pbQuZhi, pbFlip)) {
             res = true;
             break;
           }
@@ -695,7 +861,7 @@ function evaluateLeafCondition(data, cond) {
       actual = val;
     } else {
       // 普通模式
-      res = evaluateBatchPositions(data, pbPositions, pbType, pbGanZhi, pbQuZhi);
+      res = evaluateBatchPositionsFlip(data, pbPositions, pbType, pbGanZhi, pbQuZhi, pbFlip);
       actual = val;
     }
   }
