@@ -858,7 +858,8 @@ function evaluateLeafCondition(data, cond, context) {
         s.indexOf('scope=') === 0 || s.indexOf('取值=') === 0 ||
         s.indexOf('inherit=') === 0 || s.indexOf('flip=') === 0 ||
         s.indexOf('mapping=') === 0 || s.indexOf('mappingBase=') === 0 ||
-        s.indexOf('mappingType=') === 0 || s.indexOf('mappingOffset=') === 0;
+        s.indexOf('mappingType=') === 0 || s.indexOf('mappingOffset=') === 0 ||
+        s.indexOf('customMap=') === 0;
     };
     // 把一个排列编码解析为 positions 对象
     var _parseArrangementToPositions = function(arrVal) {
