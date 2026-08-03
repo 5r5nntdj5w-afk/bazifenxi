@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1578,6 +1578,14 @@
                 <input type="number" id="rule-priority" class="p-1 border rounded text-xs w-16" value="0" min="0" title="数字越大越优先，子级填更高值（如10），父级默认0">
             </div>
 
+            <div class="mb-3 p-2 border border-emerald-200 rounded bg-emerald-50">
+                <label class="block text-sm font-medium text-emerald-700 mb-1">📊 默认取值维度 <span class="text-xs text-gray-500">（最高优先级：设置后覆盖所有批量定位字段的取值维度）</span></label>
+                <select id="rule-default-quzhi" class="w-full p-2 border rounded text-sm">
+                    <option value="">--不设置（使用字段或条件宏的设置）--</option>
+                    <option value="天干">天干</option>
+                    <option value="地支">地支</option>
+                </select>
+            </div>
             <div id="rule-conditions" class="mb-4">
                 <!-- 根条件组容器 -->
                 <div class="condition-group-root" data-group-id="root" data-group-logic="and"></div>
@@ -10090,6 +10098,10 @@
             if (permLevelSel) {
                 permLevelSel.value = '0';
             }
+
+            // 重置默认取值维度
+            const ruleDefQuZhiReset = document.getElementById('rule-default-quzhi');
+            if (ruleDefQuZhiReset) ruleDefQuZhiReset.value = '';
             
             // 重置根容器，只保留一个初始条件组
             const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
@@ -10246,9 +10258,11 @@
 
             // 构建条件组结构
             const rootLogic = rootContainer.dataset.groupLogic || 'and';
+            const ruleDefaultQuZhi = document.getElementById('rule-default-quzhi')?.value || '';
             const conditionGroup = {
                 logic: rootLogic,
-                children: result.children
+                children: result.children,
+                defaultQuZhi: ruleDefaultQuZhi
             };
 
             // 获取权限等级（管理员可见该选项，普通用户不可见时默认为0）
@@ -10958,6 +10972,12 @@
                     const priorityInput = document.getElementById('rule-priority');
                     if (groupKeyInput) groupKeyInput.value = rule.groupKey || rule.group_key || '';
                     if (priorityInput) priorityInput.value = rule.priority !== undefined ? rule.priority : 0;
+
+                    // 回填默认取值维度（从 conditions.defaultQuZhi 读取）
+                    const ruleDefQuZhiSelect = document.getElementById('rule-default-quzhi');
+                    if (ruleDefQuZhiSelect) {
+                        ruleDefQuZhiSelect.value = (rule.conditions && rule.conditions.defaultQuZhi) || '';
+                    }
                     
                     
                     // 清空现有条件组
@@ -20781,8 +20801,9 @@ function openMacroEditor(macroId) {
         nameInput.value = macro.name || '';
         descInput.value = macro.description || '';
         if (permSelect) permSelect.value = macro.permission !== undefined ? macro.permission : 0;
-        // 加载默认取值维度
-        if (defaultQuZhiSelect) defaultQuZhiSelect.value = macro.defaultQuZhi || '';
+        // 加载默认取值维度（优先从 conditions.defaultQuZhi 读取，兼容旧版顶层 defaultQuZhi）
+        var loadedDefaultQuZhi = (macro.conditions && macro.conditions.defaultQuZhi) || macro.defaultQuZhi || '';
+        if (defaultQuZhiSelect) defaultQuZhiSelect.value = loadedDefaultQuZhi;
         // 加载标签
         if (tagsContainer) {
             renderMacroEditorTags(macro.tags || []);
@@ -20856,10 +20877,10 @@ async function saveMacroFromEditor() {
         permission: permission,
         tags: tags,
         pinned: pinned,
-        defaultQuZhi: defaultQuZhi,
         conditions: {
             logic: groupLogic,
-            children: result.children || []
+            children: result.children || [],
+            defaultQuZhi: defaultQuZhi || ''
         }
     };
     

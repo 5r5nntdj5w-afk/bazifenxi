@@ -204,9 +204,12 @@ function evaluateConditionNode(data, condNode, context) {
       for (var mi = 0; mi < macros.length; mi++) {
         var m = macros[mi];
         if (m && m.conditions && (String(m.id) === macroId || String(m.cloudId) === macroId)) {
-          // 传递宏的默认取值维度到上下文
+          // 传递宏的默认取值维度到上下文（优先从 conditions.defaultQuZhi 读取，兼容旧版顶层 defaultQuZhi）
           var newContext = {};
-          if (m.defaultQuZhi) newContext.macroDefaultQuZhi = m.defaultQuZhi;
+          var mDefQz = (m.conditions && m.conditions.defaultQuZhi) || m.defaultQuZhi || '';
+          if (mDefQz) newContext.macroDefaultQuZhi = mDefQz;
+          // 保留断语规则的默认取值维度（最高优先级，递归时不丢失）
+          if (context.ruleDefaultQuZhi) newContext.ruleDefaultQuZhi = context.ruleDefaultQuZhi;
           return evaluateConditionNode(data, m.conditions, newContext);
         }
       }
@@ -218,7 +221,10 @@ function evaluateConditionNode(data, condNode, context) {
             var m = macros[mi];
             if (m && m.conditions && String(m.id) === String(resolvedCloudId)) {
               var newContext2 = {};
-              if (m.defaultQuZhi) newContext2.macroDefaultQuZhi = m.defaultQuZhi;
+              var mDefQz2 = (m.conditions && m.conditions.defaultQuZhi) || m.defaultQuZhi || '';
+              if (mDefQz2) newContext2.macroDefaultQuZhi = mDefQz2;
+              // 保留断语规则的默认取值维度（最高优先级，递归时不丢失）
+              if (context.ruleDefaultQuZhi) newContext2.ruleDefaultQuZhi = context.ruleDefaultQuZhi;
               return evaluateConditionNode(data, m.conditions, newContext2);
             }
           }
@@ -294,6 +300,37 @@ var PB_COLUMN_PATH_MAP = {
   '流年柱': ['liunian.t', 'liunian.d'],
   '流月柱': ['liuyue.t', 'liuyue.d']
 };
+
+/**
+ * 根据 ID 查找宏并返回其默认取值维度
+ * @param {Object} data - 匹配数据（含 macros）
+ * @param {String} macroId - 宏的 cloudId/id
+ * @returns {String} 默认取值维度（天干/地支），未设置则返回空字符串
+ */
+function getMacroDefaultQuZhi(data, macroId) {
+  if (!macroId) return '';
+  var macros = data && data.macros;
+  if (!macros || macros.length === 0) return '';
+  for (var mi = 0; mi < macros.length; mi++) {
+    var m = macros[mi];
+    if (m && (String(m.id) === String(macroId) || String(m.cloudId) === String(macroId))) {
+      return (m.conditions && m.conditions.defaultQuZhi) || m.defaultQuZhi || '';
+    }
+  }
+  // 尝试通过 idMapping 解析
+  if (data.idMapping && data.idMapping.macros) {
+    var resolvedCloudId = data.idMapping.macros[macroId];
+    if (resolvedCloudId) {
+      for (var mi2 = 0; mi2 < macros.length; mi2++) {
+        var m2 = macros[mi2];
+        if (m2 && (String(m2.id) === String(resolvedCloudId) || String(m2.cloudId) === String(resolvedCloudId))) {
+          return (m2.conditions && m2.conditions.defaultQuZhi) || m2.defaultQuZhi || '';
+        }
+      }
+    }
+  }
+  return '';
+}
 
 /**
  * 递归提取被继承条件宏中的所有"定位批量"排列
@@ -637,6 +674,7 @@ function evaluateLeafCondition(data, cond, context) {
   var actual = '';
   var res = false;
   var macroDefaultQuZhi = context.macroDefaultQuZhi || '';
+  var ruleDefaultQuZhi = context.ruleDefaultQuZhi || '';
 
   // ---- 自定义字段（通过 template_type 判断） ----
   if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) {
@@ -789,7 +827,10 @@ function evaluateLeafCondition(data, cond, context) {
         }
       }
     }
-    // 如果字段本身没有设置取值维度，使用宏的默认值
+    // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+    if (ruleDefaultQuZhi) {
+      pbQuZhi = ruleDefaultQuZhi;
+    }
     if (!pbQuZhi && macroDefaultQuZhi) {
       pbQuZhi = macroDefaultQuZhi;
     }
@@ -827,6 +868,8 @@ function evaluateLeafCondition(data, cond, context) {
       // mapping 模式：基于基准条件宏的排列 + 映射转换 + 增量条件
       var mVisited = {};
       var mArrangements = extractInheritArrangements(data, pbMappingBaseId, mVisited);
+      // 获取基准宏的默认取值维度
+      var mapMacroDefQz = getMacroDefaultQuZhi(data, pbMappingBaseId);
       if (mArrangements.length === 0) {
         res = false;
       } else {
@@ -840,10 +883,13 @@ function evaluateLeafCondition(data, cond, context) {
           for (var incNameM in pbPositions) {
             mappedPositions[incNameM] = pbPositions[incNameM];
           }
-          // 从基准排列中提取 ganZhi 和取值维度（当前字段未设置时使用基准排列的值）
+          // 从基准排列中提取 ganZhi 和取值维度
+          // 优先级：断语规则默认(最高) > 当前字段设置 > 当前宏默认(defaultQuZhi) > 基准宏默认 > 基准排列中的取值
           var mapGanZhi = pbGanZhi;
           var mapQuZhi = pbQuZhi;
+          if (ruleDefaultQuZhi) mapQuZhi = ruleDefaultQuZhi;
           if (!mapQuZhi && macroDefaultQuZhi) mapQuZhi = macroDefaultQuZhi;
+          if (!mapQuZhi && mapMacroDefQz) mapQuZhi = mapMacroDefQz;
           var mapParts = mArrangements[mai].split('|');
           for (var mpi = 0; mpi < mapParts.length; mpi++) {
             if (mapParts[mpi].indexOf('ganZhi=') === 0) {
@@ -865,6 +911,8 @@ function evaluateLeafCondition(data, cond, context) {
       // inherit 模式：递归展开被继承条件宏的排列 + 增量条件
       var visited = {};
       var arrangements = extractInheritArrangements(data, pbInheritId, visited);
+      // 获取被引用宏的默认取值维度
+      var inhMacroDefQz = getMacroDefaultQuZhi(data, pbInheritId);
       // 对每个排列追加增量位置条件，逐个判断，任一满足即 true
       if (arrangements.length === 0) {
         res = false;
@@ -877,16 +925,17 @@ function evaluateLeafCondition(data, cond, context) {
           for (var incName in pbPositions) {
             mergedPositions[incName] = pbPositions[incName];
           }
-          // 从被引用排列中提取 ganZhi 和取值维度（当前字段未设置时使用被引用排列的值）
+          // 从被引用排列中提取 ganZhi 和取值维度
+          // 优先级：断语规则默认(最高) > 当前字段设置 > 当前宏默认(defaultQuZhi) > 被引用宏默认 > 被引用排列中的取值
           var inhGanZhi = pbGanZhi;
           var inhQuZhi = pbQuZhi;
-          // 宏级默认取值维度也可作为后备
+          if (ruleDefaultQuZhi) inhQuZhi = ruleDefaultQuZhi;
           if (!inhQuZhi && macroDefaultQuZhi) inhQuZhi = macroDefaultQuZhi;
+          if (!inhQuZhi && inhMacroDefQz) inhQuZhi = inhMacroDefQz;
           var inhParts = arrangements[ai].split('|');
           for (var ipi = 0; ipi < inhParts.length; ipi++) {
             if (inhParts[ipi].indexOf('ganZhi=') === 0) {
               var arrGz = inhParts[ipi].replace('ganZhi=','');
-              // 如果当前字段是"通用"但被引用排列有具体的干支模式，使用被引用排列的模式
               if (inhGanZhi === '通用' && arrGz !== '通用') inhGanZhi = arrGz;
             } else if (inhParts[ipi].indexOf('取值=') === 0) {
               if (!inhQuZhi) inhQuZhi = inhParts[ipi].replace('取值=','');
@@ -1551,14 +1600,20 @@ function evaluateLeafCondition(data, cond, context) {
 function matchRule(data, conditions) {
   if (!conditions) return true;
 
+  // 构建初始上下文：传递断语规则的默认取值维度（最高优先级）
+  var initContext = {};
+  if (conditions.defaultQuZhi) {
+    initContext.ruleDefaultQuZhi = conditions.defaultQuZhi;
+  }
+
   if (conditions.logic && conditions.children && !Array.isArray(conditions)) {
-    return evaluateConditionNode(data, conditions);
+    return evaluateConditionNode(data, conditions, initContext);
   }
 
   if (Array.isArray(conditions)) {
     if (conditions.length === 0) return true;
     for (var i = 0; i < conditions.length; i++) {
-      if (!evaluateConditionNode(data, conditions[i])) return false;
+      if (!evaluateConditionNode(data, conditions[i], initContext)) return false;
     }
     return true;
   }
