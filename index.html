@@ -27979,9 +27979,11 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="flex gap-2 mb-3 flex-wrap">
                 <input type="text" id="mapping-rule-name" class="flex-1 p-2 border rounded text-sm min-w-[150px]" placeholder="映射规则名称（如：食伤制官杀）">
-                <select id="mapping-rule-type" class="p-2 border rounded text-sm">
-                    <option value="十神组">十神组</option>
-                    <option value="五行">五行</option>
+                <select id="mapping-rule-type" class="p-2 border rounded text-sm" onchange="toggleCustomMappingArea()">
+                    <option value="十神组">十神组偏移</option>
+                    <option value="五行">五行偏移</option>
+                    <option value="十神组自定义">十神组自定义</option>
+                    <option value="五行自定义">五行自定义</option>
                 </select>
                 <select id="mapping-rule-offset" class="p-2 border rounded text-sm">
                     <option value="1">偏移1</option>
@@ -27996,6 +27998,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="10">偏移10</option>
                 </select>
                 <button onclick="addMappingRule()" class="px-3 py-2 bg-emerald-600 text-white rounded text-sm shrink-0">➕ 添加</button>
+            </div>
+            <div id="custom-mapping-area" class="mb-3 hidden">
+                <div class="text-xs text-gray-500 mb-1">自定义映射关系（每行一个，格式：原值→目标值）：</div>
+                <textarea id="custom-mapping-text" class="w-full p-2 border rounded text-sm font-mono" rows="5" placeholder="比劫→印星&#10;食伤→比劫&#10;财星→食伤&#10;官杀→财星&#10;印星→官杀"></textarea>
             </div>
             <div class="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
                 <p class="font-medium text-yellow-700 mb-1">📝 自定义映射规则：</p>
@@ -28038,19 +28044,64 @@ function saveMappingRules(rules) {
 }
 
 // 根据映射规则对值进行转换
-function applyMappingValue(val, mappingType, mappingOffset) {
-    if (!val || !mappingType || !mappingOffset) return val;
-    var cycle = (mappingType === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
-    var idx = cycle.indexOf(val);
-    if (idx < 0) return val; // 不在闭环中，不映射
-    var newIdx = (idx + mappingOffset) % cycle.length;
-    return cycle[newIdx];
+function applyMappingValue(val, ruleOrType, offsetOrCustom) {
+    if (!val) return val;
+
+    // 兼容旧调用方式：applyMappingValue(val, mappingType, mappingOffset)
+    if (typeof ruleOrType === 'string' && typeof offsetOrCustom === 'number') {
+        var mappingType = ruleOrType;
+        var mappingOffset = offsetOrCustom;
+        var cycle = (mappingType === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+        var idx = cycle.indexOf(val);
+        if (idx < 0) return val;
+        var newIdx = (idx + mappingOffset) % cycle.length;
+        return cycle[newIdx];
+    }
+
+    // 新方式：传入规则对象
+    if (typeof ruleOrType === 'object' && ruleOrType !== null) {
+        var rule = ruleOrType;
+        var type = rule.type || '';
+
+        // 自定义映射
+        if (type.includes('自定义') && rule.customMap) {
+            return rule.customMap[val] || val;
+        }
+
+        // 偏移映射
+        var cycle2 = (type.includes('五行')) ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+        var idx2 = cycle2.indexOf(val);
+        if (idx2 < 0) return val;
+        var offset = rule.offset || 1;
+        var newIdx2 = (idx2 + offset) % cycle2.length;
+        return cycle2[newIdx2];
+    }
+
+    return val;
 }
+
+// 切换自定义映射区域显示
+window.toggleCustomMappingArea = function() {
+    var type = document.getElementById('mapping-rule-type').value;
+    var customArea = document.getElementById('custom-mapping-area');
+    var offsetSel = document.getElementById('mapping-rule-offset');
+
+    if (type.includes('自定义')) {
+        customArea.classList.remove('hidden');
+        offsetSel.classList.add('hidden');
+    } else {
+        customArea.classList.add('hidden');
+        offsetSel.classList.remove('hidden');
+    }
+};
 
 window.openMappingRuleManager = function() {
     document.getElementById('mapping-rule-modal').classList.remove('hidden');
     _editingRuleId = null;
     document.getElementById('mapping-rule-name').value = '';
+    document.getElementById('custom-mapping-text').value = '';
+    document.getElementById('mapping-rule-type').value = '十神组';
+    window.toggleCustomMappingArea();
     renderMappingRuleList();
 };
 
@@ -28062,27 +28113,54 @@ window.closeMappingRuleManager = function() {
 window.addMappingRule = function() {
     var name = document.getElementById('mapping-rule-name').value.trim();
     var type = document.getElementById('mapping-rule-type').value;
-    var offset = parseInt(document.getElementById('mapping-rule-offset').value);
     if (!name) { alert('请输入映射规则名称'); return; }
-    if (isNaN(offset)) { alert('请选择有效的偏移值'); return; }
-    
+
+    var ruleData = { id: _editingRuleId || 'map_' + Date.now(), name: name, type: type };
+
+    // 自定义映射
+    if (type.includes('自定义')) {
+        var customText = document.getElementById('custom-mapping-text').value.trim();
+        if (!customText) { alert('请输入自定义映射关系'); return; }
+
+        // 解析映射关系：比劫→印星,食伤→比劫
+        var customMap = {};
+        var lines = customText.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            var parts = line.split('→');
+            if (parts.length === 2) {
+                var key = parts[0].trim();
+                var val = parts[1].trim();
+                if (key && val) customMap[key] = val;
+            }
+        }
+        if (Object.keys(customMap).length === 0) { alert('未解析到有效的映射关系'); return; }
+        ruleData.customMap = customMap;
+        ruleData.customText = customText; // 保存原文便于编辑
+    } else {
+        // 偏移映射
+        var offset = parseInt(document.getElementById('mapping-rule-offset').value);
+        if (isNaN(offset)) { alert('请选择有效的偏移值'); return; }
+        ruleData.offset = offset;
+    }
+
     var rules = getMappingRules();
-    
+
     if (_editingRuleId) {
         // 编辑模式
         var idx = rules.findIndex(function(r) { return r.id === _editingRuleId; });
         if (idx >= 0) {
-            rules[idx].name = name;
-            rules[idx].type = type;
-            rules[idx].offset = offset;
+            rules[idx] = ruleData;
         }
         _editingRuleId = null;
         document.getElementById('mapping-rule-name').value = '';
+        document.getElementById('custom-mapping-text').value = '';
     } else {
         // 新增模式
-        rules.push({id: 'map_' + Date.now(), name: name, type: type, offset: offset});
+        rules.push(ruleData);
     }
-    
+
     saveMappingRules(rules);
     renderMappingRuleList();
     // 刷新批量编辑器中的映射规则下拉框
@@ -28094,16 +28172,27 @@ window.editMappingRule = function(id) {
     var rules = getMappingRules();
     var rule = rules.find(function(r) { return r.id === id; });
     if (!rule) return;
-    
+
     _editingRuleId = id;
     document.getElementById('mapping-rule-name').value = rule.name;
     document.getElementById('mapping-rule-type').value = rule.type;
-    document.getElementById('mapping-rule-offset').value = rule.offset;
-    
+
+    // 触发UI切换
+    window.toggleCustomMappingArea();
+
+    // 根据类型填充不同的值
+    if (rule.type.includes('自定义')) {
+        // 自定义映射：填充原文
+        document.getElementById('custom-mapping-text').value = rule.customText || '';
+    } else {
+        // 偏移映射：填充偏移值
+        document.getElementById('mapping-rule-offset').value = rule.offset || 1;
+    }
+
     // 更新按钮文字
     var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
     if (btn) btn.textContent = '💾 保存修改';
-    
+
     // 滚动到顶部
     document.getElementById('mapping-rule-name').scrollIntoView({behavior: 'smooth', block: 'center'});
 };
@@ -28111,6 +28200,9 @@ window.editMappingRule = function(id) {
 window.cancelEditMappingRule = function() {
     _editingRuleId = null;
     document.getElementById('mapping-rule-name').value = '';
+    document.getElementById('custom-mapping-text').value = '';
+    document.getElementById('mapping-rule-type').value = '十神组';
+    window.toggleCustomMappingArea();
     var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
     if (btn) btn.textContent = '➕ 添加';
     renderMappingRuleList();
@@ -28123,6 +28215,7 @@ window.deleteMappingRule = function(id) {
     if (_editingRuleId === id) {
         _editingRuleId = null;
         document.getElementById('mapping-rule-name').value = '';
+        document.getElementById('custom-mapping-text').value = '';
         var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
         if (btn) btn.textContent = '➕ 添加';
     }
@@ -28139,19 +28232,33 @@ function renderMappingRuleList() {
         return;
     }
     listEl.innerHTML = rules.map(function(r) {
-        var cycle = (r.type === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
-        var preview = cycle.map(function(v, i) {
-            return v + '→' + cycle[(i + r.offset) % cycle.length];
-        }).join('，');
         var isEditing = (_editingRuleId === r.id);
+        var preview = '';
+        var typeLabel = r.type;
+
+        // 自定义映射
+        if (r.type.includes('自定义') && r.customMap) {
+            preview = Object.keys(r.customMap).map(function(k) {
+                return k + '→' + r.customMap[k];
+            }).join('，');
+            typeLabel = r.type;
+        } else {
+            // 偏移映射
+            var cycle = (r.type.includes('五行')) ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+            preview = cycle.map(function(v, i) {
+                return v + '→' + cycle[(i + (r.offset || 1)) % cycle.length];
+            }).join('，');
+            typeLabel = r.type + '·偏移' + (r.offset || 1);
+        }
+
         return '<div class="flex items-center justify-between p-2 border rounded hover:bg-emerald-50 ' + (isEditing ? 'bg-yellow-50 border-yellow-300' : '') + '">' +
             '<div class="flex-1">' +
             '<span class="font-medium text-sm">' + escapeHtml(r.name) + '</span>' +
-            '<span class="text-xs text-gray-400 ml-2">[' + r.type + '·偏移' + r.offset + ']</span>' +
+            '<span class="text-xs text-gray-400 ml-2">[' + typeLabel + ']</span>' +
             '<div class="text-xs text-gray-500">' + preview + '</div>' +
             '</div>' +
             '<div class="flex gap-1 shrink-0">' +
-            (isEditing ? 
+            (isEditing ?
                 '<button onclick="cancelEditMappingRule()" class="px-2 py-1 bg-gray-400 text-white rounded text-xs">取消</button>' :
                 '<button onclick="editMappingRule(\'' + r.id + '\')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️ 编辑</button>'
             ) +
@@ -28159,7 +28266,7 @@ function renderMappingRuleList() {
             '</div>' +
             '</div>';
     }).join('');
-    
+
     // 如果不在编辑模式，确保按钮文字正确
     if (!_editingRuleId) {
         var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
@@ -28889,6 +28996,12 @@ function getMappingRuleById(id) {
             const mappingType = mappingRule ? mappingRule.type : '';
             const mappingOffset = mappingRule ? mappingRule.offset : '';
             const parts = [`定位批量`, `mappingBase=${mappingMacroId}`, `mapping=${mappingRuleId}`, `mappingType=${mappingType}`, `mappingOffset=${mappingOffset}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
+            // 自定义映射：序列化 customMap
+            if(mappingRule && mappingRule.customMap && mappingType.includes('自定义')){
+                try {
+                    parts.push(`customMap=${encodeURIComponent(JSON.stringify(mappingRule.customMap))}`);
+                } catch(e) {}
+            }
             if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
             parts.push(`flip=${flip ? '1' : '0'}`);
             // 增量位置（非原局）
