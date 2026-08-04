@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7752,8 +7752,8 @@
                     }
                 }
 
-                // 如果是映射模式，从基准宏获取配置并应用映射
-                if(biMappingBase && biMappingRule){
+                // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
+                if(biMappingBase){
                     const biMacros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
                     const baseMacro = biMacros.find(m => String(m.id) === String(biMappingBase) || String(m.cloudId) === String(biMappingBase));
                     if(baseMacro){
@@ -9494,11 +9494,11 @@
                             else if(p.startsWith('inc排除=')) { var s3 = p.replace('inc排除=',''); if(s3) biS2Exc2 = s3.split(','); }
                         });
                         var biIncTxt, biExcTxt;
-                        if(biS2MappingBase && biS2MappingRule){
+                        if(biS2MappingBase){
                             var biBaseMacro = getMacroById(biS2MappingBase);
                             var biBaseName = biBaseMacro ? biBaseMacro.name : '未知';
-                            var biRuleObj = (typeof getMappingRuleById === 'function') ? getMappingRuleById(biS2MappingRule) : null;
-                            var biRuleName = biRuleObj ? biRuleObj.name : '未知';
+                            var biRuleObj = (typeof getMappingRuleById === 'function' && biS2MappingRule) ? getMappingRuleById(biS2MappingRule) : null;
+                            var biRuleName = biRuleObj ? biRuleObj.name : '保持原值';
                             var biIncTxt = biS2Inc2.length > 0 ? '·增量✅' + biS2Inc2.join(',') : '';
                             var biExcTxt = biS2Exc2.length > 0 ? '·增量❌' + biS2Exc2.join(',') : '';
                             var biSummary = '映射[' + biBaseName + '→' + biRuleName + ']·' + biS2Type + '·' + biS2Scope + biIncTxt + biExcTxt;
@@ -28547,9 +28547,12 @@ function applyMappingValue(val, ruleOrType, offsetOrCustom, customMapParam) {
     }
 
     // 兼容旧调用方式：applyMappingValue(val, mappingType, mappingOffset)
-    if (typeof ruleOrType === 'string' && typeof offsetOrCustom === 'number') {
+    if (typeof ruleOrType === 'string') {
         var mappingType = ruleOrType;
-        var mappingOffset = offsetOrCustom;
+        var mappingOffset = parseInt(offsetOrCustom, 10);
+        if (isNaN(mappingOffset)) mappingOffset = 0;
+        // 未指定映射类型：恒等映射（保持原值）
+        if (!mappingType) return val;
         var cycle = (mappingType === '五行') ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
         var idx = cycle.indexOf(val);
         if (idx < 0) return val;
@@ -28561,6 +28564,9 @@ function applyMappingValue(val, ruleOrType, offsetOrCustom, customMapParam) {
     if (typeof ruleOrType === 'object' && ruleOrType !== null) {
         var rule = ruleOrType;
         var type = rule.type || '';
+
+        // 未指定映射类型：恒等映射（保持原值）
+        if (!type) return val;
 
         // 自定义映射
         if (type.includes('自定义') && rule.customMap) {
