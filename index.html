@@ -10847,11 +10847,11 @@
         if(sGz === '通用' && sQz) label += '·通用·取值' + sQz;
         else if(sGz) label += '·' + sGz;
         if(sFlip) label += '·' + sFlip;
-        if(sMappingBase && sMappingRule){
+        if(sMappingBase){
             const baseMacro = getMacroById(sMappingBase);
             const baseName = baseMacro ? baseMacro.name : '未知';
-            const rule = getMappingRuleById(sMappingRule);
-            const ruleName = rule ? rule.name : '未知';
+            const rule = sMappingRule ? getMappingRuleById(sMappingRule) : null;
+            const ruleName = rule ? rule.name : '保持原值';
             return label + ` [映射:${baseName}→${ruleName}]`;
         }
         if(sInherit){
@@ -10883,11 +10883,11 @@
             else if(p.startsWith('inc包含=')) { const s = p.replace('inc包含=',''); if(s) inc2 = s.split(','); }
             else if(p.startsWith('inc排除=')) { const s = p.replace('inc排除=',''); if(s) exc2 = s.split(','); }
         }
-        if(mappingBase && mappingRule){
+        if(mappingBase){
             const baseMacro = getMacroById(mappingBase);
             const baseName = baseMacro ? baseMacro.name : '未知';
-            const rule = getMappingRuleById(mappingRule);
-            const ruleName = rule ? rule.name : '未知';
+            const rule = mappingRule ? getMappingRuleById(mappingRule) : null;
+            const ruleName = rule ? rule.name : '保持原值';
             const incText = inc2.length > 0 ? `·增量+${inc2.join(',')}` : '';
             const excText = exc2.length > 0 ? `·增量-${exc2.join(',')}` : '';
             const gzText = ganZhi !== '通用' ? `·${ganZhi}` : '';
@@ -29512,11 +29512,12 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         _selectedInheritId = inheritId || '';
         _selectedMappingMacroId = mappingMacroId || '';
         let initialTab = 'none';
-        if(mappingId && mappingMacroId){
+        if(mappingMacroId){
+            // 映射引用模式：只要选择了基准条件宏即为映射模式（映射规则可选）
             initialTab = 'mapping';
             if(document.getElementById('pb-mapping-search'))
                 document.getElementById('pb-mapping-search').value = '';
-            document.getElementById('pb-mapping-rule').value = mappingId;
+            document.getElementById('pb-mapping-rule').value = mappingId || '';
         } else if(inheritId){
             initialTab = 'inherit';
             if(document.getElementById('pb-inherit-search'))
@@ -30170,8 +30171,9 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                 const ruleSel = document.getElementById('bi-mapping-rule');
                 if(ruleSel && existingMappingRule){
                     ruleSel.value = existingMappingRule;
-                    renderBiMappingPreview();
                 }
+                // 无论是否选择了映射规则，都渲染预览（未选规则时显示恒等映射）
+                renderBiMappingPreview();
                 renderBiIncrementCheckboxes(type);
             }, 10);
         } else {
