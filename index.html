@@ -28420,7 +28420,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="flex items-center gap-2 mb-2">
                         <label class="text-xs text-gray-700 shrink-0">映射规则:</label>
                         <select id="pb-mapping-rule" class="flex-1 p-1.5 border rounded text-sm">
-                            <option value="">--请选择映射规则--</option>
+                            <option value="">--可选（不选=保持原值）--</option>
                         </select>
                         <button onclick="openMappingRuleManager()" class="px-2 py-1 bg-emerald-600 text-white rounded text-xs shrink-0">⚙️ 管理映射规则</button>
                     </div>
@@ -28828,7 +28828,7 @@ function renderMappingRuleList() {
 
 function populateMappingRuleSelect(sel) {
     var rules = getMappingRules();
-    sel.innerHTML = '<option value="">--请选择映射规则--</option>' + rules.map(function(r) {
+    sel.innerHTML = '<option value="">--可选（不选=保持原值）--</option>' + rules.map(function(r) {
         var suffix = r.type.includes('自定义') ? '·自定义' : '·偏移' + r.offset;
         return '<option value="' + r.id + '">' + escapeHtml(r.name) + ' [' + r.type + suffix + ']</option>';
     }).join('');
@@ -29264,8 +29264,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
     function renderMappingPreview(){
         const previewEl = document.getElementById('pb-mapping-preview');
         const ruleId = document.getElementById('pb-mapping-rule')?.value || '';
-        if(!_selectedMappingMacroId || !ruleId){
-            previewEl.innerHTML = '<span class="text-gray-400">选择基准条件宏和映射规则后将显示映射预览</span>';
+        if(!_selectedMappingMacroId){
+            previewEl.innerHTML = '<span class="text-gray-400">选择基准条件宏后将显示映射预览</span>';
             return;
         }
         const macro = getMacroById(_selectedMappingMacroId);
@@ -29273,18 +29273,19 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             previewEl.innerHTML = '<span class="text-red-400">未找到基准条件宏</span>';
             return;
         }
-        const rule = getMappingRuleById(ruleId);
-        if(!rule){
-            previewEl.innerHTML = '<span class="text-red-400">未找到映射规则</span>';
-            return;
-        }
+        // 映射规则可选，未选时使用恒等映射（保持原值）
+        const rule = ruleId ? getMappingRuleById(ruleId) : null;
+        const ruleName = rule ? rule.name : '保持原值';
         const arrangements = extractBatchArrangements(macro);
         if(arrangements.length === 0){
             previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无定位批量排列</span>';
             return;
         }
+        const mappingType = rule ? rule.type : '';
+        const mappingOffset = rule ? rule.offset : '';
+        const customMap = rule ? rule.customMap : null;
         previewEl.innerHTML = arrangements.map((a, i) => {
-            const mapped = applyMappingToArrangement(a.val, rule.type, rule.offset, rule.customMap);
+            const mapped = applyMappingToArrangement(a.val, mappingType, mappingOffset, customMap);
             const origText = arrangementToText(a.val);
             const mappedText = arrangementToText(mapped);
             return `<div class="py-0.5"><span class="text-gray-400">原:</span> ${escapeHtml(origText)}</div>
@@ -29571,8 +29572,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         const inheritMacroId = _selectedInheritId;
         const mappingRuleId = document.getElementById('pb-mapping-rule').value;
         const mappingMacroId = _selectedMappingMacroId;
-        // 判断各模式是否启用
-        const mappingEnabled = (currentTab === 'mapping' && mappingMacroId && mappingRuleId);
+        // 判断各模式是否启用（映射引用模式下，映射规则可选，未选时使用恒等映射）
+        const mappingEnabled = (currentTab === 'mapping' && mappingMacroId);
         const inheritEnabled = (currentTab === 'inherit' && inheritMacroId);
         // 验证
         if(currentTab === 'inherit' && !inheritMacroId){
@@ -29581,10 +29582,6 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         }
         if(currentTab === 'mapping' && !mappingMacroId){
             alert('请选择基准条件宏');
-            return;
-        }
-        if(currentTab === 'mapping' && !mappingRuleId){
-            alert('请选择映射规则');
             return;
         }
         // 收集勾选的位置
@@ -29601,9 +29598,9 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         });
         // 构建编码
         let encoded;
-        if(mappingEnabled && mappingMacroId && mappingRuleId){
-            // 映射引用模式：基于基准宏 + 映射规则（编码自包含 type/offset，便于服务端匹配）
-            const mappingRule = getMappingRuleById(mappingRuleId);
+        if(mappingEnabled && mappingMacroId){
+            // 映射引用模式：基于基准宏 + 映射规则（映射规则可选，未选时使用恒等映射）
+            const mappingRule = mappingRuleId ? getMappingRuleById(mappingRuleId) : null;
             const mappingType = mappingRule ? mappingRule.type : '';
             const mappingOffset = mappingRule ? mappingRule.offset : '';
             const parts = [`定位批量`, `mappingBase=${mappingMacroId}`, `mapping=${mappingRuleId}`, `mappingType=${mappingType}`, `mappingOffset=${mappingOffset}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
@@ -29668,11 +29665,11 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         if(summary){
             let summaryText;
             const flipText = flip ? '·🔄翻转' : '';
-            if(mappingEnabled && mappingMacroId && mappingRuleId){
+            if(mappingEnabled && mappingMacroId){
                 const macro = getMacroById(mappingMacroId);
                 const macroName = macro ? macro.name : '未知';
-                const rule = getMappingRuleById(mappingRuleId);
-                const ruleName = rule ? rule.name : '未知';
+                const rule = mappingRuleId ? getMappingRuleById(mappingRuleId) : null;
+                const ruleName = rule ? rule.name : '保持原值';
                 const increment = checked.filter(c => {
                     return !c.startsWith('年') && !c.startsWith('月') || c.startsWith('大运') || c.startsWith('流年') || c.startsWith('流月');
                 });
@@ -30035,8 +30032,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         const previewEl = document.getElementById('bi-mapping-preview');
         if(!previewEl) return;
         const ruleId = document.getElementById('bi-mapping-rule')?.value || '';
-        if(!_biSelectedMappingMacroId || !ruleId){
-            previewEl.innerHTML = '<span class="text-gray-400">选择基准条件宏和映射规则后将显示映射预览</span>';
+        if(!_biSelectedMappingMacroId){
+            previewEl.innerHTML = '<span class="text-gray-400">选择基准条件宏后将显示映射预览</span>';
             return;
         }
         const macro = getMacroById(_biSelectedMappingMacroId);
@@ -30044,11 +30041,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             previewEl.innerHTML = '<span class="text-red-400">未找到基准条件宏</span>';
             return;
         }
-        const rule = getMappingRuleById(ruleId);
-        if(!rule){
-            previewEl.innerHTML = '<span class="text-red-400">未找到映射规则</span>';
-            return;
-        }
+        // 映射规则可选，未选时使用恒等映射（保持原值）
+        const rule = ruleId ? getMappingRuleById(ruleId) : null;
         const configs = extractBiConfigsFromMacro(macro);
         if(configs.length === 0){
             previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无批量包含配置</span>';
@@ -30058,7 +30052,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         let html = '';
         configs.forEach((cfg) => {
             if(fieldType && cfg.type !== fieldType) return;
-            const mapped = mapBiConfigValues(cfg, rule);
+            const mapped = rule ? mapBiConfigValues(cfg, rule) : cfg;
             const finalCfg = mergeBiWithIncrement(mapped);
             const origIncText = cfg.include.length > 0 ? `✅${cfg.include.join(',')}` : '（无）';
             const origExcText = cfg.exclude.length > 0 ? `❌${cfg.exclude.join(',')}` : '（无）';
@@ -30207,8 +30201,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             const mappingRuleId = document.getElementById('bi-mapping-rule').value;
             const mappingMacroId = _biSelectedMappingMacroId;
             if(!mappingMacroId){ alert('请选择基准条件宏'); return; }
-            if(!mappingRuleId){ alert('请选择映射规则'); return; }
-            const mappingRule = getMappingRuleById(mappingRuleId);
+            // 映射规则可选，未选时使用恒等映射（保持原值）
+            const mappingRule = mappingRuleId ? getMappingRuleById(mappingRuleId) : null;
             const mappingType = mappingRule ? mappingRule.type : '';
             const mappingOffset = mappingRule ? mappingRule.offset : '';
 
@@ -30230,7 +30224,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             if(summary){
                 const baseMacro = getMacroById(mappingMacroId);
                 const baseName = baseMacro ? baseMacro.name : '未知';
-                const ruleName = mappingRule ? mappingRule.name : '未知';
+                const ruleName = mappingRule ? mappingRule.name : '保持原值';
                 const incText = _biIncrementInclude.length > 0 ? `·增量✅${_biIncrementInclude.join(',')}` : '';
                 const excText = _biIncrementExclude.length > 0 ? `·增量❌${_biIncrementExclude.join(',')}` : '';
                 summary.textContent = `映射[${baseName}→${ruleName}]·${type}·${scope}${incText}${excText}`;
