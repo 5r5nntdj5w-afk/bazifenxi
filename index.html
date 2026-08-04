@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1587,7 +1587,10 @@
                 </select>
             </div>
             <div class="mb-3 p-2 border border-emerald-200 rounded bg-emerald-50">
-                <label class="block text-sm font-medium text-emerald-700 mb-1">🔁 默认映射规则 <span class="text-xs text-gray-500">（按类型整体覆盖：优先级 断语级 &gt; 条件宏级 &gt; 字段级；未使用的类型自动忽略）</span></label>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-sm font-medium text-emerald-700">🔁 默认映射规则 <span class="text-xs text-gray-500">（按类型整体覆盖：优先级 断语级 &gt; 条件宏级 &gt; 字段级；未使用的类型自动忽略）</span></label>
+                    <button onclick="openMappingRuleManager()" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded shrink-0">⚙️ 管理映射规则</button>
+                </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block text-xs text-gray-600 mb-0.5">十神组默认映射</label>
@@ -28092,7 +28095,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 </select>
             </div>
             <div class="mb-3 p-2 border border-blue-200 rounded bg-blue-50">
-                <label class="block text-sm font-medium text-blue-700 mb-1">🔁 默认映射规则 <span class="text-xs text-gray-500">（按类型整体覆盖：优先级 断语级 &gt; 条件宏级 &gt; 字段级；未使用的类型自动忽略）</span></label>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-sm font-medium text-blue-700">🔁 默认映射规则 <span class="text-xs text-gray-500">（按类型整体覆盖：优先级 断语级 &gt; 条件宏级 &gt; 字段级；未使用的类型自动忽略）</span></label>
+                    <button onclick="openMappingRuleManager()" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded shrink-0">⚙️ 管理映射规则</button>
+                </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block text-xs text-gray-600 mb-0.5">十神组默认映射</label>
@@ -28438,7 +28444,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- 映射规则管理弹窗 -->
-<div id="mapping-rule-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+<div id="mapping-rule-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] hidden">
     <div class="bg-white rounded-lg shadow-xl w-[600px] max-h-[80vh] flex flex-col mx-4">
         <div class="flex justify-between items-center p-4 border-b shrink-0">
             <h3 class="text-lg font-bold text-emerald-800">🔁 五行/十神映射规则管理</h3>
@@ -28640,6 +28646,13 @@ window.openMappingRuleManager = function() {
 window.closeMappingRuleManager = function() {
     document.getElementById('mapping-rule-modal').classList.add('hidden');
     _editingRuleId = null;
+    // 刷新所有映射规则下拉框选项（断语/条件宏/批量编辑器）
+    if (typeof refreshDefaultMappingSelects === 'function') refreshDefaultMappingSelects();
+    // 刷新批量编辑器中的映射规则下拉
+    var pbSel = document.getElementById('pb-mapping-rule');
+    if (pbSel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(pbSel);
+    var biSel = document.getElementById('bi-mapping-rule');
+    if (biSel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(biSel);
 };
 
 window.addMappingRule = function() {
@@ -28695,9 +28708,12 @@ window.addMappingRule = function() {
 
     saveMappingRules(rules);
     renderMappingRuleList();
-    // 刷新批量编辑器中的映射规则下拉框
+    // 刷新所有映射规则下拉框（断语/条件宏/批量编辑器）
+    if (typeof refreshDefaultMappingSelects === 'function') refreshDefaultMappingSelects();
     var sel = document.getElementById('pb-mapping-rule');
-    if (sel) populateMappingRuleSelect(sel);
+    if (sel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(sel);
+    var biSel = document.getElementById('bi-mapping-rule');
+    if (biSel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(biSel);
 };
 
 window.editMappingRule = function(id) {
@@ -28752,8 +28768,12 @@ window.deleteMappingRule = function(id) {
         if (btn) btn.textContent = '➕ 添加';
     }
     renderMappingRuleList();
+    // 刷新所有映射规则下拉框
+    if (typeof refreshDefaultMappingSelects === 'function') refreshDefaultMappingSelects();
     var sel = document.getElementById('pb-mapping-rule');
-    if (sel) populateMappingRuleSelect(sel);
+    if (sel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(sel);
+    var biSel = document.getElementById('bi-mapping-rule');
+    if (biSel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(biSel);
 };
 
 function renderMappingRuleList() {
