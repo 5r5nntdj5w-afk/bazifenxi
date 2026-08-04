@@ -1586,6 +1586,23 @@
                     <option value="地支">地支</option>
                 </select>
             </div>
+            <div class="mb-3 p-2 border border-emerald-200 rounded bg-emerald-50">
+                <label class="block text-sm font-medium text-emerald-700 mb-1">🔁 默认映射规则 <span class="text-xs text-gray-500">（按类型整体覆盖：优先级 断语级 &gt; 条件宏级 &gt; 字段级；未使用的类型自动忽略）</span></label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-0.5">十神组默认映射</label>
+                        <select id="rule-default-mapping-sz" class="w-full p-1.5 border rounded text-sm">
+                            <option value="">--不设置（使用字段或条件宏的设置）--</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-0.5">五行默认映射</label>
+                        <select id="rule-default-mapping-wx" class="w-full p-1.5 border rounded text-sm">
+                            <option value="">--不设置（使用字段或条件宏的设置）--</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             <div id="rule-conditions" class="mb-4">
                 <!-- 根条件组容器 -->
                 <div class="condition-group-root" data-group-id="root" data-group-logic="and"></div>
@@ -7447,13 +7464,18 @@
         const debugMatch = false; // 设置为 true 可以开启调试
         
         // 单条件求值函数
-        function evaluateSingleCondition(c) {
+        function evaluateSingleCondition(c, ctxMapping) {
+            // ctxMapping: { ruleDefaultMapping, macroDefaultMapping }
+            ctxMapping = ctxMapping || {};
             let actual = '', res = false;
 
             // 定位批量判断
             if(c.field.startsWith('定位批量-') && c.val && c.val.startsWith('定位批量|')){
                 const parts = c.val.split('|');
                 let pbType = '十神', pbGanZhi = '天干', pbScope = '原局', pbQuZhi = '', pbInheritId = '';
+                let pbFlip = false;
+                let pbMappingId = '', pbMappingBaseId = '', pbMappingType = '', pbMappingOffset = '';
+                let pbCustomMap = null;
                 const pbPositions = {};
                 parts.forEach(p => {
                     if(p.startsWith('type=')) pbType = p.replace('type=','');
@@ -7461,6 +7483,12 @@
                     else if(p.startsWith('scope=')) pbScope = p.replace('scope=','');
                     else if(p.startsWith('取值=')) pbQuZhi = p.replace('取值=','');
                     else if(p.startsWith('inherit=')) pbInheritId = p.replace('inherit=','');
+                    else if(p.startsWith('flip=')) pbFlip = p.replace('flip=','') === '1';
+                    else if(p.startsWith('mapping=')) pbMappingId = p.replace('mapping=','');
+                    else if(p.startsWith('mappingBase=')) pbMappingBaseId = p.replace('mappingBase=','');
+                    else if(p.startsWith('mappingType=')) pbMappingType = p.replace('mappingType=','');
+                    else if(p.startsWith('mappingOffset=')) pbMappingOffset = p.replace('mappingOffset=','');
+                    else if(p.startsWith('customMap=')) { try { pbCustomMap = JSON.parse(decodeURIComponent(p.replace('customMap=',''))); } catch(e){} }
                     else if(p.includes('=')){
                         let pop = 'eq';
                         let pval = p;
@@ -7469,6 +7497,23 @@
                         if(pos && val) pbPositions[pos] = { op: pop, val: val };
                     }
                 });
+                // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+                const ruleDefQz = ctxMapping.ruleDefaultQuZhi || '';
+                const macroDefQz = ctxMapping.macroDefaultQuZhi || '';
+                if(ruleDefQz) pbQuZhi = ruleDefQz;
+                if(!pbQuZhi && macroDefQz) pbQuZhi = macroDefQz;
+                // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
+                if(pbMappingBaseId || pbMappingId){
+                    let mappingRulesList = null;
+                    try { const raw = localStorage.getItem('pb_mapping_rules'); if(raw) mappingRulesList = JSON.parse(raw); } catch(e){}
+                    const resolvedMap = resolveDefaultMapping(pbType, ctxMapping.ruleDefaultMapping, ctxMapping.macroDefaultMapping, pbMappingId, mappingRulesList);
+                    if(resolvedMap){
+                        pbMappingType = resolvedMap.mappingType;
+                        pbMappingOffset = resolvedMap.mappingOffset;
+                        pbCustomMap = resolvedMap.customMap;
+                        pbMappingId = resolvedMap._ruleId;
+                    }
+                }
                 const pbPathMap = {
                     '年干':'nian.t','月干':'yue.t','日干':'ri.t','时干':'shi.t',
                     '大运干':'dayun.t','流年干':'liunian.t','流月干':'liuyue.t',
@@ -7536,6 +7581,13 @@
                     }
                     return true;
                 };
+                // 带原局翻转的位置评估（年↔时、月↔日，大运/流年/流月不翻转）
+                const evalPositionsWithFlip = (positions) => {
+                    if(evalPositions(positions)) return true;
+                    if(!pbFlip) return false;
+                    const flipped = flipPositions(positions, pbGanZhi);
+                    return evalPositions(flipped);
+                };
                 // inherit 模式
                 if(pbInheritId){
                     // 从条件宏列表中查找
@@ -7562,7 +7614,7 @@
                                     const subArrs = extractArrangements(subInherit);
                                     const incPos = {};
                                     sp.forEach(pp => {
-                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=')){
+                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=') && !pp.startsWith('flip=') && !pp.startsWith('mapping=') && !pp.startsWith('mappingBase=') && !pp.startsWith('mappingType=') && !pp.startsWith('mappingOffset=') && !pp.startsWith('customMap=')){
                                             let op2 = 'eq', v2 = pp;
                                             if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
                                             const [pn, pv] = v2.split('=');
@@ -7578,7 +7630,7 @@
                                 } else {
                                     const posObj = {};
                                     sp.forEach(pp => {
-                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=')){
+                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=') && !pp.startsWith('flip=') && !pp.startsWith('mapping=') && !pp.startsWith('mappingBase=') && !pp.startsWith('mappingType=') && !pp.startsWith('mappingOffset=') && !pp.startsWith('customMap=')){
                                             let op2 = 'eq', v2 = pp;
                                             if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
                                             const [pn, pv] = v2.split('=');
@@ -7601,11 +7653,63 @@
                         res = arrangements.some(basePositions => {
                             const merged = { ...basePositions };
                             Object.assign(merged, pbPositions);
-                            return evalPositions(merged);
+                            return evalPositionsWithFlip(merged);
+                        });
+                    }
+                } else if(pbMappingBaseId){
+                    // 映射模式：基于基准条件宏的排列 + 映射转换 + 增量条件
+                    const macros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
+                    const mVisited = {};
+                    const extractMappingArrangements = (macroId) => {
+                        if(!macroId || mVisited[macroId]) return [];
+                        mVisited[macroId] = true;
+                        const macro = macros.find(m => String(m.id) === String(macroId) || String(m.cloudId) === String(macroId));
+                        if(!macro || !macro.conditions) return [];
+                        const arrs = [];
+                        const walk = (node) => {
+                            if(!node) return;
+                            if(node.macroRef){
+                                const sub = extractMappingArrangements(node.macroRef);
+                                sub.forEach(v => arrs.push(v));
+                                return;
+                            }
+                            if(node.field && node.field.startsWith('定位批量-') && node.val && node.val.startsWith('定位批量|')){
+                                const sp = node.val.split('|');
+                                const posObj = {};
+                                sp.forEach(pp => {
+                                    if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=') && !pp.startsWith('flip=') && !pp.startsWith('mapping=') && !pp.startsWith('mappingBase=') && !pp.startsWith('mappingType=') && !pp.startsWith('mappingOffset=') && !pp.startsWith('customMap=')){
+                                        let op2 = 'eq', v2 = pp;
+                                        if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
+                                        const [pn, pv] = v2.split('=');
+                                        if(pn && pv) posObj[pn] = { op: op2, val: pv };
+                                    }
+                                });
+                                arrs.push(posObj);
+                                return;
+                            }
+                            if(node.logic && node.children) node.children.forEach(walk);
+                        };
+                        walk(macro.conditions);
+                        return arrs;
+                    };
+                    const mArrangements = extractMappingArrangements(pbMappingBaseId);
+                    if(mArrangements.length === 0){
+                        res = false;
+                    } else {
+                        res = mArrangements.some(basePositions => {
+                            // 对基准排列应用映射转换（仅转换位置条件的值）
+                            const mappedPositions = {};
+                            for(const pos in basePositions){
+                                const mappedVal = applyMappingValue(basePositions[pos].val, pbMappingType, pbMappingOffset, pbCustomMap);
+                                mappedPositions[pos] = { op: basePositions[pos].op, val: mappedVal };
+                            }
+                            // 追加增量位置（覆盖同名位置）
+                            const merged = { ...mappedPositions, ...pbPositions };
+                            return evalPositionsWithFlip(merged);
                         });
                     }
                 } else {
-                    res = evalPositions(pbPositions);
+                    res = evalPositionsWithFlip(pbPositions);
                 }
                 actual = c.val;
             }
@@ -7631,6 +7735,19 @@
                     else if(p.startsWith('inc排除=')) { const s = p.replace('inc排除=',''); if(s) biExc2 = s.split(','); }
                 });
 
+                // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
+                if(biMappingBase || biMappingRule){
+                    let biMappingRulesList = null;
+                    try { const raw = localStorage.getItem('pb_mapping_rules'); if(raw) biMappingRulesList = JSON.parse(raw); } catch(e){}
+                    const biResolvedMap = resolveDefaultMapping(biType, ctxMapping.ruleDefaultMapping, ctxMapping.macroDefaultMapping, biMappingRule, biMappingRulesList);
+                    if(biResolvedMap){
+                        biMappingType = biResolvedMap.mappingType;
+                        biMappingOffset = biResolvedMap.mappingOffset;
+                        biCustomMap = biResolvedMap.customMap;
+                        biMappingRule = biResolvedMap._ruleId;
+                    }
+                }
+
                 // 如果是映射模式，从基准宏获取配置并应用映射
                 if(biMappingBase && biMappingRule){
                     const biMacros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
@@ -7651,10 +7768,19 @@
                     biExc = biExc.concat(biExc2);
                 }
 
-                // 通用模式不判断（需要取值维度）
-                if(biGz === '通用'){
+                // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+                let biQuZhi = '';
+                const biRuleDefQz = ctxMapping.ruleDefaultQuZhi || '';
+                const biMacroDefQz = ctxMapping.macroDefaultQuZhi || '';
+                if(biRuleDefQz) biQuZhi = biRuleDefQz;
+                if(!biQuZhi && biGz !== '通用') biQuZhi = biGz;
+                if(!biQuZhi && biMacroDefQz) biQuZhi = biMacroDefQz;
+
+                // 通用模式且未指定取值维度 → 不判断
+                if(biGz === '通用' && !biQuZhi){
                     res = false;
                 } else {
+                    const actualBiGz = biQuZhi || biGz;
                     const biPillars = biSc === '原局' ? ['nian','yue','ri','shi']
                         : biSc === '原局+大运' ? ['nian','yue','ri','shi','dayun']
                         : biSc === '原局+大运+流年' ? ['nian','yue','ri','shi','dayun','liunian']
@@ -7664,12 +7790,12 @@
                     biPillars.forEach(k => {
                         const pillar = data[k];
                         if(!pillar) return;
-                        const node = (biGz === '地支') ? pillar.d : pillar.t;
+                        const node = (actualBiGz === '地支') ? pillar.d : pillar.t;
                         if(!node) return;
                         let v = '';
                         if(biType === '五行') v = WU_XING[node] || '';
-                        else if(biType === '十神') v = (biGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg);
-                        else if(biType === '十神组') { const s = (biGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg); v = SHEN_TO_GROUP[s] || ''; }
+                        else if(biType === '十神') v = (actualBiGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg);
+                        else if(biType === '十神组') { const s = (actualBiGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg); v = SHEN_TO_GROUP[s] || ''; }
                         if(v && !biActual.includes(v)) biActual.push(v);
                     });
                     // 包含：所有 include 值都必须出现
@@ -8440,27 +8566,28 @@
         }
         
         // 递归评估条件组（支持宏引用 + 嵌套 + 循环引用检测 + 排除逻辑）
-        function evaluateConditionGroup(group, depth = 0, visitedMacros = new Set()) {
+        function evaluateConditionGroup(group, depth = 0, visitedMacros = new Set(), ctxMapping) {
+            ctxMapping = ctxMapping || {};
             const logic = group.logic || 'and';
             if (depth > 20) return false;
-            
+
             if (logic === 'not_all') {
                 for (let i = 0; i < group.children.length; i++) {
                     const child = group.children[i];
-                    const childResult = evaluateChildNode(child, depth, visitedMacros);
+                    const childResult = evaluateChildNode(child, depth, visitedMacros, ctxMapping);
                     if (child.exclude) childResult = !childResult;
                     if (childResult) return false;
                 }
                 return true;
             }
-            
+
             let result = logic === 'and';
-            
+
             for (let i = 0; i < group.children.length; i++) {
                 const child = group.children[i];
-                const childResult = evaluateChildNode(child, depth, visitedMacros);
+                const childResult = evaluateChildNode(child, depth, visitedMacros, ctxMapping);
                 const finalResult = child.exclude ? !childResult : childResult;
-                
+
                 if (logic === 'and') {
                     result = result && finalResult;
                     if (!result) break;
@@ -8469,18 +8596,26 @@
                     if (result) break;
                 }
             }
-            
+
             return result;
         }
         
-        function evaluateChildNode(child, depth, visitedMacros) {
+        function evaluateChildNode(child, depth, visitedMacros, ctxMapping) {
+            ctxMapping = ctxMapping || {};
             if (child.macroRef) {
                 if (visitedMacros.has(child.macroRef)) return false;
                 const macro = (cache.conditionMacros || []).find(m => String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef));
                 if (macro && macro.conditions) {
                     const newVisited = new Set(visitedMacros);
                     newVisited.add(child.macroRef);
-                    return evaluateConditionGroup(macro.conditions, depth + 1, newVisited);
+                    // 传递宏级默认取值维度和映射（覆盖上层宏级，保留断语级）
+                    const newCtx = {
+                        ruleDefaultQuZhi: ctxMapping.ruleDefaultQuZhi || '',
+                        macroDefaultQuZhi: (macro.conditions && macro.conditions.defaultQuZhi) || '',
+                        ruleDefaultMapping: ctxMapping.ruleDefaultMapping || null,
+                        macroDefaultMapping: (macro.conditions && macro.conditions.defaultMapping) || null
+                    };
+                    return evaluateConditionGroup(macro.conditions, depth + 1, newVisited, newCtx);
                 }
                 return false;
             }
@@ -8490,15 +8625,15 @@
                 if (refRule && refRule.conditions) {
                     const newVisited = new Set(visitedMacros);
                     newVisited.add('rule:' + child.ruleRef);
-                    return evaluateConditionGroup(refRule.conditions, depth + 1, newVisited);
+                    return evaluateConditionGroup(refRule.conditions, depth + 1, newVisited, ctxMapping);
                 }
                 return false;
             }
             if (child.children) {
-                return evaluateConditionGroup(child, depth + 1, new Set(visitedMacros));
+                return evaluateConditionGroup(child, depth + 1, new Set(visitedMacros), ctxMapping);
             }
             if (child.field) {
-                const { res } = evaluateSingleCondition(child);
+                const { res } = evaluateSingleCondition(child, ctxMapping);
                 return res;
             }
             return false;
@@ -8506,26 +8641,31 @@
         
         cache.rules.forEach((rule) => {
             let isMatch = false;
-            
+
+            // 构建断语级上下文：传递默认取值维度和默认映射规则（最高优先级）
+            const ruleCtx = {};
+            if (rule.conditions && rule.conditions.defaultQuZhi) ruleCtx.ruleDefaultQuZhi = rule.conditions.defaultQuZhi;
+            if (rule.conditions && rule.conditions.defaultMapping) ruleCtx.ruleDefaultMapping = rule.conditions.defaultMapping;
+
             if (rule.conditions && rule.conditions.children && rule.conditions.children.length > 0) {
                 // 使用新格式：嵌套条件组（conditions 是一个带有 children 的对象）
-                isMatch = evaluateConditionGroup(rule.conditions);
+                isMatch = evaluateConditionGroup(rule.conditions, 0, new Set(), ruleCtx);
             } else if (rule.conditionGroups && rule.conditionGroups.length > 0) {
                 // 使用旧格式：嵌套条件组（conditionGroups 是数组）
                 isMatch = evaluateConditionGroup({
                     logic: 'and',
                     children: rule.conditionGroups
-                });
+                }, 0, new Set(), ruleCtx);
             } else if (rule.conditions && rule.conditions.length > 0) {
                 // 使用旧格式：线性条件（向后兼容）
                 isMatch = true;
                 let logic = 'and';
-                
+
                 for (let i=0; i<rule.conditions.length; i++) {
                     const c = rule.conditions[i];
                     if(i>0) logic = c.logic || 'and';
-                    const { res } = evaluateSingleCondition(c);
-                    
+                    const { res } = evaluateSingleCondition(c, ruleCtx);
+
                     if (logic === 'and') {
                         isMatch = isMatch && res;
                         if (!isMatch) break;
@@ -10272,6 +10412,15 @@
             // 重置默认取值维度
             const ruleDefQuZhiReset = document.getElementById('rule-default-quzhi');
             if (ruleDefQuZhiReset) ruleDefQuZhiReset.value = '';
+
+            // 重置默认映射规则
+            const ruleMapSzReset = document.getElementById('rule-default-mapping-sz');
+            const ruleMapWxReset = document.getElementById('rule-default-mapping-wx');
+            if (ruleMapSzReset) ruleMapSzReset.value = '';
+            if (ruleMapWxReset) ruleMapWxReset.value = '';
+            // 填充默认映射规则下拉选项
+            populateDefaultMappingSelect(ruleMapSzReset, '十神组');
+            populateDefaultMappingSelect(ruleMapWxReset, '五行');
             
             // 重置根容器，只保留一个初始条件组
             const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
@@ -10429,10 +10578,16 @@
             // 构建条件组结构
             const rootLogic = rootContainer.dataset.groupLogic || 'and';
             const ruleDefaultQuZhi = document.getElementById('rule-default-quzhi')?.value || '';
+            const ruleMapSz = document.getElementById('rule-default-mapping-sz')?.value || '';
+            const ruleMapWx = document.getElementById('rule-default-mapping-wx')?.value || '';
+            const ruleDefaultMapping = {};
+            if (ruleMapSz) ruleDefaultMapping['十神组'] = ruleMapSz;
+            if (ruleMapWx) ruleDefaultMapping['五行'] = ruleMapWx;
             const conditionGroup = {
                 logic: rootLogic,
                 children: result.children,
-                defaultQuZhi: ruleDefaultQuZhi
+                defaultQuZhi: ruleDefaultQuZhi,
+                defaultMapping: ruleDefaultMapping
             };
 
             // 获取权限等级（管理员可见该选项，普通用户不可见时默认为0）
@@ -10745,7 +10900,29 @@
     function conditionsToText(conditions, depth = 0) {
         if (!conditions) return '';
         let text = '';
-        
+
+        // 在根层级显示默认取值维度和默认映射规则摘要
+        if (depth === 0 && !Array.isArray(conditions)) {
+            const parts = [];
+            // 默认取值维度
+            if (conditions.defaultQuZhi) {
+                parts.push('默认取值:' + conditions.defaultQuZhi);
+            }
+            // 默认映射规则
+            if (conditions.defaultMapping) {
+                const dmParts = [];
+                for (const ft in conditions.defaultMapping) {
+                    if (conditions.defaultMapping[ft]) {
+                        const rule = getMappingRuleById(conditions.defaultMapping[ft]);
+                        const ruleName = rule ? rule.name : 'ID:' + conditions.defaultMapping[ft];
+                        dmParts.push(ft + '=' + ruleName);
+                    }
+                }
+                if (dmParts.length > 0) parts.push('默认映射[' + dmParts.join(', ') + ']');
+            }
+            if (parts.length > 0) text += '⚙ ' + parts.join(' · ') + ' | ';
+        }
+
         // 如果是数组（旧格式），直接遍历
         if (Array.isArray(conditions)) {
             conditions.forEach((c, i) => {
@@ -11230,6 +11407,15 @@
                     if (ruleDefQuZhiSelect) {
                         ruleDefQuZhiSelect.value = (rule.conditions && rule.conditions.defaultQuZhi) || '';
                     }
+
+                    // 回填默认映射规则
+                    populateDefaultMappingSelect(document.getElementById('rule-default-mapping-sz'), '十神组');
+                    populateDefaultMappingSelect(document.getElementById('rule-default-mapping-wx'), '五行');
+                    const defMapping = (rule.conditions && rule.conditions.defaultMapping) || {};
+                    const ruleMapSzSel = document.getElementById('rule-default-mapping-sz');
+                    const ruleMapWxSel = document.getElementById('rule-default-mapping-wx');
+                    if (ruleMapSzSel) ruleMapSzSel.value = defMapping['十神组'] || '';
+                    if (ruleMapWxSel) ruleMapWxSel.value = defMapping['五行'] || '';
                     
                     
                     // 清空现有条件组
@@ -20922,6 +21108,25 @@ const OP_TEXT_MAP = { 'eq':'等于','ne':'不等于','ge':'大于等于','gt':'�
 function macroConditionsToText(conditions, depth = 0) {
     if (!conditions || !conditions.children) return '无条件';
     let text = '';
+    // 在根层级显示默认取值维度和默认映射规则摘要
+    if (depth === 0) {
+        const parts = [];
+        if (conditions.defaultQuZhi) {
+            parts.push('默认取值:' + conditions.defaultQuZhi);
+        }
+        if (conditions.defaultMapping) {
+            const dmParts = [];
+            for (const ft in conditions.defaultMapping) {
+                if (conditions.defaultMapping[ft]) {
+                    const rule = getMappingRuleById(conditions.defaultMapping[ft]);
+                    const ruleName = rule ? rule.name : 'ID:' + conditions.defaultMapping[ft];
+                    dmParts.push(ft + '=' + ruleName);
+                }
+            }
+            if (dmParts.length > 0) parts.push('默认映射[' + dmParts.join(', ') + ']');
+        }
+        if (parts.length > 0) text += '⚙ ' + parts.join(' · ') + ' | ';
+    }
     const logic = conditions.logic === 'and' ? ' 并且 ' : ' 或者 ';
     conditions.children.forEach((c, i) => {
         if (i > 0 && text) text += logic;
@@ -21059,6 +21264,12 @@ function openMacroEditor(macroId) {
         // 加载默认取值维度（优先从 conditions.defaultQuZhi 读取，兼容旧版顶层 defaultQuZhi）
         var loadedDefaultQuZhi = (macro.conditions && macro.conditions.defaultQuZhi) || macro.defaultQuZhi || '';
         if (defaultQuZhiSelect) defaultQuZhiSelect.value = loadedDefaultQuZhi;
+        // 加载默认映射规则
+        const macroDefMapping = (macro.conditions && macro.conditions.defaultMapping) || {};
+        const macroMapSzSel = document.getElementById('macro-default-mapping-sz');
+        const macroMapWxSel = document.getElementById('macro-default-mapping-wx');
+        if (macroMapSzSel) macroMapSzSel.value = macroDefMapping['十神组'] || '';
+        if (macroMapWxSel) macroMapWxSel.value = macroDefMapping['五行'] || '';
         // 加载标签
         if (tagsContainer) {
             renderMacroEditorTags(macro.tags || []);
@@ -21077,6 +21288,10 @@ function openMacroEditor(macroId) {
         descInput.value = '';
         if (permSelect) permSelect.value = '0';
         if (defaultQuZhiSelect) defaultQuZhiSelect.value = '';
+        const newMacroMapSzSel = document.getElementById('macro-default-mapping-sz');
+        const newMacroMapWxSel = document.getElementById('macro-default-mapping-wx');
+        if (newMacroMapSzSel) newMacroMapSzSel.value = '';
+        if (newMacroMapWxSel) newMacroMapWxSel.value = '';
         if (tagsContainer) tagsContainer.innerHTML = '';
         if (tagsInput) tagsInput.value = '';
         if (pinnedCheckbox) pinnedCheckbox.checked = false;
@@ -21090,6 +21305,20 @@ function openMacroEditor(macroId) {
     const permRow = document.getElementById('macro-editor-permission-row');
     if (permRow) {
         permRow.style.display = (currentUser && isAdmin(currentUser.email)) ? '' : 'none';
+    }
+    // 刷新默认映射规则下拉选项（条件宏编辑器）
+    populateDefaultMappingSelect(document.getElementById('macro-default-mapping-sz'), '十神组');
+    populateDefaultMappingSelect(document.getElementById('macro-default-mapping-wx'), '五行');
+    // 如果有已加载值，重新回填（populate可能清空了）
+    if (macroId) {
+        const macro = getMacroById(macroId);
+        if (macro) {
+            const dm = (macro.conditions && macro.conditions.defaultMapping) || {};
+            const szSel = document.getElementById('macro-default-mapping-sz');
+            const wxSel = document.getElementById('macro-default-mapping-wx');
+            if (szSel) szSel.value = dm['十神组'] || '';
+            if (wxSel) wxSel.value = dm['五行'] || '';
+        }
     }
 }
 
@@ -21108,6 +21337,11 @@ async function saveMacroFromEditor() {
     const tags = getMacroEditorTags();
     const pinned = document.getElementById('macro-pinned-checkbox')?.checked || false;
     const defaultQuZhi = document.getElementById('macro-default-quzhi')?.value || '';
+    const macroMapSz = document.getElementById('macro-default-mapping-sz')?.value || '';
+    const macroMapWx = document.getElementById('macro-default-mapping-wx')?.value || '';
+    const macroDefaultMapping = {};
+    if (macroMapSz) macroDefaultMapping['十神组'] = macroMapSz;
+    if (macroMapWx) macroDefaultMapping['五行'] = macroMapWx;
     const root = document.getElementById('macro-condition-root');
     
     if (!name) {
@@ -21135,7 +21369,8 @@ async function saveMacroFromEditor() {
         conditions: {
             logic: groupLogic,
             children: result.children || [],
-            defaultQuZhi: defaultQuZhi || ''
+            defaultQuZhi: defaultQuZhi || '',
+            defaultMapping: macroDefaultMapping
         }
     };
     
@@ -27855,6 +28090,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="地支">地支</option>
                 </select>
             </div>
+            <div class="mb-3 p-2 border border-blue-200 rounded bg-blue-50">
+                <label class="block text-sm font-medium text-blue-700 mb-1">🔁 默认映射规则 <span class="text-xs text-gray-500">（按类型整体覆盖：优先级 断语级 &gt; 条件宏级 &gt; 字段级；未使用的类型自动忽略）</span></label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-0.5">十神组默认映射</label>
+                        <select id="macro-default-mapping-sz" class="w-full p-1.5 border rounded text-sm">
+                            <option value="">--不设置（使用字段设置）--</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-0.5">五行默认映射</label>
+                        <select id="macro-default-mapping-wx" class="w-full p-1.5 border rounded text-sm">
+                            <option value="">--不设置（使用字段设置）--</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             <div class="mb-3">
                 <label class="block text-sm font-medium text-gray-700 mb-2">条件定义</label>
                 <div class="border-2 border-indigo-300 rounded-lg p-3 bg-indigo-50">
@@ -28315,6 +28567,45 @@ function applyMappingValue(val, ruleOrType, offsetOrCustom, customMapParam) {
     return val;
 }
 
+// 解析最终生效的映射规则（层级覆盖：断语级 > 条件宏级 > 字段级）
+function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMapping, fieldMappingId, mappingRules) {
+    if (!fieldType) return null;
+    var ruleId = '';
+    if (ruleDefaultMapping && ruleDefaultMapping[fieldType]) ruleId = ruleDefaultMapping[fieldType];
+    if (!ruleId && macroDefaultMapping && macroDefaultMapping[fieldType]) ruleId = macroDefaultMapping[fieldType];
+    if (!ruleId && fieldMappingId) ruleId = fieldMappingId;
+    if (!ruleId) return null;
+    var rule = null;
+    if (mappingRules && mappingRules.length) {
+        for (var i = 0; i < mappingRules.length; i++) {
+            if (String(mappingRules[i].id) === String(ruleId)) { rule = mappingRules[i]; break; }
+        }
+    }
+    if (!rule) return null;
+    return {
+        mappingType: rule.type || '',
+        mappingOffset: rule.offset || '',
+        customMap: rule.customMap || null,
+        _ruleId: ruleId
+    };
+}
+
+// 生成原局位置翻转后的 positions 副本（年↔时、月↔日），大运/流年/流月位置保持不变
+function flipPositions(positions, pbGanZhi) {
+    var flipMap = (pbGanZhi === '通用') ? PB_FLIP_MAP_COL : PB_FLIP_MAP;
+    var flipped = {};
+    for (var pos in positions) {
+        if (!Object.prototype.hasOwnProperty.call(positions, pos)) continue;
+        var flippedPos = flipMap[pos];
+        if (flippedPos) {
+            flipped[flippedPos] = positions[pos];
+        } else {
+            flipped[pos] = positions[pos];
+        }
+    }
+    return flipped;
+}
+
 // 切换自定义映射区域显示
 window.toggleCustomMappingArea = function() {
     var type = document.getElementById('mapping-rule-type').value;
@@ -28532,6 +28823,53 @@ function getMappingRuleById(id) {
         }
     }
     return _mappingRuleIdMap[id] || null;
+}
+
+// 填充默认映射规则下拉（按类型筛选：十神组/五行）
+function populateDefaultMappingSelect(sel, filterType) {
+    if (!sel) return;
+    var rules = getMappingRules();
+    var currentVal = sel.value;
+    var html = '<option value="">--不设置（使用上层或字段设置）--</option>';
+    for (var i = 0; i < rules.length; i++) {
+        var r = rules[i];
+        var typeMatch = false;
+        if (filterType === '十神组') typeMatch = (r.type.indexOf('十神组') === 0);
+        else if (filterType === '五行') typeMatch = (r.type.indexOf('五行') === 0);
+        if (!typeMatch) continue;
+        var suffix = r.type.indexOf('自定义') >= 0 ? '·自定义' : '·偏移' + r.offset;
+        html += '<option value="' + r.id + '">' + escapeHtml(r.name) + ' [' + r.type + suffix + ']</option>';
+    }
+    sel.innerHTML = html;
+    if (currentVal) sel.value = currentVal;
+}
+
+// 批量填充断语/条件宏编辑器中的默认映射下拉
+function refreshDefaultMappingSelects() {
+    populateDefaultMappingSelect(document.getElementById('rule-default-mapping-sz'), '十神组');
+    populateDefaultMappingSelect(document.getElementById('rule-default-mapping-wx'), '五行');
+    populateDefaultMappingSelect(document.getElementById('macro-default-mapping-sz'), '十神组');
+    populateDefaultMappingSelect(document.getElementById('macro-default-mapping-wx'), '五行');
+}
+
+// 按字段类型解析最终生效的映射规则（层级：ruleDefault > macroDefault > fieldMapping）
+// 返回 { mappingType, mappingOffset, customMap } 或 null
+function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMappingId) {
+    // fieldType 形如 "十神组" / "五行"
+    var ruleId = '';
+    if (ruleDefault && ruleDefault[fieldType]) ruleId = ruleDefault[fieldType];
+    if (!ruleId && macroDefault && macroDefault[fieldType]) ruleId = macroDefault[fieldType];
+    if (!ruleId && fieldMappingId) ruleId = fieldMappingId;
+    if (!ruleId) return null;
+    var rule = getMappingRuleById(ruleId);
+    if (!rule) return null;
+    return {
+        mappingType: rule.type || '',
+        mappingOffset: rule.offset || '',
+        customMap: rule.customMap || null,
+        _ruleId: ruleId,
+        _ruleName: rule.name || ''
+    };
 }
 </script>
 
