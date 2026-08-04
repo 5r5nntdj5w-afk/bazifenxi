@@ -531,20 +531,38 @@ function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMappin
 }
 
 // ---- 批量包含映射辅助函数 ----
+// 按 id / cloudId 查找宏，查找失败时通过 idMapping 将本地ID解析为 cloudId 后二次查找
+// （映射引用/继承引用保存的可能是本地ID，云端需要 idMapping 才能定位基准宏）
+function findMacroById(data, macroId) {
+  if (!macroId) return null;
+  var macros = (data && data.macros) || [];
+  for (var mi = 0; mi < macros.length; mi++) {
+    if (macros[mi] && (String(macros[mi].id) === String(macroId) || String(macros[mi].cloudId) === String(macroId))) {
+      return macros[mi];
+    }
+  }
+  if (data && data.idMapping && data.idMapping.macros) {
+    var resolvedCloudId = data.idMapping.macros[macroId];
+    if (resolvedCloudId) {
+      for (var mi2 = 0; mi2 < macros.length; mi2++) {
+        if (macros[mi2] && (String(macros[mi2].id) === String(resolvedCloudId) || String(macros[mi2].cloudId) === String(resolvedCloudId))) {
+          return macros[mi2];
+        }
+      }
+    }
+  }
+  return null;
+}
+
 // 从条件宏中提取批量包含配置
-function _extractBiConfigsFromMacro(macro, filterType, macros) {
+function _extractBiConfigsFromMacro(macro, filterType, macros, data) {
   var configs = [];
   if (!macro || !macro.conditions) return configs;
   function walk(node) {
     if (!node) return;
     if (node.macroRef) {
-      var macroList = macros || [];
-      for (var mi = 0; mi < macroList.length; mi++) {
-        if (macroList[mi].id === node.macroRef || macroList[mi].cloudId === node.macroRef) {
-          walk(macroList[mi].conditions);
-          break;
-        }
-      }
+      var subMacro = findMacroById(data || { macros: macros || [] }, node.macroRef);
+      if (subMacro && subMacro.conditions) walk(subMacro.conditions);
       return;
     }
     if (node.field && node.field.indexOf('批量包含-') === 0 && node.val && node.val.indexOf('批量包含|') === 0) {
@@ -1169,13 +1187,10 @@ function evaluateLeafCondition(data, cond, context) {
 
     // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
     if (biMappingBase) {
-      var biMacros = data && data.macros ? data.macros : [];
-      var biBaseMacro = null;
-      for (var mi = 0; mi < biMacros.length; mi++) {
-        if (String(biMacros[mi].id) === biMappingBase || String(biMacros[mi].cloudId) === biMappingBase) { biBaseMacro = biMacros[mi]; break; }
-      }
+      // 通过 idMapping 解析基准宏（mappingBase 可能是本地ID，云端需解析为 cloudId）
+      var biBaseMacro = findMacroById(data, biMappingBase);
       if (biBaseMacro) {
-        var biConfigs = _extractBiConfigsFromMacro(biBaseMacro, biType, biMacros);
+        var biConfigs = _extractBiConfigsFromMacro(biBaseMacro, biType, data && data.macros ? data.macros : [], data);
         for (var bci = 0; bci < biConfigs.length; bci++) {
           var bc = biConfigs[bci];
           if (bc.ganZhi === biGanZhi && bc.scope === biScope) {
