@@ -508,9 +508,10 @@ function applyMappingValue(val, mappingType, mappingOffset, customMap) {
 function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMapping, fieldMappingId, mappingRules) {
   if (!fieldType) return null;
   var ruleId = '';
-  if (ruleDefaultMapping && ruleDefaultMapping[fieldType]) ruleId = ruleDefaultMapping[fieldType];
-  if (!ruleId && macroDefaultMapping && macroDefaultMapping[fieldType]) ruleId = macroDefaultMapping[fieldType];
-  if (!ruleId && fieldMappingId) ruleId = fieldMappingId;
+  var source = ''; // 'rule'=断语级 defaultMapping / 'macro'=条件宏级 defaultMapping / 'field'=字段自身映射
+  if (ruleDefaultMapping && ruleDefaultMapping[fieldType]) { ruleId = ruleDefaultMapping[fieldType]; source = 'rule'; }
+  if (!ruleId && macroDefaultMapping && macroDefaultMapping[fieldType]) { ruleId = macroDefaultMapping[fieldType]; source = 'macro'; }
+  if (!ruleId && fieldMappingId) { ruleId = fieldMappingId; source = 'field'; }
   if (!ruleId) return null;
   // 查找规则详情
   var rule = null;
@@ -524,7 +525,8 @@ function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMappin
     mappingType: rule.type || '',
     mappingOffset: rule.offset || '',
     customMap: rule.customMap || null,
-    _ruleId: ruleId
+    _ruleId: ruleId,
+    _source: source
   };
 }
 
@@ -973,7 +975,9 @@ function evaluateLeafCondition(data, cond, context) {
         } catch(e) {}
       }
       var resolvedMap = resolveDefaultMapping(fieldTypeForMapping, ruleDefaultMapping, macroDefaultMapping, pbMappingId, mappingRulesList);
-      if (resolvedMap) {
+      // 仅断语级/条件宏级 defaultMapping 生效时用规则当前值覆盖字段快照；
+      // 字段级回退（_source='field'）时保留字段编码中的快照值，避免规则修改后旧配置行为突变
+      if (resolvedMap && resolvedMap._source !== 'field') {
         pbMappingType = resolvedMap.mappingType;
         pbMappingOffset = resolvedMap.mappingOffset;
         pbCustomMap = resolvedMap.customMap;
@@ -1153,7 +1157,9 @@ function evaluateLeafCondition(data, cond, context) {
         } catch(e) {}
       }
       var biResolvedMap = resolveDefaultMapping(biFieldTypeForMapping, ruleDefaultMapping, macroDefaultMapping, biMappingRule, biMappingRulesList);
-      if (biResolvedMap) {
+      // 仅断语级/条件宏级 defaultMapping 生效时用规则当前值覆盖字段快照；
+      // 字段级回退（_source='field'）时保留字段编码中的快照值，避免规则修改后旧配置行为突变
+      if (biResolvedMap && biResolvedMap._source !== 'field') {
         biMappingType = biResolvedMap.mappingType;
         biMappingOffset = biResolvedMap.mappingOffset;
         biCustomMap = biResolvedMap.customMap;

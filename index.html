@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7512,7 +7512,8 @@
                 if(pbMappingBaseId || pbMappingId){
                     let mappingRulesList = (typeof getMappingRules === 'function') ? getMappingRules() : null;
                     const resolvedMap = resolveDefaultMapping(pbType, ctxMapping.ruleDefaultMapping, ctxMapping.macroDefaultMapping, pbMappingId, mappingRulesList);
-                    if(resolvedMap){
+                    // 仅断语级/条件宏级 defaultMapping 生效时用规则当前值覆盖字段快照；字段级回退时保留快照
+                    if(resolvedMap && resolvedMap._source !== 'field'){
                         pbMappingType = resolvedMap.mappingType;
                         pbMappingOffset = resolvedMap.mappingOffset;
                         pbCustomMap = resolvedMap.customMap;
@@ -7744,7 +7745,8 @@
                 if(biMappingBase || biMappingRule){
                     let biMappingRulesList = (typeof getMappingRules === 'function') ? getMappingRules() : null;
                     const biResolvedMap = resolveDefaultMapping(biType, ctxMapping.ruleDefaultMapping, ctxMapping.macroDefaultMapping, biMappingRule, biMappingRulesList);
-                    if(biResolvedMap){
+                    // 仅断语级/条件宏级 defaultMapping 生效时用规则当前值覆盖字段快照；字段级回退时保留快照
+                    if(biResolvedMap && biResolvedMap._source !== 'field'){
                         biMappingType = biResolvedMap.mappingType;
                         biMappingOffset = biResolvedMap.mappingOffset;
                         biCustomMap = biResolvedMap.customMap;
@@ -28589,9 +28591,10 @@ function applyMappingValue(val, ruleOrType, offsetOrCustom, customMapParam) {
 function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMapping, fieldMappingId, mappingRules) {
     if (!fieldType) return null;
     var ruleId = '';
-    if (ruleDefaultMapping && ruleDefaultMapping[fieldType]) ruleId = ruleDefaultMapping[fieldType];
-    if (!ruleId && macroDefaultMapping && macroDefaultMapping[fieldType]) ruleId = macroDefaultMapping[fieldType];
-    if (!ruleId && fieldMappingId) ruleId = fieldMappingId;
+    var source = ''; // 'rule'=断语级 defaultMapping / 'macro'=条件宏级 defaultMapping / 'field'=字段自身映射
+    if (ruleDefaultMapping && ruleDefaultMapping[fieldType]) { ruleId = ruleDefaultMapping[fieldType]; source = 'rule'; }
+    if (!ruleId && macroDefaultMapping && macroDefaultMapping[fieldType]) { ruleId = macroDefaultMapping[fieldType]; source = 'macro'; }
+    if (!ruleId && fieldMappingId) { ruleId = fieldMappingId; source = 'field'; }
     if (!ruleId) return null;
     var rule = null;
     if (mappingRules && mappingRules.length) {
@@ -28604,7 +28607,8 @@ function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMappin
         mappingType: rule.type || '',
         mappingOffset: rule.offset || '',
         customMap: rule.customMap || null,
-        _ruleId: ruleId
+        _ruleId: ruleId,
+        _source: source
     };
 }
 
