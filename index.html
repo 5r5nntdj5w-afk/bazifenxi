@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7755,6 +7755,7 @@
                 }
 
                 // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
+                let biBaseFound = false;
                 if(biMappingBase){
                     const biMacros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
                     let baseMacro = biMacros.find(m => String(m.id) === String(biMappingBase) || String(m.cloudId) === String(biMappingBase));
@@ -7767,6 +7768,7 @@
                         }
                     }
                     if(baseMacro){
+                        biBaseFound = true;
                         const configs = extractBiConfigsFromMacro(baseMacro, biType);
                         configs.forEach(cfg => {
                             if(cfg.ganZhi === biGz && cfg.scope === biSc){
@@ -7791,7 +7793,11 @@
                 if(!biQuZhi && biMacroDefQz) biQuZhi = biMacroDefQz;
 
                 // 通用模式且未指定取值维度 → 不判断
-                if(biGz === '通用' && !biQuZhi){
+                // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed），
+                // 避免 include=[] 导致 every() 恒真而误匹配所有断语（与定位批量 inherit/mapping 行为一致）
+                if(biMappingBase && !biBaseFound){
+                    res = false;
+                } else if(biGz === '通用' && !biQuZhi){
                     res = false;
                 } else {
                     const actualBiGz = biQuZhi || biGz;
@@ -8618,7 +8624,8 @@
             ctxMapping = ctxMapping || {};
             if (child.macroRef) {
                 if (visitedMacros.has(child.macroRef)) return false;
-                const macro = (cache.conditionMacros || []).find(m => String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef));
+                // 【修复】与后端 findMacroById 保持一致：优先按 id/cloudId 匹配，失败时经 idMapping 二次解析
+                const macro = getMacroById(child.macroRef);
                 if (macro && macro.conditions) {
                     const newVisited = new Set(visitedMacros);
                     newVisited.add(child.macroRef);
@@ -13274,7 +13281,9 @@
             const macro = getMacroById(refId);
             let targetCloudId = null;
             if (macro) {
-                targetCloudId = (idMapping && idMapping.macros && idMapping.macros[macro.id]) || macro.cloudId;
+                // 优先使用宏自身记录的 cloudId（权威值），
+                // idMapping 可能存在过期值（如重复记录导致映射被覆盖），仅在宏无 cloudId 时回退
+                targetCloudId = macro.cloudId || (idMapping && idMapping.macros && idMapping.macros[macro.id]) || null;
             } else if (idMapping && idMapping.macros && idMapping.macros[refId]) {
                 targetCloudId = idMapping.macros[refId];
             }
@@ -13623,9 +13632,21 @@
         if (error) throw error;
     }
 
+    // 递归对对象键排序，使键序不同的同一内容比较结果一致
+    // （否则 conditions 键顺序不同会导致 saveMacro/syncMacros 查重失败 → 云端同名同内容重复记录）
+    function sortObjectKeys(value) {
+        if (Array.isArray(value)) return value.map(sortObjectKeys);
+        if (value !== null && typeof value === 'object') {
+            const sorted = {};
+            Object.keys(value).sort().forEach(function(k) { sorted[k] = sortObjectKeys(value[k]); });
+            return sorted;
+        }
+        return value;
+    }
+
     function normalizeConditionsForCompare(conditions) {
         if (!conditions) return '';
-        try { return JSON.stringify(conditions); } catch(e) { return ''; }
+        try { return JSON.stringify(sortObjectKeys(conditions)); } catch(e) { return ''; }
     }
 
     async function syncMacros() {
@@ -13683,13 +13704,28 @@
                     }
                     if (matchIdx === -1) {
                         // 优先级3：name + createdBy 匹配（允许conditions略有差异，用云端覆盖）
+                        // 【修复】兼容离线创建：本地宏 createdBy 为空（未登录时创建）但云端记录属于当前用户，
+                        // 也视为同一宏合并，避免本地出现重复条目并被再次上传造成云端重复
                         matchIdx = cache.conditionMacros.findIndex(r =>
-                            r.name === cm.name && r.createdBy === cm.user_id && !r.cloudId
+                            r.name === cm.name && !r.cloudId &&
+                            (r.createdBy === cm.user_id || (cm.user_id === currentUser.id && !r.createdBy))
                         );
                     }
 
                     if (matchIdx !== -1) {
                         const existing = cache.conditionMacros[matchIdx];
+                        // 【修复】防止 cloudId 在云端重复记录间翻覆：
+                        // 若该云端记录与本地宏的 cloudId 不同，且本地所指向的原云端记录仍存在，
+                        // 说明当前记录是云端重复项 → 跳过合并，保持本地映射指向原记录
+                        // （否则会导致引用 mappingBase 悬空、清理冗余误删被引用记录）
+                        if (existing.cloudId && String(existing.cloudId) !== String(cm.id)) {
+                            const origStillExists = (data || []).some(d => String(d.id) === String(existing.cloudId));
+                            if (origStillExists) {
+                                console.warn(`云端记录 #${cm.id}「${cm.name}」与本地宏 ${existing.id}(cloudId=${existing.cloudId}) 重复，跳过合并`);
+                                continue;
+                            }
+                            // 原云端记录已被删除 → 由当前记录接管映射
+                        }
                         setCloudId(idMapping, 'macros', existing.id, cm.id);
                         cache.conditionMacros[matchIdx] = Object.assign({}, macroData, { id: existing.id });
                     } else {
@@ -13701,42 +13737,74 @@
 
             // --- 阶段2：把本地没有cloudId的宏（用户在多端新增且未上传）推送到云端 ---
             for (const localMacro of cache.conditionMacros) {
-                if (!localMacro.cloudId && localMacro.createdBy === getCurrentUserId() && !localMacro._skipUpload) {
+                // 【修复】兼容离线创建：未登录时创建的宏 createdBy 为空，
+                // 登录后也应视为本人宏上传，避免其一直停留在本地导致云端/服务端无法解析引用
+                const isOwnMacro = localMacro.createdBy === getCurrentUserId() || (!localMacro.createdBy && !!currentUser);
+                if (localMacro.cloudId || !isOwnMacro || localMacro._skipUpload) continue;
+                try {
+                    // 【修复】插入前查重：云端已有 user_id+name+conditions 完全一致的记录时，
+                    // 直接合并 cloudId 而不再次 insert（防止云端同名同内容重复记录）
+                    let matchedCloudId = null;
                     try {
-                        const res = await supabaseClient
+                        const condStr = normalizeConditionsForCompare(localMacro.conditions || { logic: 'and', children: [] });
+                        const { data: existCloudData, error: existErr } = await supabaseClient
                             .from('condition_macros')
-                            .insert({
-                                name: localMacro.name,
-                                description: localMacro.description || '',
-                                permission: localMacro.permission !== undefined ? localMacro.permission : 0,
-                                conditions: localMacro.conditions || { logic: 'and', children: [] },
-                                tags: localMacro.tags || [],
-                                pinned: localMacro.pinned || false,
-                                usage_count: localMacro.usageCount || 0,
-                                user_id: localMacro.createdBy || currentUser.id,
-                                create_time: localMacro.createTime || new Date().toISOString(),
-                                update_time: localMacro.updateTime || new Date().toISOString(),
-                                last_used_at: localMacro.lastUsedAt || null,
-                                owner_id: localMacro.createdBy || currentUser.id
-                            })
-                            .select('*');
-                        if (res && res.data && res.data[0]) {
-                            const cm = res.data[0];
-                            localMacro.cloudId = cm.id;
-                            setCloudId(idMapping, 'macros', localMacro.id, cm.id);
-                            localMacro.permission = cm.permission !== undefined ? cm.permission : localMacro.permission;
-                            localMacro.updateTime = cm.update_time || localMacro.updateTime;
+                            .select('id, conditions')
+                            .eq('user_id', currentUser.id)
+                            .eq('name', localMacro.name || '');
+                        if (!existErr && existCloudData && existCloudData.length > 0) {
+                            for (const ec of existCloudData) {
+                                if (normalizeConditionsForCompare(ec.conditions) === condStr) {
+                                    matchedCloudId = ec.id;
+                                    break;
+                                }
+                            }
                         }
-                    } catch (upErr) {
-                        console.warn('上传本地宏到云端失败:', localMacro.name, upErr);
+                    } catch (qErr) {
+                        console.warn('上传前查重失败:', localMacro.name, qErr);
                     }
+                    if (matchedCloudId) {
+                        localMacro.cloudId = matchedCloudId;
+                        localMacro.createdBy = currentUser.id;
+                        setCloudId(idMapping, 'macros', localMacro.id, matchedCloudId);
+                        continue;
+                    }
+                    const res = await supabaseClient
+                        .from('condition_macros')
+                        .insert({
+                            name: localMacro.name,
+                            description: localMacro.description || '',
+                            permission: localMacro.permission !== undefined ? localMacro.permission : 0,
+                            conditions: localMacro.conditions || { logic: 'and', children: [] },
+                            tags: localMacro.tags || [],
+                            pinned: localMacro.pinned || false,
+                            usage_count: localMacro.usageCount || 0,
+                            user_id: localMacro.createdBy || currentUser.id,
+                            create_time: localMacro.createTime || new Date().toISOString(),
+                            update_time: localMacro.updateTime || new Date().toISOString(),
+                            last_used_at: localMacro.lastUsedAt || null,
+                            owner_id: localMacro.createdBy || currentUser.id
+                        })
+                        .select('*');
+                    if (res && res.data && res.data[0]) {
+                        const cm = res.data[0];
+                        localMacro.cloudId = cm.id;
+                        localMacro.createdBy = currentUser.id; // 补全离线宏的创建者
+                        setCloudId(idMapping, 'macros', localMacro.id, cm.id);
+                        localMacro.permission = cm.permission !== undefined ? cm.permission : localMacro.permission;
+                        localMacro.updateTime = cm.update_time || localMacro.updateTime;
+                    }
+                } catch (upErr) {
+                    console.warn('上传本地宏到云端失败:', localMacro.name, upErr);
                 }
             }
 
             // --- 阶段3：去重清理（同一createdBy下同名或同conditions保留有cloudId的） ---
             const seenKeys = {};
             const duplicates = [];
-            for (let i = cache.conditionMacros.length - 1; i >= 0; i--) {
+            // 【修复】从前向后遍历：保证 priority 相同时保留"先见到的"（数组靠前的原宏/已映射宏），
+            // 删除后插入的重复项，避免把本地原宏误删（原宏的 cloudId 可能正被其他宏引用）
+            for (let i = 0; i < cache.conditionMacros.length; i++) {
                 const m = cache.conditionMacros[i];
                 const condStr = normalizeConditionsForCompare(m.conditions);
                 const nameKey = `${m.createdBy}::name::${m.name}`;
@@ -13749,12 +13817,14 @@
                             const otherIdx = seenKeys[k];
                             const other = cache.conditionMacros[otherIdx];
                             const otherPrio = (other.cloudId ? 4 : 0) + (other.usageCount > 0 ? 2 : 0) + (other.updateTime ? 1 : 0);
-                            if (priority < otherPrio) {
-                                duplicates.push(i);
-                                break;
-                            } else {
+                            if (priority > otherPrio) {
+                                // 当前项优先级更高 → 删除先前保留项，改保留当前项
                                 if (!duplicates.includes(otherIdx)) duplicates.push(otherIdx);
                                 seenKeys[k] = i;
+                            } else {
+                                // 当前项优先级相同或更低 → 删除当前项（保留先见到的原宏）
+                                duplicates.push(i);
+                                break;
                             }
                         } else {
                             seenKeys[k] = i;
@@ -13771,14 +13841,31 @@
             // 【修复】迁移本地宏 conditions 中的映射/继承引用ID（mappingBase/inherit 本地ID → cloudId）
             // 使云端/本地数据自包含，新环境（无idMapping）也能正确解析引用
             let macroRefMigrated = false;
+            const migratedMacros = [];
             for (const lm of cache.conditionMacros) {
                 if (lm.conditions) {
                     const nr = normalizeRuleConditions(lm.conditions);
-                    if (nr.changed) macroRefMigrated = true;
+                    if (nr.changed) {
+                        macroRefMigrated = true;
+                        migratedMacros.push(lm);
+                    }
                 }
             }
             if (macroRefMigrated) {
                 console.log('条件宏映射/继承引用迁移完成：mappingBase/inherit 已更新为 cloudId');
+                // 【修复】将迁移后的 conditions 回写云端，使云端数据自包含：
+                // 否则云端仍存本地ID引用（如 mappingBase=macro_xxx），
+                // 新环境/服务端无 idMapping 时无法解析基准宏 → 断语无法匹配
+                for (const lm of migratedMacros) {
+                    const targetCloudId = lm.cloudId || getCloudId(idMapping, 'macros', lm.id);
+                    if (targetCloudId) {
+                        try {
+                            await updateSupabaseMacro(targetCloudId, lm);
+                        } catch (we) {
+                            console.warn('回写云端宏条件失败:', lm.name, we);
+                        }
+                    }
+                }
             }
 
             // 保存ID映射和本地缓存
@@ -21449,41 +21536,10 @@ async function saveMacroFromEditor() {
     console.log('【宏引用调试】saveMacroFromEditor 保存宏引用:', 
         JSON.parse(JSON.stringify(macroData.conditions.children.filter(c => c.macroRef))));
     
-    // 先保存到本地
+    // 先保存到本地（saveMacro 内部已包含自动同步到 Supabase 的逻辑：
+    // 新建时查重→addSupabaseMacro 并写入 idMapping/cloudId，编辑时 updateSupabaseMacro）
+    // 此处不再重复同步，避免新建宏在云端产生两条同名同内容记录
     const saved = saveMacro(macroData);
-    
-    // 同步到 Supabase（若已登录）
-    if (currentUser && supabaseClient) {
-        try {
-            if (editingMacroId) {
-                // 编辑：查找cloudId，更新云端
-                const idMapping = getIdMapping();
-                const cloudId = getCloudId(idMapping, 'macros', editingMacroId);
-                if (cloudId) {
-                    await updateSupabaseMacro(cloudId, macroData);
-                }
-            } else {
-                // 新建：插入云端，建立映射
-                const newMacro = await addSupabaseMacro(macroData);
-                if (newMacro && newMacro.id) {
-                    const idMapping = getIdMapping();
-                    if (!idMapping.macros) idMapping.macros = {};
-                    idMapping.macros[saved.id] = newMacro.id;
-                    saveIdMapping(idMapping);
-                    // 更新本地数据的cloudId
-                    const macros = getAllMacros();
-                    const idx = macros.findIndex(m => m.id === saved.id);
-                    if (idx !== -1) {
-                        macros[idx].cloudId = newMacro.id;
-                        cache.conditionMacros = macros;
-                        localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('同步宏到云端失败（本地已保存）:', e);
-        }
-    }
     
     closeMacroEditor();
     renderMacroList();
@@ -23965,10 +24021,9 @@ async function saveMacro(macroData) {
                                 break;
                             }
                         }
-                        // conditions不完全匹配时，退化为按name匹配（用户改名后新建的场景）
-                        if (!matchedCloudId && existCloudData.length === 1) {
-                            matchedCloudId = existCloudData[0].id;
-                        }
+                        // 【修复】移除"conditions不完全匹配时退化为按name合并"的破坏性回退：
+                        // 该回退会用新宏的 conditions 覆盖云端同名不同内容宏的条件，
+                        // 导致被覆盖宏的引用关系丢失、匹配行为突变；仅在 conditions 完全一致时合并
                     }
                 } catch (qErr) {
                     console.warn('查询云端同名宏失败:', qErr);
@@ -23989,6 +24044,15 @@ async function saveMacro(macroData) {
                         if (!idMapping.macros) idMapping.macros = {};
                         idMapping.macros[macroData.id] = cloudMacro.id;
                         saveIdMapping(idMapping);
+                        // 【修复】同步写入本地宏的 cloudId 字段，
+                        // 避免 syncMacros 阶段2 因本地宏无 cloudId 而重复上传产生云端重复记录
+                        const updatedLocalMacro = macros.find(m => String(m.id) === String(macroData.id));
+                        if (updatedLocalMacro) {
+                            updatedLocalMacro.cloudId = cloudMacro.id;
+                            cache.conditionMacros = macros;
+                            localStorage.setItem(MACRO_KEY, JSON.stringify(macros));
+                            _macroIdMap = null;
+                        }
                     }
                 }
             } else {
@@ -24118,12 +24182,37 @@ async function deduplicateMacros() {
     const toDelete = [];
     const keyMap = new Map();
 
+    // 【修复】判断某云端宏的条件是否引用指定宏（mappingBase/inherit/macroRef）
+    // 被引用的云端记录即使本地不存在也不应清理，否则引用悬空导致断语无法匹配
+    function conditionRefsMacro(conditions, targetId) {
+        const t = String(targetId);
+        let found = false;
+        function walk(node) {
+            if (found || !node) return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            if (node.macroRef && String(node.macroRef) === t) { found = true; return; }
+            if (node.val && typeof node.val === 'string' && (node.val.indexOf('mappingBase=') >= 0 || node.val.indexOf('inherit=') >= 0)) {
+                const vm = node.val.match(/(?:mappingBase|inherit)=([^|]+)/);
+                if (vm && String(vm[1]) === t) { found = true; return; }
+            }
+            if (node.children) node.children.forEach(walk);
+        }
+        walk(conditions);
+        return found;
+    }
+
     for (const cloudMacro of (cloudMacros || [])) {
         const cloudIdStr = String(cloudMacro.id);
         const isLocalPresent = localCloudIds.has(cloudIdStr);
 
         // --- 类别1：本地已删除但云端残留 ---
         if (!isLocalPresent) {
+            // 【修复】被其他云端宏引用（mappingBase/inherit/macroRef）的记录跳过清理，
+            // 避免删除被引用基准宏导致映射引用失效
+            const referenced = (cloudMacros || []).some(cm2 =>
+                String(cm2.id) !== cloudIdStr && conditionRefsMacro(cm2.conditions, cloudMacro.id)
+            );
+            if (referenced) continue;
             toDelete.push({
                 id: cloudMacro.id,
                 name: cloudMacro.name,
@@ -26766,8 +26855,12 @@ async function syncLocalToCloud() {
                 macro.id = crypto.randomUUID();
             }
             
-            const cloudId = getCloudId(idMapping, 'macros', macro.id);
-            const cloudMacro = cloudId ? cloudMacrosLocalIdMap.get(macro.id) : null;
+            // 【修复】优先使用宏自身的 cloudId 字段（权威值），
+            // idMapping 丢失/损坏时仍能定位云端记录，避免误判为"云端无此宏"而重复插入
+            const cloudId = macro.cloudId || getCloudId(idMapping, 'macros', macro.id);
+            const cloudMacro = cloudId
+                ? (cloudMacrosLocalIdMap.get(macro.id) || (cloudMacros || []).find(c => String(c.id) === String(cloudId)))
+                : null;
             
             const record = {
                 name: macro.name || '',
@@ -26791,6 +26884,18 @@ async function syncLocalToCloud() {
                     console.error('更新条件宏失败:', error, macro.name);
                 }
             } else {
+                // 【修复】插入前查重：云端已有 user_id+name+conditions 完全一致的记录时，
+                // 建立映射而不重复插入（防止云端同名同内容重复记录）
+                const condStr = normalizeConditionsForCompare(macro.conditions || { logic: 'and', children: [] });
+                const existCloud = (cloudMacros || []).find(c =>
+                    c.name === (macro.name || '') &&
+                    normalizeConditionsForCompare(c.conditions) === condStr
+                );
+                if (existCloud) {
+                    setCloudId(idMapping, 'macros', macro.id, existCloud.id);
+                    macro.cloudId = existCloud.id;
+                    continue;
+                }
                 const { data: newMacro, error } = await supabaseClient
                     .from('condition_macros')
                     .insert([record])
@@ -27167,6 +27272,86 @@ async function syncCloudToLocal() {
             };
         });
         
+        // 条件宏同步：基于ID映射 + 内容去重（云端→本地）
+        // 【修复】此前 syncCloudToLocal 完全没有条件宏同步逻辑，
+        // 用户点"云端→本地"后本地永远不会出现云端宏 → 基准条件宏"丢失"无法恢复
+        let addedMacros = 0;
+        let updatedMacros = 0;
+        let localMacros = JSON.parse(localStorage.getItem(MACRO_KEY) || '[]');
+
+        const { data: cloudMacros, error: macrosError } = await supabaseClient
+            .from('condition_macros')
+            .select('*')
+            .or(`user_id.eq.${user.id},permission.gte.1`);
+
+        if (macrosError) console.error('获取云端条件宏失败:', macrosError);
+
+        for (const cm of cloudMacros || []) {
+            if (!cm.id) continue;
+
+            // 公开加密（permission=2）且非本人/非管理员的宏 → 剥离 conditions
+            const isMacroEncrypted = cm.permission === 2;
+            const isMacroOwner = cm.user_id === user.id;
+            const isMacroAdminUser = isAdmin(userData.user.email);
+            const stripMacroConditions = isMacroEncrypted && !isMacroOwner && !isMacroAdminUser;
+            const cloudConditions = stripMacroConditions ? null : (cm.conditions || { logic: 'and', children: [] });
+            const cloudCondStr = normalizeConditionsForCompare(cloudConditions);
+
+            const macroData = {
+                id: crypto.randomUUID(),
+                cloudId: cm.id,
+                name: cm.name,
+                description: cm.description || '',
+                permission: cm.permission !== undefined ? cm.permission : 0,
+                conditions: cloudConditions,
+                tags: cm.tags || [],
+                pinned: cm.pinned || false,
+                usageCount: cm.usage_count || 0,
+                createdBy: cm.user_id || '',
+                createTime: cm.create_time || new Date().toISOString(),
+                updateTime: cm.update_time || cm.create_time || new Date().toISOString(),
+                lastUsedAt: cm.last_used_at || null
+            };
+
+            // 查找本地宏：优先 cloudId 映射，其次 name+createdBy+conditions，最后 name+createdBy（兼容离线创建）
+            let matchIdx = -1;
+            const localId = getLocalIdByCloudId(idMapping, 'macros', cm.id);
+            if (localId) {
+                matchIdx = localMacros.findIndex(m => String(m.id) === String(localId));
+            }
+            if (matchIdx === -1) {
+                matchIdx = localMacros.findIndex(m =>
+                    m.name === cm.name &&
+                    m.createdBy === cm.user_id &&
+                    normalizeConditionsForCompare(m.conditions) === cloudCondStr
+                );
+            }
+            if (matchIdx === -1) {
+                matchIdx = localMacros.findIndex(m =>
+                    m.name === cm.name && !m.cloudId &&
+                    (m.createdBy === cm.user_id || (cm.user_id === user.id && !m.createdBy))
+                );
+            }
+
+            if (matchIdx !== -1) {
+                const existing = localMacros[matchIdx];
+                // 防止 cloudId 在云端重复记录间翻覆：本地指向的原云端记录仍存在时跳过合并
+                if (existing.cloudId && String(existing.cloudId) !== String(cm.id)) {
+                    const origStillExists = (cloudMacros || []).some(d => String(d.id) === String(existing.cloudId));
+                    if (origStillExists) {
+                        continue;
+                    }
+                }
+                setCloudId(idMapping, 'macros', existing.id, cm.id);
+                localMacros[matchIdx] = Object.assign({}, macroData, { id: existing.id });
+                updatedMacros++;
+            } else {
+                localMacros.push(macroData);
+                setCloudId(idMapping, 'macros', macroData.id, cm.id);
+                addedMacros++;
+            }
+        }
+
         // 保存ID映射表
         saveIdMapping(idMapping);
         
@@ -27175,12 +27360,14 @@ async function syncCloudToLocal() {
         localStorage.setItem('bazi_cases', JSON.stringify(localCases));
         localStorage.setItem('bazi_event_tags', JSON.stringify(localTags));
         localStorage.setItem('bazi_tag_categories', JSON.stringify(localTagCategories));
+        localStorage.setItem(MACRO_KEY, JSON.stringify(localMacros));
         
         // 同步到内存缓存
         cache.rules = localRules;
         caseCache.cases = localCases;
         caseCache.eventTags = localTags;
         caseCache.tagCategories = localTagCategories;
+        cache.conditionMacros = localMacros;
         
         // 安全清洗：执行权限清洗（第二道防线）
         cleanUnauthorizedRules();
@@ -27199,6 +27386,8 @@ async function syncCloudToLocal() {
         if (updatedTags > 0) resultMsg.push(`✓ 更新 ${updatedTags} 个标签`);
         if (addedTagCategories > 0) resultMsg.push(`+ 新增 ${addedTagCategories} 个标签分类`);
         if (updatedTagCategories > 0) resultMsg.push(`✓ 更新 ${updatedTagCategories} 个标签分类`);
+        if (addedMacros > 0) resultMsg.push(`+ 新增 ${addedMacros} 个条件宏`);
+        if (updatedMacros > 0) resultMsg.push(`✓ 更新 ${updatedMacros} 个条件宏`);
         
         if (resultMsg.length === 0) {
             alert('✓ 本地与云端数据已同步，无需更新');

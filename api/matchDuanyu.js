@@ -1186,9 +1186,10 @@ function evaluateLeafCondition(data, cond, context) {
     }
 
     // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
+    var biBaseMacro = null;
     if (biMappingBase) {
       // 通过 idMapping 解析基准宏（mappingBase 可能是本地ID，云端需解析为 cloudId）
-      var biBaseMacro = findMacroById(data, biMappingBase);
+      biBaseMacro = findMacroById(data, biMappingBase);
       if (biBaseMacro) {
         var biConfigs = _extractBiConfigsFromMacro(biBaseMacro, biType, data && data.macros ? data.macros : [], data);
         for (var bci = 0; bci < biConfigs.length; bci++) {
@@ -1213,7 +1214,12 @@ function evaluateLeafCondition(data, cond, context) {
     if (!biQuZhi && macroDefaultQuZhi) biQuZhi = macroDefaultQuZhi;
 
     // 通用模式且未指定取值维度 → 不判断
-    if (biGanZhi === '通用' && !biQuZhi) {
+    // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed），
+    // 避免 include=[] 导致 every() 恒真而误匹配所有断语（与定位批量 inherit/mapping 行为一致）
+    if (biMappingBase && !biBaseMacro) {
+      res = false;
+      actual = val;
+    } else if (biGanZhi === '通用' && !biQuZhi) {
       res = false;
       actual = val;
     } else {
