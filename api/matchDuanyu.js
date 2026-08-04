@@ -2095,7 +2095,7 @@ function filterRulesByAccess(rules, currentUserId, isAdmin) {
 
 // ===================== 主匹配函数 =====================
 
-function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules, birthYear, macros, macroIdMapping) {
+function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules, birthYear, macros, macroIdMapping, mappingRules) {
   var md = {
     nian: { t: baziData.bazi.nian.gan, d: baziData.bazi.nian.zhi },
     yue:  { t: baziData.bazi.yue.gan, d: baziData.bazi.yue.zhi },
@@ -2105,7 +2105,8 @@ function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules
     birthYear: birthYear || null,
     macros: macros || [],
     rules: rules || [],
-    idMapping: macroIdMapping ? { macros: macroIdMapping } : null
+    idMapping: macroIdMapping ? { macros: macroIdMapping } : null,
+    mappingRules: mappingRules || null
   };
   if (dayunItem) md.dayun = { t: dayunItem.gan, d: dayunItem.zhi, ganZhi: dayunItem.ganZhi };
   if (liunianItem) md.liunian = { t: liunianItem.gan, d: liunianItem.zhi, ganZhi: liunianItem.ganZhi };
@@ -2247,7 +2248,7 @@ module.exports = async (req, res) => {
     var currentLiunian = body.currentLiunian || null;
     var currentLiuyue = body.currentLiuyue || null;
     
-    var matched = matchDuanyu(baziData, currentDayun, currentLiunian, currentLiuyue, baziData.gender, rules, birthYear, macros, body.macroIdMapping || null);
+    var matched = matchDuanyu(baziData, currentDayun, currentLiunian, currentLiuyue, baziData.gender, rules, birthYear, macros, body.macroIdMapping || null, body.mappingRules || null);
     var result = matched.map(function(r) {
       return {
         duanyu: r.duanyu_text,

@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3689,7 +3689,8 @@
           currentLiuyue: currentLiuyue || null,
           currentUserId: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null,
           isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false,
-          macroIdMapping: (function() { try { return (getIdMapping() || {}).macros || {}; } catch(e) { return {}; } })()
+          macroIdMapping: (function() { try { return (getIdMapping() || {}).macros || {}; } catch(e) { return {}; } })(),
+          mappingRules: (typeof getMappingRules === 'function') ? getMappingRules() : []
         }));
       });
     }
@@ -4319,6 +4320,8 @@
         initMacroEvents();
         initDataManagement();
         initStatsAdjust();
+        // 初始化默认映射规则下拉框选项
+        if (typeof refreshDefaultMappingSelects === 'function') refreshDefaultMappingSelects();
         initGroupKeyCombo();
         refreshGroupFilter();
         refreshGroupKeyDropdown();
@@ -7504,8 +7507,7 @@
                 if(!pbQuZhi && macroDefQz) pbQuZhi = macroDefQz;
                 // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
                 if(pbMappingBaseId || pbMappingId){
-                    let mappingRulesList = null;
-                    try { const raw = localStorage.getItem('pb_mapping_rules'); if(raw) mappingRulesList = JSON.parse(raw); } catch(e){}
+                    let mappingRulesList = (typeof getMappingRules === 'function') ? getMappingRules() : null;
                     const resolvedMap = resolveDefaultMapping(pbType, ctxMapping.ruleDefaultMapping, ctxMapping.macroDefaultMapping, pbMappingId, mappingRulesList);
                     if(resolvedMap){
                         pbMappingType = resolvedMap.mappingType;
@@ -7737,8 +7739,7 @@
 
                 // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
                 if(biMappingBase || biMappingRule){
-                    let biMappingRulesList = null;
-                    try { const raw = localStorage.getItem('pb_mapping_rules'); if(raw) biMappingRulesList = JSON.parse(raw); } catch(e){}
+                    let biMappingRulesList = (typeof getMappingRules === 'function') ? getMappingRules() : null;
                     const biResolvedMap = resolveDefaultMapping(biType, ctxMapping.ruleDefaultMapping, ctxMapping.macroDefaultMapping, biMappingRule, biMappingRulesList);
                     if(biResolvedMap){
                         biMappingType = biResolvedMap.mappingType;
@@ -28498,18 +28499,8 @@ var _mappingRulesCache = null;
 var _mappingRulesCacheRaw = '';
 
 function getMappingRules() {
-    try {
-        var raw = localStorage.getItem(MAPPING_RULES_KEY);
-        if (raw) {
-            if (_mappingRulesCacheRaw !== raw) {
-                _mappingRulesCacheRaw = raw;
-                _mappingRulesCache = JSON.parse(raw);
-            }
-            return _mappingRulesCache;
-        }
-    } catch(e) {}
     // 默认预设规则
-    return [
+    var defaultRules = [
         {id: 'map_sg_1', name: '食伤制官杀', type: '十神组', offset: 1},
         {id: 'map_sg_2', name: '财星制印星', type: '十神组', offset: 2},
         {id: 'map_sg_3', name: '官杀制比劫', type: '十神组', offset: 3},
@@ -28519,6 +28510,21 @@ function getMappingRules() {
         {id: 'map_wx_3', name: '火克金', type: '五行', offset: 3},
         {id: 'map_wx_4', name: '土克水', type: '五行', offset: 4}
     ];
+    try {
+        var raw = localStorage.getItem(MAPPING_RULES_KEY);
+        if (raw) {
+            if (_mappingRulesCacheRaw !== raw) {
+                _mappingRulesCacheRaw = raw;
+                _mappingRulesCache = JSON.parse(raw);
+            }
+            // 如果存储的规则为空数组，回退到默认预设规则
+            if (!_mappingRulesCache || _mappingRulesCache.length === 0) {
+                return defaultRules;
+            }
+            return _mappingRulesCache;
+        }
+    } catch(e) {}
+    return defaultRules;
 }
 
 function saveMappingRules(rules) {
@@ -28833,6 +28839,7 @@ function populateDefaultMappingSelect(sel, filterType) {
     var html = '<option value="">--不设置（使用上层或字段设置）--</option>';
     for (var i = 0; i < rules.length; i++) {
         var r = rules[i];
+        if (!r || !r.type) continue;
         var typeMatch = false;
         if (filterType === '十神组') typeMatch = (r.type.indexOf('十神组') === 0);
         else if (filterType === '五行') typeMatch = (r.type.indexOf('五行') === 0);
