@@ -1161,8 +1161,8 @@ function evaluateLeafCondition(data, cond, context) {
       }
     }
 
-    // 如果是映射模式，从基准宏获取配置并应用映射
-    if (biMappingBase && biMappingRule) {
+    // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
+    if (biMappingBase) {
       var biMacros = data && data.macros ? data.macros : [];
       var biBaseMacro = null;
       for (var mi = 0; mi < biMacros.length; mi++) {
