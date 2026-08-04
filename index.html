@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9458,11 +9458,11 @@
                         });
                         var flipText = sFlip ? '·🔄翻转' : '';
                         var summaryText;
-                        if(sMappingBase && sMappingRule){
+                        if(sMappingBase){
                             var baseMacro = getMacroById(sMappingBase);
                             var baseName = baseMacro ? baseMacro.name : '未知';
-                            var ruleObj = (typeof getMappingRuleById === 'function') ? getMappingRuleById(sMappingRule) : null;
-                            var ruleName = ruleObj ? ruleObj.name : '未知';
+                            var ruleObj = (typeof getMappingRuleById === 'function' && sMappingRule) ? getMappingRuleById(sMappingRule) : null;
+                            var ruleName = ruleObj ? ruleObj.name : '保持原值';
                             var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
                             summaryText = '映射[' + baseName + '→' + ruleName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + flipText + incText;
                         } else if(sInherit){
@@ -22725,11 +22725,11 @@ function loadConditionsToEditor(container, conditions) {
                             });
                             var flipText = sFlip ? '·🔄翻转' : '';
                             var summaryText;
-                            if(sMappingBase && sMappingRule){
+                            if(sMappingBase){
                                 var baseMacro = getMacroById(sMappingBase);
                                 var baseName = baseMacro ? baseMacro.name : '未知';
-                                var ruleObj = (typeof getMappingRuleById === 'function') ? getMappingRuleById(sMappingRule) : null;
-                                var ruleName = ruleObj ? ruleObj.name : '未知';
+                                var ruleObj = (typeof getMappingRuleById === 'function' && sMappingRule) ? getMappingRuleById(sMappingRule) : null;
+                                var ruleName = ruleObj ? ruleObj.name : '保持原值';
                                 var incText = sPositions.length > 0 ? '·增量: ' + sPositions.join(', ') : '';
                                 summaryText = '映射[' + baseName + '→' + ruleName + ']·' + sType + '·' + sGz + (sGz === '通用' && sQz ? '·取值' + sQz : '') + flipText + incText;
                             } else if(sInherit){
@@ -22768,11 +22768,11 @@ function loadConditionsToEditor(container, conditions) {
                                 else if(p.startsWith('inc排除=')) { var se = p.replace('inc排除=',''); if(se) biExc2 = se.split(','); }
                             });
                             var biSm2;
-                            if(biMB2 && biMR2){
+                            if(biMB2){
                                 var biBM = getMacroById(biMB2);
                                 var biBN = biBM ? biBM.name : '未知';
-                                var biRO = (typeof getMappingRuleById === 'function') ? getMappingRuleById(biMR2) : null;
-                                var biRN = biRO ? biRO.name : '未知';
+                                var biRO = (typeof getMappingRuleById === 'function' && biMR2) ? getMappingRuleById(biMR2) : null;
+                                var biRN = biRO ? biRO.name : '保持原值';
                                 var biIT = biInc2.length > 0 ? '·增量✅' + biInc2.join(',') : '';
                                 var biET = biExc2.length > 0 ? '·增量❌' + biExc2.join(',') : '';
                                 biSm2 = '映射[' + biBN + '→' + biRN + ']·' + biT2 + '·' + biSc2 + biIT + biET;
