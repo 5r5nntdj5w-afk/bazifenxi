@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -13257,6 +13257,37 @@
         }
     }
 
+    // 迁移条件值编码中的映射/继承引用ID（本地ID → cloudId）
+    // 覆盖 批量包含|mappingBase=xxx 与 定位批量|inherit=xxx 中的宏引用
+    function migrateValRefId(val) {
+        if (!val || typeof val !== 'string') return val;
+        if (val.indexOf('mappingBase=') < 0 && val.indexOf('inherit=') < 0) return val;
+        const idMapping = getIdMapping();
+        let result = val;
+        const refRe = /(mappingBase|inherit)=([^|]+)/g;
+        let m;
+        const replacements = [];
+        while ((m = refRe.exec(val)) !== null) {
+            const key = m[1];
+            const refId = m[2];
+            if (!refId) continue;
+            const macro = getMacroById(refId);
+            let targetCloudId = null;
+            if (macro) {
+                targetCloudId = (idMapping && idMapping.macros && idMapping.macros[macro.id]) || macro.cloudId;
+            } else if (idMapping && idMapping.macros && idMapping.macros[refId]) {
+                targetCloudId = idMapping.macros[refId];
+            }
+            if (targetCloudId && String(targetCloudId) !== refId) {
+                replacements.push({ key, refId, cloudId: String(targetCloudId) });
+            }
+        }
+        for (const r of replacements) {
+            result = result.split(`${r.key}=${r.refId}`).join(`${r.key}=${r.cloudId}`);
+        }
+        return result;
+    }
+
     // 递归遍历条件树中的所有 macroRef，尝试将旧格式（本地ID）迁移为 cloudId
     // 并补全 macroName 字段作为显示回退
     // 返回 { changed: boolean, macros: object[] } 是否修改过及引用的宏列表
@@ -13270,6 +13301,14 @@
                 node.forEach(walk);
             } else if (node.children) {
                 node.children.forEach(c => {
+                    // 【修复】迁移 val 编码中的映射/继承引用ID（mappingBase/inherit 本地ID → cloudId）
+                    if (c.val && typeof c.val === 'string' && (c.val.indexOf('mappingBase=') >= 0 || c.val.indexOf('inherit=') >= 0)) {
+                        const migratedVal = migrateValRefId(c.val);
+                        if (migratedVal !== c.val) {
+                            c.val = migratedVal;
+                            changed = true;
+                        }
+                    }
                     if (c.macroRef) {
                         const refIdStr = String(c.macroRef);
                         // 尝试解析 macroRef
@@ -13727,6 +13766,19 @@
             duplicates.sort((a,b) => b - a);
             for (const di of duplicates) {
                 cache.conditionMacros.splice(di, 1);
+            }
+
+            // 【修复】迁移本地宏 conditions 中的映射/继承引用ID（mappingBase/inherit 本地ID → cloudId）
+            // 使云端/本地数据自包含，新环境（无idMapping）也能正确解析引用
+            let macroRefMigrated = false;
+            for (const lm of cache.conditionMacros) {
+                if (lm.conditions) {
+                    const nr = normalizeRuleConditions(lm.conditions);
+                    if (nr.changed) macroRefMigrated = true;
+                }
+            }
+            if (macroRefMigrated) {
+                console.log('条件宏映射/继承引用迁移完成：mappingBase/inherit 已更新为 cloudId');
             }
 
             // 保存ID映射和本地缓存
@@ -23680,7 +23732,16 @@ function getMacroById(macroId) {
             if (m.cloudId != null) _macroIdMap[String(m.cloudId)] = m;
         });
     }
-    return _macroIdMap[String(macroId)] || null;
+    let found = _macroIdMap[String(macroId)] || null;
+    // 【修复】直接匹配失败时，通过 idMapping 将本地ID解析为 cloudId 后二次查找
+    if (!found) {
+        try {
+            const idMapping = getIdMapping();
+            const cloudId = idMapping && idMapping.macros ? idMapping.macros[String(macroId)] : null;
+            if (cloudId) found = _macroIdMap[String(cloudId)] || null;
+        } catch (e) { /* 忽略解析错误 */ }
+    }
+    return found;
 }
 
 // 从所有宏中提取所有标签（去重排序）
