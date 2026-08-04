@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7757,7 +7757,15 @@
                 // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
                 if(biMappingBase){
                     const biMacros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
-                    const baseMacro = biMacros.find(m => String(m.id) === String(biMappingBase) || String(m.cloudId) === String(biMappingBase));
+                    let baseMacro = biMacros.find(m => String(m.id) === String(biMappingBase) || String(m.cloudId) === String(biMappingBase));
+                    // 本地ID未直接匹配时，通过 idMapping 解析为 cloudId 后二次查找（与后端一致）
+                    if(!baseMacro){
+                        const biIdMap = (typeof getIdMapping === 'function') ? getIdMapping() : null;
+                        const biResolvedCloudId = biIdMap && biIdMap.macros ? biIdMap.macros[biMappingBase] : null;
+                        if(biResolvedCloudId){
+                            baseMacro = biMacros.find(m => String(m.id) === String(biResolvedCloudId) || String(m.cloudId) === String(biResolvedCloudId));
+                        }
+                    }
                     if(baseMacro){
                         const configs = extractBiConfigsFromMacro(baseMacro, biType);
                         configs.forEach(cfg => {
