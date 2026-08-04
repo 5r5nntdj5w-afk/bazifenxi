@@ -208,8 +208,13 @@ function evaluateConditionNode(data, condNode, context) {
           var newContext = {};
           var mDefQz = (m.conditions && m.conditions.defaultQuZhi) || m.defaultQuZhi || '';
           if (mDefQz) newContext.macroDefaultQuZhi = mDefQz;
+          // 传递宏的默认映射规则到上下文
+          var mDefMap = (m.conditions && m.conditions.defaultMapping) || null;
+          if (mDefMap) newContext.macroDefaultMapping = mDefMap;
           // 保留断语规则的默认取值维度（最高优先级，递归时不丢失）
           if (context.ruleDefaultQuZhi) newContext.ruleDefaultQuZhi = context.ruleDefaultQuZhi;
+          // 保留断语规则的默认映射规则（最高优先级，递归时不丢失）
+          if (context.ruleDefaultMapping) newContext.ruleDefaultMapping = context.ruleDefaultMapping;
           return evaluateConditionNode(data, m.conditions, newContext);
         }
       }
@@ -223,8 +228,12 @@ function evaluateConditionNode(data, condNode, context) {
               var newContext2 = {};
               var mDefQz2 = (m.conditions && m.conditions.defaultQuZhi) || m.defaultQuZhi || '';
               if (mDefQz2) newContext2.macroDefaultQuZhi = mDefQz2;
+              var mDefMap2 = (m.conditions && m.conditions.defaultMapping) || null;
+              if (mDefMap2) newContext2.macroDefaultMapping = mDefMap2;
               // 保留断语规则的默认取值维度（最高优先级，递归时不丢失）
               if (context.ruleDefaultQuZhi) newContext2.ruleDefaultQuZhi = context.ruleDefaultQuZhi;
+              // 保留断语规则的默认映射规则（最高优先级，递归时不丢失）
+              if (context.ruleDefaultMapping) newContext2.ruleDefaultMapping = context.ruleDefaultMapping;
               return evaluateConditionNode(data, m.conditions, newContext2);
             }
           }
@@ -484,6 +493,39 @@ function applyMappingValue(val, mappingType, mappingOffset, customMap) {
   var offset = Number(mappingOffset) || 0;
   var newIdx = ((idx + offset) % cycle.length + cycle.length) % cycle.length;
   return cycle[newIdx];
+}
+
+/**
+ * 按字段类型解析最终生效的映射规则（层级覆盖）
+ * 优先级：ruleDefaultMapping[fieldType] > macroDefaultMapping[fieldType] > fieldMappingId
+ * @param {String} fieldType - 字段类型（"十神组" / "五行"）
+ * @param {Object} ruleDefaultMapping - 断语级默认映射 { "十神组": "ruleId", "五行": "ruleId" }
+ * @param {Object} macroDefaultMapping - 条件宏级默认映射
+ * @param {String} fieldMappingId - 字段级映射规则ID
+ * @param {Array} mappingRules - 映射规则列表（用于查找规则详情）
+ * @returns {Object|null} { mappingType, mappingOffset, customMap, _ruleId } 或 null
+ */
+function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMapping, fieldMappingId, mappingRules) {
+  if (!fieldType) return null;
+  var ruleId = '';
+  if (ruleDefaultMapping && ruleDefaultMapping[fieldType]) ruleId = ruleDefaultMapping[fieldType];
+  if (!ruleId && macroDefaultMapping && macroDefaultMapping[fieldType]) ruleId = macroDefaultMapping[fieldType];
+  if (!ruleId && fieldMappingId) ruleId = fieldMappingId;
+  if (!ruleId) return null;
+  // 查找规则详情
+  var rule = null;
+  if (mappingRules && mappingRules.length) {
+    for (var i = 0; i < mappingRules.length; i++) {
+      if (String(mappingRules[i].id) === String(ruleId)) { rule = mappingRules[i]; break; }
+    }
+  }
+  if (!rule) return null;
+  return {
+    mappingType: rule.type || '',
+    mappingOffset: rule.offset || '',
+    customMap: rule.customMap || null,
+    _ruleId: ruleId
+  };
 }
 
 // ---- 批量包含映射辅助函数 ----
@@ -751,6 +793,8 @@ function evaluateLeafCondition(data, cond, context) {
   var res = false;
   var macroDefaultQuZhi = context.macroDefaultQuZhi || '';
   var ruleDefaultQuZhi = context.ruleDefaultQuZhi || '';
+  var macroDefaultMapping = context.macroDefaultMapping || null;
+  var ruleDefaultMapping = context.ruleDefaultMapping || null;
 
   // ---- 自定义字段（通过 template_type 判断） ----
   if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) {
@@ -916,6 +960,26 @@ function evaluateLeafCondition(data, cond, context) {
     if (!pbQuZhi && macroDefaultQuZhi) {
       pbQuZhi = macroDefaultQuZhi;
     }
+    // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
+    // 仅对映射引用模式（pbMappingBaseId 非空）或字段级有 mapping 时生效
+    if (pbMappingBaseId || pbMappingId) {
+      var fieldTypeForMapping = pbType; // "十神组" / "五行"
+      var mappingRulesList = data && data.mappingRules ? data.mappingRules : null;
+      // 也尝试从 localStorage 缓存读取（API场景下 data 可能不传）
+      if (!mappingRulesList && typeof localStorage !== 'undefined') {
+        try {
+          var rawRules = localStorage.getItem('pb_mapping_rules');
+          if (rawRules) mappingRulesList = JSON.parse(rawRules);
+        } catch(e) {}
+      }
+      var resolvedMap = resolveDefaultMapping(fieldTypeForMapping, ruleDefaultMapping, macroDefaultMapping, pbMappingId, mappingRulesList);
+      if (resolvedMap) {
+        pbMappingType = resolvedMap.mappingType;
+        pbMappingOffset = resolvedMap.mappingOffset;
+        pbCustomMap = resolvedMap.customMap;
+        pbMappingId = resolvedMap._ruleId;
+      }
+    }
     // 判断一个排列段是否为元信息（非位置条件）
     var _isMetaSeg = function(s) {
       return s === '定位批量' ||
@@ -1075,6 +1139,25 @@ function evaluateLeafCondition(data, cond, context) {
       else if (bp.indexOf('inc排除=') === 0) {
         var exc2Str = bp.replace('inc排除=','');
         if (exc2Str) biExc2 = exc2Str.split(',');
+      }
+    }
+
+    // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
+    if (biMappingBase || biMappingRule) {
+      var biFieldTypeForMapping = biType; // "十神组" / "五行"
+      var biMappingRulesList = data && data.mappingRules ? data.mappingRules : null;
+      if (!biMappingRulesList && typeof localStorage !== 'undefined') {
+        try {
+          var biRawRules = localStorage.getItem('pb_mapping_rules');
+          if (biRawRules) biMappingRulesList = JSON.parse(biRawRules);
+        } catch(e) {}
+      }
+      var biResolvedMap = resolveDefaultMapping(biFieldTypeForMapping, ruleDefaultMapping, macroDefaultMapping, biMappingRule, biMappingRulesList);
+      if (biResolvedMap) {
+        biMappingType = biResolvedMap.mappingType;
+        biMappingOffset = biResolvedMap.mappingOffset;
+        biCustomMap = biResolvedMap.customMap;
+        biMappingRule = biResolvedMap._ruleId;
       }
     }
 
@@ -1813,6 +1896,10 @@ function matchRule(data, conditions) {
   var initContext = {};
   if (conditions.defaultQuZhi) {
     initContext.ruleDefaultQuZhi = conditions.defaultQuZhi;
+  }
+  // 传递断语规则的默认映射规则（最高优先级）
+  if (conditions.defaultMapping) {
+    initContext.ruleDefaultMapping = conditions.defaultMapping;
   }
 
   if (conditions.logic && conditions.children && !Array.isArray(conditions)) {
