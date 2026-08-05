@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -21551,6 +21551,11 @@ async function saveMacroFromEditor() {
 async function deleteMacroConfirm(macroId) {
     const macro = getMacroById(macroId);
     if (!macro) return;
+    // 【权限限制】普通用户只能删除自己创建的条件宏，不能删除管理员/他人创建的宏
+    if (macro.createdBy && macro.createdBy !== getCurrentUserId() && !(currentUser && isAdmin(currentUser.email))) {
+        alert('只能删除自己创建的条件宏！');
+        return;
+    }
     const refCount = getRulesReferencingMacro(macroId);
     const macroRefCount = getMacrosReferencingMacro(macroId);
     let msg = `确定要删除条件宏「${macro.name}」吗？`;
@@ -23776,8 +23781,13 @@ function getAllMacros() {
 // ============ 条件宏专用同步（宏管理窗口手动同步） ============
 
 // 上传单个条件宏到云端（核心逻辑，供单个/全部同步复用）
-// 返回 { status: 'insert'|'update'|'dup', cloudId }
+// 权限规则：只能同步自己创建的条件宏（createdBy 为空视为本地新建宏）
+// 返回 { status: 'insert'|'update'|'dup'|'skipped', cloudId }
 async function uploadMacroToCloud(user, macro, idMapping, cloudMacros) {
+    // 【权限限制】非本人创建的宏（如从云端同步下来的管理员公开宏）不允许上传
+    if (macro.createdBy && macro.createdBy !== user.id) {
+        return { status: 'skipped', cloudId: null, reason: 'not_owner' };
+    }
     if (!macro.id) macro.id = crypto.randomUUID();
     // 优先使用宏自身的 cloudId（权威值），idMapping 丢失/损坏时仍能定位云端记录
     const cloudId = macro.cloudId || getCloudId(idMapping, 'macros', macro.id);
@@ -23850,13 +23860,14 @@ async function syncMacrosToCloud() {
                 .eq('user_id', user.id);
             if (macrosError) console.error('获取云端条件宏失败:', macrosError);
 
-            let added = 0, updated = 0, dup = 0, failed = 0;
+            let added = 0, updated = 0, dup = 0, skipped = 0, failed = 0;
             for (const macro of localMacros) {
                 try {
                     const r = await uploadMacroToCloud(user, macro, idMapping, cloudMacros || []);
                     if (r.status === 'insert') added++;
                     else if (r.status === 'update') updated++;
-                    else dup++;
+                    else if (r.status === 'dup') dup++;
+                    else skipped++;
                 } catch (e) {
                     failed++;
                     console.error('同步条件宏失败:', e, macro.name);
@@ -23867,7 +23878,7 @@ async function syncMacrosToCloud() {
             cache.conditionMacros = localMacros;
             _macroIdMap = null;
             refreshMacroListAfterSync();
-            alert(`✅ 条件宏同步到云端完成\n新增 ${added} 个，更新 ${updated} 个，去重关联 ${dup} 个${failed > 0 ? `，失败 ${failed} 个（详见控制台）` : ''}`);
+            alert(`✅ 条件宏同步到云端完成\n新增 ${added} 个，更新 ${updated} 个，去重关联 ${dup} 个\n${skipped > 0 ? `跳过 ${skipped} 个（他人创建的宏，仅同步自己创建的宏）\n` : ''}${failed > 0 ? `失败 ${failed} 个（详见控制台）` : ''}`);
         } finally {
             if (loadingIndicator && loadingIndicator.parentNode) {
                 loadingIndicator.parentNode.removeChild(loadingIndicator);
@@ -23993,6 +24004,11 @@ async function syncSingleMacroToCloud(macroId) {
         const macro = getMacroById(macroId);
         if (!macro) {
             alert('未找到该条件宏！');
+            return;
+        }
+        // 【权限限制】只能同步自己创建的条件宏
+        if (macro.createdBy && macro.createdBy !== user.id) {
+            alert('只能同步自己创建的条件宏！');
             return;
         }
         const loadingIndicator = document.createElement('div');
@@ -27120,6 +27136,9 @@ async function syncLocalToCloud() {
             if (!macro.id) {
                 macro.id = crypto.randomUUID();
             }
+            
+            // 【权限限制】只同步自己创建的条件宏，跳过他人创建的宏（如同步下来的管理员公开宏）
+            if (macro.createdBy && macro.createdBy !== user.id) continue;
             
             // 【修复】优先使用宏自身的 cloudId 字段（权威值），
             // idMapping 丢失/损坏时仍能定位云端记录，避免误判为"云端无此宏"而重复插入
