@@ -1228,7 +1228,10 @@ function evaluateLeafCondition(data, cond, context) {
     biDbg('  取值维度: 规则默认=' + (ruleDefaultQuZhi || '空') + ' 字段=' + biGanZhi + ' 宏默认=' + (macroDefaultQuZhi || '空') + ' → 最终收集=' + biActualGzFinal);
 
     // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
+    // 基准宏内多个批量包含字段为"或"关系（任一满足即通过），因此每条配置作为独立候选，
+    // 不再把所有 include/exclude 合并成一个大集合后 AND 判断（避免"须出现与不许出现"矛盾导致多值恒不匹配）
     var biBaseMacro = null;
+    var biCandidates = [];
     if (biMappingBase) {
       // 通过 idMapping 解析基准宏（mappingBase 可能是本地ID，云端需解析为 cloudId）
       biBaseMacro = findMacroById(data, biMappingBase);
@@ -1236,6 +1239,7 @@ function evaluateLeafCondition(data, cond, context) {
       if (biBaseMacro) {
         var biConfigs = _extractBiConfigsFromMacro(biBaseMacro, biType, data && data.macros ? data.macros : [], data);
         biDbg('  基准宏提取配置数=' + biConfigs.length);
+        var bcRule = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
         for (var bci = 0; bci < biConfigs.length; bci++) {
           var bc = biConfigs[bci];
           // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
@@ -1243,27 +1247,23 @@ function evaluateLeafCondition(data, cond, context) {
           var bcGzOk = bc.ganZhi === '通用' || bc.ganZhi === biActualGzFinal;
           biDbg('    config[' + bci + ']: type=' + bc.type + ' ganZhi=' + bc.ganZhi + ' scope=' + bc.scope + ' include=[' + (bc.include||[]).join(',') + '] exclude=[' + (bc.exclude||[]).join(',') + '] 维度兼容=' + bcGzOk + ' scope一致=' + (bc.scope === biScope));
           if (bcGzOk && bc.scope === biScope) {
-            var bcRule = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
             var bcMapped = _mapBiConfigValues(bc, bcRule);
-            biInclude = biInclude.concat(bcMapped.include);
-            biExclude = biExclude.concat(bcMapped.exclude);
+            biCandidates.push({ include: bcMapped.include || [], exclude: bcMapped.exclude || [] });
           }
         }
       }
-      // 合并增量
-      biInclude = biInclude.concat(biInc2);
-      biExclude = biExclude.concat(biExc2);
     }
-    biDbg('  合并后: include=[' + biInclude.join(',') + '] exclude=[' + biExclude.join(',') + ']');
+    biDbg('  合并候选数=' + biCandidates.length + ' → ' + biCandidates.map(function(c){ return '[' + c.include.join(',') + ']/[' + c.exclude.join(',') + ']'; }).join(' | '));
 
     // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed）
-    // 合并后无任何包含/排除配置可判定 → 判定不满足（fail-closed），
+    // 无任何包含/排除配置可判定 → 判定不满足（fail-closed），
     // 避免 include=[] 导致 every() 恒真而误匹配所有断语（与定位批量 inherit/mapping 行为一致）
+    var hasAnyBiConstraint = biInclude.length > 0 || biExclude.length > 0 || biCandidates.length > 0 || biInc2.length > 0 || biExc2.length > 0;
     if (biMappingBase && !biBaseMacro) {
       res = false;
       actual = val;
       biDbg('  判定: ❌ 不匹配（基准宏未找到 fail-closed）');
-    } else if (biInclude.length === 0 && biExclude.length === 0) {
+    } else if (!hasAnyBiConstraint) {
       res = false;
       actual = val;
       biDbg('  判定: ❌ 不匹配（无任何包含/排除配置可判定 fail-closed）');
@@ -1298,25 +1298,51 @@ function evaluateLeafCondition(data, cond, context) {
         if (biVal && biActualVals.indexOf(biVal) < 0) biActualVals.push(biVal);
       }
 
-      // 包含检查：所有 include 值都必须在实际值集合中出现
-      var biIncludeOk = true;
-      for (var bii = 0; bii < biInclude.length; bii++) {
-        if (biActualVals.indexOf(biInclude[bii]) < 0) {
-          biIncludeOk = false;
-          break;
+      // 字段自身直接包含/排除（映射模式下一般为空）：全部满足
+      var biDirectOk = true;
+      for (var bdi = 0; bdi < biInclude.length; bdi++) {
+        if (biActualVals.indexOf(biInclude[bdi]) < 0) { biDirectOk = false; break; }
+      }
+      if (biDirectOk) {
+        for (var bde = 0; bde < biExclude.length; bde++) {
+          if (biActualVals.indexOf(biExclude[bde]) >= 0) { biDirectOk = false; break; }
         }
       }
-      // 排除检查：所有 exclude 值都不能在实际值集合中出现
-      var biExcludeOk = true;
-      for (var bei = 0; bei < biExclude.length; bei++) {
-        if (biActualVals.indexOf(biExclude[bei]) >= 0) {
-          biExcludeOk = false;
-          break;
+      // 基准宏候选：每条配置为"或"关系，任一满足即通过
+      // （修复：多值不匹配——原实现把全部配置合并成一个大集合后 AND 判断，
+      //   产生"须出现与不许出现"互相矛盾的约束，导致基准宏含多字段时恒不匹配）
+      var biCandidateOk = biCandidates.length === 0;
+      for (var bci2 = 0; bci2 < biCandidates.length; bci2++) {
+        var biCand = biCandidates[bci2];
+        var biCandInOk = true;
+        for (var bci3 = 0; bci3 < biCand.include.length; bci3++) {
+          if (biActualVals.indexOf(biCand.include[bci3]) < 0) { biCandInOk = false; break; }
+        }
+        var biCandExOk = true;
+        if (biCandInOk) {
+          for (var bci4 = 0; bci4 < biCand.exclude.length; bci4++) {
+            if (biActualVals.indexOf(biCand.exclude[bci4]) >= 0) { biCandExOk = false; break; }
+          }
+        }
+        if (biCandInOk && biCandExOk) { biCandidateOk = true; break; }
+      }
+      // 增量包含/排除（inc包含/inc排除）：全部满足（与合并前行为一致）
+      var biIncOk = true;
+      for (var bij = 0; bij < biInc2.length; bij++) {
+        if (biActualVals.indexOf(biInc2[bij]) < 0) { biIncOk = false; break; }
+      }
+      if (biIncOk) {
+        for (var bij2 = 0; bij2 < biExc2.length; bij2++) {
+          if (biActualVals.indexOf(biExc2[bij2]) >= 0) { biIncOk = false; break; }
         }
       }
-      res = biIncludeOk && biExcludeOk;
+      res = biDirectOk && biCandidateOk && biIncOk;
       actual = val;
-      biDbg('  八字实际值(' + actualBiGz + ',' + biScope + ')=[' + biActualVals.join(',') + '] → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配（' + (biIncludeOk ? '' : '包含值未全部命中') + (biIncludeOk ? '' : biExcludeOk ? '' : '; ') + (biExcludeOk ? '' : '排除值被命中') + '）'));
+      var biFailReason = '';
+      if (!biDirectOk) biFailReason += '字段值未满足';
+      if (!biCandidateOk) biFailReason += (biFailReason ? '; ' : '') + '基准宏候选未满足';
+      if (!biIncOk) biFailReason += (biFailReason ? '; ' : '') + '增量未满足';
+      biDbg('  八字实际值(' + actualBiGz + ',' + biScope + ')=[' + biActualVals.join(',') + '] → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配（' + biFailReason + '）'));
     }
   }
 

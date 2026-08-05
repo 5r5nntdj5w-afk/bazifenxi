@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7777,7 +7777,10 @@
                 const biActualGzFinal = biQuZhi || (biGz !== '通用' ? biGz : '天干');
 
                 // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
+                // 基准宏内多个批量包含字段为"或"关系（任一满足即通过），因此每条配置作为独立候选，
+                // 不再把所有 include/exclude 合并成一个大集合后 AND 判断（避免"须出现与不许出现"矛盾导致多值恒不匹配）
                 let biBaseFound = false;
+                const biCandidates = [];
                 if(biMappingBase){
                     const biMacros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
                     let baseMacro = biMacros.find(m => String(m.id) === String(biMappingBase) || String(m.cloudId) === String(biMappingBase));
@@ -7792,29 +7795,26 @@
                     if(baseMacro){
                         biBaseFound = true;
                         const configs = extractBiConfigsFromMacro(baseMacro, biType);
+                        const ruleObj = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
                         configs.forEach(cfg => {
                             // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
                             // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
                             const cfgGzOk = cfg.ganZhi === '通用' || cfg.ganZhi === biActualGzFinal;
                             if(cfgGzOk && cfg.scope === biSc){
-                                const ruleObj = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
                                 const mapped = mapBiConfigValues(cfg, ruleObj);
-                                biInc = biInc.concat(mapped.include);
-                                biExc = biExc.concat(mapped.exclude);
+                                biCandidates.push({ include: mapped.include || [], exclude: mapped.exclude || [] });
                             }
                         });
                     }
-                    // 合并增量
-                    biInc = biInc.concat(biInc2);
-                    biExc = biExc.concat(biExc2);
                 }
 
                 // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed）
                 // 无任何包含/排除配置可判定 → 判定不满足（fail-closed），
                 // 避免 include=[] 导致 every() 恒真而误匹配所有断语（与定位批量 inherit/mapping 行为一致）
+                const hasAnyBiConstraint = biInc.length > 0 || biExc.length > 0 || biCandidates.length > 0 || biInc2.length > 0 || biExc2.length > 0;
                 if(biMappingBase && !biBaseFound){
                     res = false;
-                } else if(biInc.length === 0 && biExc.length === 0){
+                } else if(!hasAnyBiConstraint){
                     res = false;
                 } else {
                     const actualBiGz = biActualGzFinal;
@@ -7835,11 +7835,19 @@
                         else if(biType === '十神组') { const s = (actualBiGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg); v = SHEN_TO_GROUP[s] || ''; }
                         if(v && !biActual.includes(v)) biActual.push(v);
                     });
-                    // 包含：所有 include 值都必须出现
-                    let incOk = biInc.every(v => biActual.includes(v));
-                    // 排除：所有 exclude 值都不能出现
-                    let excOk = biExc.every(v => !biActual.includes(v));
-                    res = incOk && excOk;
+                    // 字段自身直接包含/排除（映射模式下一般为空）：全部满足
+                    const directOk = biInc.every(v => biActual.includes(v)) && biExc.every(v => !biActual.includes(v));
+                    // 基准宏候选：每条配置为"或"关系，任一满足即通过
+                    // （修复：多值不匹配——原实现把全部配置合并成一个大集合后 AND 判断，
+                    //   产生"须出现与不许出现"互相矛盾的约束，导致基准宏含多字段时恒不匹配）
+                    let candOk = biCandidates.length === 0;
+                    for(const cand of biCandidates){
+                        const cOk = cand.include.every(v => biActual.includes(v)) && cand.exclude.every(v => !biActual.includes(v));
+                        if(cOk){ candOk = true; break; }
+                    }
+                    // 增量包含/排除（inc包含/inc排除）：全部满足（与合并前行为一致）
+                    const incOk = biInc2.every(v => biActual.includes(v)) && biExc2.every(v => !biActual.includes(v));
+                    res = directOk && candOk && incOk;
                 }
                 actual = c.val;
             }
