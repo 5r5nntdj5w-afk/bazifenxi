@@ -11332,6 +11332,21 @@
                     const priorityInput = document.getElementById('rule-priority');
                     if (groupKeyInput) groupKeyInput.value = '';
                     if (priorityInput) priorityInput.value = '0';
+
+                    // 回填默认取值维度（从 conditions.defaultQuZhi 读取）
+                    const ruleDefQuZhiSelect = document.getElementById('rule-default-quzhi');
+                    if (ruleDefQuZhiSelect) {
+                        ruleDefQuZhiSelect.value = (rule.conditions && rule.conditions.defaultQuZhi) || '';
+                    }
+
+                    // 回填默认映射规则
+                    populateDefaultMappingSelect(document.getElementById('rule-default-mapping-sz'), '十神组');
+                    populateDefaultMappingSelect(document.getElementById('rule-default-mapping-wx'), '五行');
+                    const defMapping = (rule.conditions && rule.conditions.defaultMapping) || {};
+                    const ruleMapSzSel = document.getElementById('rule-default-mapping-sz');
+                    const ruleMapWxSel = document.getElementById('rule-default-mapping-wx');
+                    if (ruleMapSzSel) ruleMapSzSel.value = defMapping['十神组'] || '';
+                    if (ruleMapWxSel) ruleMapWxSel.value = defMapping['五行'] || '';
                     
                     // 清空现有条件组
                     const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
@@ -21838,6 +21853,59 @@ function batchEditTags() {
     document.getElementById('macro-batch-tags-modal').classList.remove('hidden');
 }
 
+// 批量删除选中的条件宏
+async function batchDeleteMacros() {
+    if (_selectedMacroIds.size === 0) return;
+    const ids = [..._selectedMacroIds];
+    const macros = ids.map(id => getMacroById(id)).filter(Boolean);
+    if (macros.length === 0) return;
+
+    // 权限限制：普通用户只能删除自己创建的条件宏（管理员可删所有）
+    const deletable = macros.filter(m => {
+        if (!m.createdBy || m.createdBy === getCurrentUserId()) return true;
+        return currentUser && isAdmin(currentUser.email);
+    });
+    const skipped = macros.length - deletable.length;
+    if (deletable.length === 0) {
+        alert('选中的条件宏均非您创建，无法删除（管理员除外）');
+        return;
+    }
+
+    // 引用统计（断语引用 + 宏间引用）
+    let refTotal = 0;
+    deletable.forEach(m => {
+        refTotal += getRulesReferencingMacro(m.id) + getMacrosReferencingMacro(m.id);
+    });
+
+    let msg = `确定要删除选中的 ${deletable.length} 个条件宏吗？`;
+    if (refTotal > 0) msg += `\n\n⚠️ 共 ${refTotal} 处引用（断语/条件宏）在删除后将失效！`;
+    if (skipped > 0) msg += `\n\n（另有 ${skipped} 个非您创建的宏已跳过，未纳入删除）`;
+    if (!confirm(msg)) return;
+
+    let successCount = 0;
+    for (const m of deletable) {
+        const id = m.id;
+        // 从 Supabase 删除（若已登录）
+        if (currentUser && supabaseClient) {
+            try {
+                const idMapping = getIdMapping();
+                const cloudId = getCloudId(idMapping, 'macros', id) || id;
+                await deleteSupabaseMacro(cloudId);
+                removeCloudId(idMapping, 'macros', id);
+                saveIdMapping(idMapping);
+            } catch (e) {
+                console.warn('删除云端宏失败（本地已删除）:', e);
+            }
+        }
+        deleteMacro(id);
+        successCount++;
+    }
+    clearMacroSelection();
+    renderMacroList();
+    updateMacroTagFilters();
+    alert(`已删除 ${successCount} 个条件宏${skipped > 0 ? `（跳过 ${skipped} 个非您创建的宏）` : ''}`);
+}
+
 let _batchAddTags = new Set();
 let _batchRemoveTags = new Set();
 
@@ -28579,6 +28647,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="text-sm text-indigo-700">已选择 <span id="macro-selected-count" class="font-bold">0</span> 个条件宏</span>
                 <button onclick="batchCopyMacros()" class="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs">📋 批量复制</button>
                 <button onclick="batchEditTags()" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs">🏷️ 批量调整标签</button>
+                <button onclick="batchDeleteMacros()" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs">🗑️ 批量删除</button>
                 <button onclick="clearMacroSelection()" class="px-3 py-1.5 bg-gray-400 text-white rounded text-xs">✖️ 取消选择</button>
             </div>
             <div id="macro-list" class="space-y-3">
