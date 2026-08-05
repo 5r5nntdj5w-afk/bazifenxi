@@ -554,10 +554,15 @@ function findMacroById(data, macroId) {
   return null;
 }
 
-// 从条件宏中提取批量包含配置
-function _extractBiConfigsFromMacro(macro, filterType, macros, data) {
+// 从条件宏中提取批量包含配置（支持嵌套映射引用递归展开）
+function _extractBiConfigsFromMacro(macro, filterType, macros, data, visited) {
   var configs = [];
   if (!macro || !macro.conditions) return configs;
+  // 防循环引用：嵌套映射引用（A→B→A）时用 visited 记录已展开的宏
+  var key = macro.cloudId != null ? macro.cloudId : macro.id;
+  visited = visited || {};
+  if (key != null && visited[String(key)]) return configs;
+  if (key != null) visited[String(key)] = true;
   function walk(node) {
     if (!node) return;
     if (node.macroRef) {
@@ -567,7 +572,24 @@ function _extractBiConfigsFromMacro(macro, filterType, macros, data) {
     }
     if (node.field && node.field.indexOf('批量包含-') === 0 && node.val && node.val.indexOf('批量包含|') === 0) {
       var parsed = _parseBiEncoded(node.val);
-      if (parsed && (!filterType || parsed.type === filterType)) {
+      if (!parsed) return;
+      // 【修复】字段本身是映射引用（mappingBase=基准宏）→ 递归展开其基准宏的批量包含配置，
+      // 并对每个子配置应用本字段的映射规则（解决嵌套映射引用时继承值为空的问题）
+      if (parsed.mappingBase) {
+        var subMacro2 = findMacroById(data || { macros: macros || [] }, parsed.mappingBase);
+        if (subMacro2) {
+          var subConfigs = _extractBiConfigsFromMacro(subMacro2, filterType || parsed.type, macros, data, visited);
+          var subRule = { type: parsed.mappingType || '', offset: parsed.mappingOffset || '', customMap: parsed.customMap || null };
+          for (var si = 0; si < subConfigs.length; si++) {
+            var sc = subConfigs[si];
+            if ((parsed.ganZhi === '通用' || sc.ganZhi === '通用' || sc.ganZhi === parsed.ganZhi) && sc.scope === parsed.scope) {
+              configs.push(_mapBiConfigValues(sc, subRule));
+            }
+          }
+        }
+        return;
+      }
+      if (!filterType || parsed.type === filterType) {
         configs.push(parsed);
       }
       return;
@@ -577,6 +599,7 @@ function _extractBiConfigsFromMacro(macro, filterType, macros, data) {
     }
   }
   walk(macro.conditions);
+  if (key != null) delete visited[String(key)];
   return configs;
 }
 
@@ -584,7 +607,7 @@ function _extractBiConfigsFromMacro(macro, filterType, macros, data) {
 function _parseBiEncoded(val) {
   if (!val || val.indexOf('批量包含|') !== 0) return null;
   var parts = val.split('|');
-  var result = { type: '', ganZhi: '通用', scope: '原局', include: [], exclude: [] };
+  var result = { type: '', ganZhi: '通用', scope: '原局', include: [], exclude: [], mappingBase: '', mappingRule: '', mappingType: '', mappingOffset: '', customMap: null };
   for (var i = 0; i < parts.length; i++) {
     var p = parts[i];
     if (p === '批量包含') continue;
@@ -593,6 +616,11 @@ function _parseBiEncoded(val) {
     else if (p.indexOf('scope=') === 0) result.scope = p.replace('scope=','');
     else if (p.indexOf('包含=') === 0) { var s = p.replace('包含=',''); if (s) result.include = s.split(','); }
     else if (p.indexOf('排除=') === 0) { var s = p.replace('排除=',''); if (s) result.exclude = s.split(','); }
+    else if (p.indexOf('mappingBase=') === 0) result.mappingBase = p.replace('mappingBase=','');
+    else if (p.indexOf('mapping=') === 0) result.mappingRule = p.replace('mapping=','');
+    else if (p.indexOf('mappingType=') === 0) result.mappingType = p.replace('mappingType=','');
+    else if (p.indexOf('mappingOffset=') === 0) result.mappingOffset = p.replace('mappingOffset=','');
+    else if (p.indexOf('customMap=') === 0) { try { result.customMap = JSON.parse(decodeURIComponent(p.replace('customMap=',''))); } catch(e) {} }
   }
   return result;
 }
@@ -1128,6 +1156,8 @@ function evaluateLeafCondition(data, cond, context) {
 
   // ---- 批量包含判断 ----
   else if (field.indexOf('批量包含-') === 0 && val && val.indexOf('批量包含|') === 0) {
+    var biDbg = function(msg){ if (data && Array.isArray(data.biDebug)) data.biDebug.push(msg); };
+    biDbg('[批量包含] 字段=' + field + ' 编码=' + val);
     var biParts = val.split('|');
     var biType = '十神组', biGanZhi = '通用', biScope = '原局';
     var biInclude = [], biExclude = [];
@@ -1163,6 +1193,7 @@ function evaluateLeafCondition(data, cond, context) {
         if (exc2Str) biExc2 = exc2Str.split(',');
       }
     }
+    biDbg('  解析: type=' + biType + ' ganZhi=' + biGanZhi + ' scope=' + biScope + ' include=[' + biInclude.join(',') + '] exclude=[' + biExclude.join(',') + '] 增量包含=[' + biInc2.join(',') + '] 增量排除=[' + biExc2.join(',') + ']');
 
     // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
     if (biMappingBase || biMappingRule) {
@@ -1175,6 +1206,7 @@ function evaluateLeafCondition(data, cond, context) {
         } catch(e) {}
       }
       var biResolvedMap = resolveDefaultMapping(biFieldTypeForMapping, ruleDefaultMapping, macroDefaultMapping, biMappingRule, biMappingRulesList);
+      var biFieldSnapshotRule = biMappingRule;
       // 仅断语级/条件宏级 defaultMapping 生效时用规则当前值覆盖字段快照；
       // 字段级回退（_source='field'）时保留字段编码中的快照值，避免规则修改后旧配置行为突变
       if (biResolvedMap && biResolvedMap._source !== 'field') {
@@ -1183,18 +1215,34 @@ function evaluateLeafCondition(data, cond, context) {
         biCustomMap = biResolvedMap.customMap;
         biMappingRule = biResolvedMap._ruleId;
       }
+      biDbg('  映射规则: 字段快照 rule=' + (biFieldSnapshotRule || '空') + ' 生效 ruleId=' + (biMappingRule || '空') + ' type=' + (biMappingType || '空') + ' offset=' + (biMappingOffset || '空') + ' customMap=' + (biCustomMap ? JSON.stringify(biCustomMap) : 'null'));
     }
+
+    // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+    var biQuZhi = '';
+    if (ruleDefaultQuZhi) biQuZhi = ruleDefaultQuZhi;
+    if (!biQuZhi && biGanZhi !== '通用') biQuZhi = biGanZhi;
+    if (!biQuZhi && macroDefaultQuZhi) biQuZhi = macroDefaultQuZhi;
+    // 实际收集取值维度：通用（未指定）时后备为天干
+    var biActualGzFinal = biQuZhi || (biGanZhi !== '通用' ? biGanZhi : '天干');
+    biDbg('  取值维度: 规则默认=' + (ruleDefaultQuZhi || '空') + ' 字段=' + biGanZhi + ' 宏默认=' + (macroDefaultQuZhi || '空') + ' → 最终收集=' + biActualGzFinal);
 
     // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
     var biBaseMacro = null;
     if (biMappingBase) {
       // 通过 idMapping 解析基准宏（mappingBase 可能是本地ID，云端需解析为 cloudId）
       biBaseMacro = findMacroById(data, biMappingBase);
+      biDbg('  基准宏: mappingBase=' + biMappingBase + ' → ' + (biBaseMacro ? '找到(' + (biBaseMacro.name || '') + ')' : '未找到(fail-closed)'));
       if (biBaseMacro) {
         var biConfigs = _extractBiConfigsFromMacro(biBaseMacro, biType, data && data.macros ? data.macros : [], data);
+        biDbg('  基准宏提取配置数=' + biConfigs.length);
         for (var bci = 0; bci < biConfigs.length; bci++) {
           var bc = biConfigs[bci];
-          if (bc.ganZhi === biGanZhi && bc.scope === biScope) {
+          // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
+          // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
+          var bcGzOk = bc.ganZhi === '通用' || bc.ganZhi === biActualGzFinal;
+          biDbg('    config[' + bci + ']: type=' + bc.type + ' ganZhi=' + bc.ganZhi + ' scope=' + bc.scope + ' include=[' + (bc.include||[]).join(',') + '] exclude=[' + (bc.exclude||[]).join(',') + '] 维度兼容=' + bcGzOk + ' scope一致=' + (bc.scope === biScope));
+          if (bcGzOk && bc.scope === biScope) {
             var bcRule = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
             var bcMapped = _mapBiConfigValues(bc, bcRule);
             biInclude = biInclude.concat(bcMapped.include);
@@ -1206,26 +1254,22 @@ function evaluateLeafCondition(data, cond, context) {
       biInclude = biInclude.concat(biInc2);
       biExclude = biExclude.concat(biExc2);
     }
+    biDbg('  合并后: include=[' + biInclude.join(',') + '] exclude=[' + biExclude.join(',') + ']');
 
-    // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
-    var biQuZhi = '';
-    if (ruleDefaultQuZhi) biQuZhi = ruleDefaultQuZhi;
-    if (!biQuZhi && biGanZhi !== '通用') biQuZhi = biGanZhi;
-    if (!biQuZhi && macroDefaultQuZhi) biQuZhi = macroDefaultQuZhi;
-
-    // 通用模式且未指定取值维度 → 不判断
-    // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed），
+    // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed）
+    // 合并后无任何包含/排除配置可判定 → 判定不满足（fail-closed），
     // 避免 include=[] 导致 every() 恒真而误匹配所有断语（与定位批量 inherit/mapping 行为一致）
     if (biMappingBase && !biBaseMacro) {
       res = false;
       actual = val;
-    } else if (biGanZhi === '通用' && !biQuZhi) {
+      biDbg('  判定: ❌ 不匹配（基准宏未找到 fail-closed）');
+    } else if (biInclude.length === 0 && biExclude.length === 0) {
       res = false;
       actual = val;
+      biDbg('  判定: ❌ 不匹配（无任何包含/排除配置可判定 fail-closed）');
     } else {
       // 确定实际取值维度
-      var actualBiGz = biQuZhi || biGanZhi; // 天干 or 地支
-      if (actualBiGz === '通用') actualBiGz = '天干'; // 后备默认
+      var actualBiGz = biActualGzFinal;
 
       // 确定要收集的柱位
       var biPillars = [];
@@ -1272,6 +1316,7 @@ function evaluateLeafCondition(data, cond, context) {
       }
       res = biIncludeOk && biExcludeOk;
       actual = val;
+      biDbg('  八字实际值(' + actualBiGz + ',' + biScope + ')=[' + biActualVals.join(',') + '] → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配（' + (biIncludeOk ? '' : '包含值未全部命中') + (biIncludeOk ? '' : biExcludeOk ? '' : '; ') + (biExcludeOk ? '' : '排除值被命中') + '）'));
     }
   }
 
@@ -2122,7 +2167,7 @@ function filterRulesByAccess(rules, currentUserId, isAdmin) {
 
 // ===================== 主匹配函数 =====================
 
-function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules, birthYear, macros, macroIdMapping, mappingRules) {
+function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules, birthYear, macros, macroIdMapping, mappingRules, biDebug) {
   var md = {
     nian: { t: baziData.bazi.nian.gan, d: baziData.bazi.nian.zhi },
     yue:  { t: baziData.bazi.yue.gan, d: baziData.bazi.yue.zhi },
@@ -2133,7 +2178,8 @@ function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules
     macros: macros || [],
     rules: rules || [],
     idMapping: macroIdMapping ? { macros: macroIdMapping } : null,
-    mappingRules: mappingRules || null
+    mappingRules: mappingRules || null,
+    biDebug: biDebug ? [] : null
   };
   if (dayunItem) md.dayun = { t: dayunItem.gan, d: dayunItem.zhi, ganZhi: dayunItem.ganZhi };
   if (liunianItem) md.liunian = { t: liunianItem.gan, d: liunianItem.zhi, ganZhi: liunianItem.ganZhi };
@@ -2179,6 +2225,9 @@ function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules
     }
   }
   result = ungrouped.concat(deduped);
+
+  // 调试信息随结果返回（仅 body.debug=true 时启用）
+  result._biDebug = md.biDebug;
 
   return result;
 }
@@ -2274,8 +2323,9 @@ module.exports = async (req, res) => {
     var currentDayun = body.currentDayun || null;
     var currentLiunian = body.currentLiunian || null;
     var currentLiuyue = body.currentLiuyue || null;
+    var biDebug = !!(body.debug === true || body.debug === 'true' || body.debug === 1 || body.debug === '1');
     
-    var matched = matchDuanyu(baziData, currentDayun, currentLiunian, currentLiuyue, baziData.gender, rules, birthYear, macros, body.macroIdMapping || null, body.mappingRules || null);
+    var matched = matchDuanyu(baziData, currentDayun, currentLiunian, currentLiuyue, baziData.gender, rules, birthYear, macros, body.macroIdMapping || null, body.mappingRules || null, biDebug);
     var result = matched.map(function(r) {
       return {
         duanyu: r.duanyu_text,
@@ -2286,11 +2336,12 @@ module.exports = async (req, res) => {
       };
     });
 
+    var respData = { duanyu: result };
+    if (biDebug) respData.debug = matched._biDebug || [];
+
     return res.json({
       success: true,
-      data: {
-        duanyu: result
-      }
+      data: respData
     });
 
   } catch (e) {

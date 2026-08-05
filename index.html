@@ -3660,6 +3660,11 @@
     /** 调用 /api/matchDuanyu（Vercel 服务端匹配） */
     function callDuanyuMatchApi(baziData, gender, birthYear, dayunList, liunianList, currentDayun, currentLiunian, currentLiuyue) {
       var matchUrl = window.location.origin + '/api/matchDuanyu';
+      // 调试开关：控制台执行 window.__BI_DEBUG = true 或 URL 加 ?bidebug=1
+      var biDebug = (window.__BI_DEBUG === true || /[?&]bidebug=1/.test(window.location.search));
+      if (biDebug) {
+        console.log('%c[BI-DEBUG] 断语匹配请求：八字=' + (baziData ? (baziData.nian.gan + baziData.nian.zhi + ' ' + baziData.yue.gan + baziData.yue.zhi + ' ' + baziData.ri.gan + baziData.ri.zhi + ' ' + baziData.shi.gan + baziData.shi.zhi) : '') + ' 性别=' + gender + ' 大运=' + (currentDayun ? currentDayun.ganZhi : '无') + ' 流年=' + (currentLiunian ? currentLiunian.ganZhi : '无') + ' 流月=' + (currentLiuyue ? (currentLiuyue.gan + currentLiuyue.zhi) : '无'), 'color:#b45309;font-weight:bold');
+      }
       return new Promise(function(resolve, reject) {
         var xhr = new XMLHttpRequest();
         xhr.open('POST', matchUrl, true);
@@ -3668,7 +3673,13 @@
           if (xhr.status === 200) {
             try {
               var result = JSON.parse(xhr.responseText);
+              if (result && result.data && result.data.debug && Array.isArray(result.data.debug)) {
+                console.log('%c[BI-DEBUG] 批量包含诊断（' + result.data.debug.length + ' 条）', 'color:#b45309;font-weight:bold');
+                result.data.debug.forEach(function(d){ console.log('%c[BI-DEBUG] ' + d, 'color:#92400e'); });
+                window.__BI_DEBUG_DATA = result.data.debug;
+              }
               if (result && result.success && result.data && result.data.duanyu) {
+                if (biDebug) console.log('%c[BI-DEBUG] 匹配断语数=' + result.data.duanyu.length, 'color:#b45309;font-weight:bold');
                 resolve(result.data.duanyu);
               } else {
                 reject(new Error(result && result.error ? result.error : '断语匹配 API 返回异常'));
@@ -3693,7 +3704,8 @@
           currentUserId: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null,
           isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false,
           macroIdMapping: (function() { try { return (getIdMapping() || {}).macros || {}; } catch(e) { return {}; } })(),
-          mappingRules: (typeof getMappingRules === 'function') ? getMappingRules() : []
+          mappingRules: (typeof getMappingRules === 'function') ? getMappingRules() : [],
+          debug: biDebug ? true : undefined
         }));
       });
     }
@@ -7754,6 +7766,16 @@
                     }
                 }
 
+                // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+                let biQuZhi = '';
+                const biRuleDefQz = ctxMapping.ruleDefaultQuZhi || '';
+                const biMacroDefQz = ctxMapping.macroDefaultQuZhi || '';
+                if(biRuleDefQz) biQuZhi = biRuleDefQz;
+                if(!biQuZhi && biGz !== '通用') biQuZhi = biGz;
+                if(!biQuZhi && biMacroDefQz) biQuZhi = biMacroDefQz;
+                // 实际收集取值维度：通用（未指定）时后备为天干
+                const biActualGzFinal = biQuZhi || (biGz !== '通用' ? biGz : '天干');
+
                 // 如果是映射模式，从基准宏获取配置并应用映射（映射规则可选，未选时恒等映射）
                 let biBaseFound = false;
                 if(biMappingBase){
@@ -7771,7 +7793,10 @@
                         biBaseFound = true;
                         const configs = extractBiConfigsFromMacro(baseMacro, biType);
                         configs.forEach(cfg => {
-                            if(cfg.ganZhi === biGz && cfg.scope === biSc){
+                            // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
+                            // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
+                            const cfgGzOk = cfg.ganZhi === '通用' || cfg.ganZhi === biActualGzFinal;
+                            if(cfgGzOk && cfg.scope === biSc){
                                 const ruleObj = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
                                 const mapped = mapBiConfigValues(cfg, ruleObj);
                                 biInc = biInc.concat(mapped.include);
@@ -7784,23 +7809,15 @@
                     biExc = biExc.concat(biExc2);
                 }
 
-                // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
-                let biQuZhi = '';
-                const biRuleDefQz = ctxMapping.ruleDefaultQuZhi || '';
-                const biMacroDefQz = ctxMapping.macroDefaultQuZhi || '';
-                if(biRuleDefQz) biQuZhi = biRuleDefQz;
-                if(!biQuZhi && biGz !== '通用') biQuZhi = biGz;
-                if(!biQuZhi && biMacroDefQz) biQuZhi = biMacroDefQz;
-
-                // 通用模式且未指定取值维度 → 不判断
-                // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed），
+                // 映射引用模式且基准宏无法解析 → 判定不满足（fail-closed）
+                // 无任何包含/排除配置可判定 → 判定不满足（fail-closed），
                 // 避免 include=[] 导致 every() 恒真而误匹配所有断语（与定位批量 inherit/mapping 行为一致）
                 if(biMappingBase && !biBaseFound){
                     res = false;
-                } else if(biGz === '通用' && !biQuZhi){
+                } else if(biInc.length === 0 && biExc.length === 0){
                     res = false;
                 } else {
-                    const actualBiGz = biQuZhi || biGz;
+                    const actualBiGz = biActualGzFinal;
                     const biPillars = biSc === '原局' ? ['nian','yue','ri','shi']
                         : biSc === '原局+大运' ? ['nian','yue','ri','shi','dayun']
                         : biSc === '原局+大运+流年' ? ['nian','yue','ri','shi','dayun','liunian']
@@ -30430,9 +30447,14 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
     };
 
     // 从条件宏中提取批量包含配置
-    function extractBiConfigsFromMacro(macro, filterType){
+    function extractBiConfigsFromMacro(macro, filterType, _visited){
         const configs = [];
         if(!macro || !macro.conditions) return configs;
+        // 防循环引用：嵌套映射引用（A→B→A）时用 visited 集合记录已展开的宏
+        _visited = _visited || new Set();
+        const key = macro.cloudId || macro.id;
+        if(key != null && _visited.has(String(key))) return configs;
+        if(key != null) _visited.add(String(key));
         function walk(node){
             if(!node) return;
             if(node.macroRef){
@@ -30442,7 +30464,23 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             }
             if(node.field && node.field.startsWith('批量包含-') && node.val && node.val.startsWith('批量包含|')){
                 const parsed = parseBiEncoded(node.val);
-                if(parsed && (!filterType || parsed.type === filterType)){
+                if(!parsed) return;
+                // 【修复】字段本身是映射引用（mappingBase=基准宏）→ 递归展开其基准宏的批量包含配置，
+                // 并对每个子配置应用本字段的映射规则（解决嵌套映射引用时继承值为空的问题）
+                if(parsed.mappingBase){
+                    const subMacro = getMacroById(parsed.mappingBase);
+                    if(subMacro){
+                        const subConfigs = extractBiConfigsFromMacro(subMacro, filterType || parsed.type, _visited);
+                        const subRule = { type: parsed.mappingType, offset: parsed.mappingOffset, customMap: parsed.customMap };
+                        subConfigs.forEach(sc => {
+                            if((parsed.ganZhi === '通用' || sc.ganZhi === '通用' || sc.ganZhi === parsed.ganZhi) && sc.scope === parsed.scope){
+                                configs.push(mapBiConfigValues(sc, subRule));
+                            }
+                        });
+                    }
+                    return;
+                }
+                if(!filterType || parsed.type === filterType){
                     configs.push(parsed);
                 }
                 return;
@@ -30452,6 +30490,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             }
         }
         walk(macro.conditions);
+        if(key != null) _visited.delete(String(key));
         return configs;
     }
 
@@ -30459,7 +30498,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
     function parseBiEncoded(val){
         if(!val || !val.startsWith('批量包含|')) return null;
         const parts = val.split('|');
-        const result = { type: '', ganZhi: '通用', scope: '原局', include: [], exclude: [] };
+        const result = { type: '', ganZhi: '通用', scope: '原局', include: [], exclude: [], mappingBase: '', mappingRule: '', mappingType: '', mappingOffset: '', customMap: null };
         for(const p of parts){
             if(p === '批量包含') continue;
             if(p.startsWith('type=')) result.type = p.replace('type=','');
@@ -30467,6 +30506,11 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             else if(p.startsWith('scope=')) result.scope = p.replace('scope=','');
             else if(p.startsWith('包含=')) { const s = p.replace('包含=',''); if(s) result.include = s.split(',').filter(v => v); }
             else if(p.startsWith('排除=')) { const s = p.replace('排除=',''); if(s) result.exclude = s.split(',').filter(v => v); }
+            else if(p.startsWith('mappingBase=')) result.mappingBase = p.replace('mappingBase=','');
+            else if(p.startsWith('mapping=')) result.mappingRule = p.replace('mapping=','');
+            else if(p.startsWith('mappingType=')) result.mappingType = p.replace('mappingType=','');
+            else if(p.startsWith('mappingOffset=')) result.mappingOffset = p.replace('mappingOffset=','');
+            else if(p.startsWith('customMap=')) { try { result.customMap = JSON.parse(decodeURIComponent(p.replace('customMap=',''))); } catch(e){} }
         }
         return result;
     }
@@ -30593,6 +30637,11 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             return;
         }
         const macro = getMacroById(_biSelectedMappingMacroId);
+        const biDbgOn = (window.__BI_DEBUG === true || /[?&]bidebug=1/.test(window.location.search));
+        if(biDbgOn){
+            console.log('%c[BI-DEBUG] 映射预览: 当前字段=' + _biCurrentField + ' 基准宏ID=' + _biSelectedMappingMacroId, 'color:#0369a1;font-weight:bold');
+            console.log('%c[BI-DEBUG] 基准宏解析=', 'color:#0369a1', macro ? { id: macro.id, cloudId: macro.cloudId, name: macro.name, conditions: macro.conditions } : null);
+        }
         if(!macro){
             previewEl.innerHTML = '<span class="text-red-400">未找到基准条件宏</span>';
             return;
@@ -30600,6 +30649,12 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         // 映射规则可选，未选时使用恒等映射（保持原值）
         const rule = ruleId ? getMappingRuleById(ruleId) : null;
         const configs = extractBiConfigsFromMacro(macro);
+        if(biDbgOn){
+            console.log('%c[BI-DEBUG] 提取配置数=' + configs.length, 'color:#0369a1');
+            configs.forEach((c, i) => {
+                console.log('%c[BI-DEBUG]   config[' + i + ']: type=' + c.type + ' ganZhi=' + c.ganZhi + ' scope=' + c.scope + ' include=[' + (c.include||[]).join(',') + '] exclude=[' + (c.exclude||[]).join(',') + ']', 'color:#075985');
+            });
+        }
         if(configs.length === 0){
             previewEl.innerHTML = '<span class="text-gray-400">该条件宏中无批量包含配置</span>';
             return;
