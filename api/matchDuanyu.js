@@ -415,8 +415,50 @@ function extractInheritArrangements(data, macroId, visited) {
           arrangements.push(newArr);
         }
       } else {
-        // 普通定位批量排列，直接收集
-        arrangements.push(node.val);
+        // 检查是否本身是映射引用（嵌套映射：基准宏内的字段又映射引用其他宏）
+        var subMappingBaseId = '';
+        for (var smi = 0; smi < subParts.length; smi++) {
+          if (subParts[smi].indexOf('mappingBase=') === 0) {
+            subMappingBaseId = subParts[smi].replace('mappingBase=', '');
+            break;
+          }
+        }
+        if (subMappingBaseId) {
+          // 嵌套映射：递归展开被引用宏的排列，应用该字段自身的映射规则，再追加该字段的增量条件
+          var subMappingType = '', subMappingOffset = '';
+          var subCustomMap = null;
+          for (var smi2 = 0; smi2 < subParts.length; smi2++) {
+            if (subParts[smi2].indexOf('mappingType=') === 0) subMappingType = subParts[smi2].replace('mappingType=','');
+            else if (subParts[smi2].indexOf('mappingOffset=') === 0) subMappingOffset = subParts[smi2].replace('mappingOffset=','');
+            else if (subParts[smi2].indexOf('customMap=') === 0) {
+              try { subCustomMap = JSON.parse(decodeURIComponent(subParts[smi2].replace('customMap=',''))); } catch(e) { subCustomMap = null; }
+            }
+          }
+          var subArr3 = extractInheritArrangements(data, subMappingBaseId, visited);
+          // 提取该节点的增量位置条件（排除元信息段）
+          var incPos2 = {};
+          for (var spi3 = 0; spi3 < subParts.length; spi3++) {
+            var sp3 = subParts[spi3];
+            if (sp3.indexOf('=') > 0 && sp3.indexOf('type=') !== 0 && sp3.indexOf('ganZhi=') !== 0 && sp3.indexOf('scope=') !== 0 && sp3.indexOf('取值=') !== 0 && sp3.indexOf('inherit=') !== 0 && sp3.indexOf('flip=') !== 0 && sp3.indexOf('mapping=') !== 0 && sp3.indexOf('mappingBase=') !== 0 && sp3.indexOf('mappingType=') !== 0 && sp3.indexOf('mappingOffset=') !== 0 && sp3.indexOf('customMap=') !== 0) {
+              var sop2 = 'eq';
+              var sval2 = sp3;
+              if (sp3.indexOf('!=') > 0) { sop2 = 'ne'; sval2 = sp3.replace('!=','='); }
+              var skv2 = sval2.split('=');
+              if (skv2.length === 2 && skv2[1]) {
+                incPos2[skv2[0]] = { op: sop2, val: skv2[1] };
+              }
+            }
+          }
+          for (var sai2 = 0; sai2 < subArr3.length; sai2++) {
+            // 先应用该字段自身的映射规则，再追加该字段的增量条件（增量保持字面值）
+            var mappedSub = applyMappingToArrangement(subArr3[sai2], subMappingType, subMappingOffset, subCustomMap);
+            var newArr2 = mergeArrangementWithIncrement(mappedSub, incPos2);
+            arrangements.push(newArr2);
+          }
+        } else {
+          // 普通定位批量排列，直接收集
+          arrangements.push(node.val);
+        }
       }
       return;
     }
@@ -442,7 +484,7 @@ function mergeArrangementWithIncrement(baseVal, incPositions) {
     var p = parts[i];
     if (p === '定位批量') continue;
     if (p.indexOf('scope=') === 0) continue; // 跳过 scope（继承后范围可能变化）
-    if (p.indexOf('=') > 0 && p.indexOf('type=') !== 0 && p.indexOf('ganZhi=') !== 0 && p.indexOf('取值=') !== 0 && p.indexOf('inherit=') !== 0) {
+    if (p.indexOf('=') > 0 && p.indexOf('type=') !== 0 && p.indexOf('ganZhi=') !== 0 && p.indexOf('取值=') !== 0 && p.indexOf('inherit=') !== 0 && p.indexOf('flip=') !== 0 && p.indexOf('mapping=') !== 0 && p.indexOf('mappingBase=') !== 0 && p.indexOf('mappingType=') !== 0 && p.indexOf('mappingOffset=') !== 0 && p.indexOf('customMap=') !== 0 && p.indexOf('inc包含=') !== 0 && p.indexOf('inc排除=') !== 0) {
       // 位置条件，记录下来（后续会被增量覆盖）
       basePositions[p.split('=')[0].replace('!','')] = p;
     } else {
