@@ -28994,7 +28994,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div id="pb-mapping-preview" class="text-xs text-gray-600 bg-white border rounded p-2 max-h-32 overflow-y-auto">
                         <span class="text-gray-400">选择基准条件宏和映射规则后将显示映射预览</span>
                     </div>
-                    <p class="text-xs text-gray-400 mt-1">ℹ 映射引用会自动继承基准条件宏的原局翻转设置</p>
+                    <p class="text-xs text-gray-400 mt-1">ℹ 映射引用会自动继承基准条件宏的原局翻转设置；基准宏内所有配置按"任一满足即通过"（或）匹配，其内部的条件组逻辑（并且/排除/全排除）不生效</p>
                 </div>
             </div>
             <p class="text-xs text-gray-500 mb-2">提示：未勾选的位置表示"不限"；每个位置可独立选择"等于/不等于"。</p>
@@ -30328,7 +30328,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                     <label class="text-xs font-medium text-gray-700">增量排除（映射后额外排除的值）</label>
                     <div id="bi-increment-exclude" class="flex flex-wrap gap-1 mt-1"></div>
                 </div>
-                <p class="text-xs text-gray-400">ℹ 映射引用会自动继承基准条件宏的包含/排除配置</p>
+                <p class="text-xs text-gray-400">ℹ 映射引用会自动继承基准条件宏的包含/排除配置；基准宏内所有配置按"任一满足即通过"（或）匹配，其内部的条件组逻辑（并且/排除/全排除）不生效</p>
             </div>
         </div>
         <div id="bi-checkbox-area" class="mb-4">
