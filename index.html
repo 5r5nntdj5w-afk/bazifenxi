@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7606,65 +7606,94 @@
                     const flipped = flipPositions(positions, pbGanZhi);
                     return evalPositions(flipped);
                 };
+                // 从条件宏列表中查找（inherit 与映射模式共用）
+                const macros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
+                // 共享提取器：递归提取定位批量排列（位置对象 {位置名:{op,val}}）
+                // 支持：宏引用 macroRef、嵌套 inherit、嵌套映射引用 mappingBase、普通排列
+                const extractPbArrangements = (macroId, visited) => {
+                    if(!macroId || visited[macroId]) return [];
+                    visited[macroId] = true;
+                    const macro = macros.find(m => String(m.id) === String(macroId) || String(m.cloudId) === String(macroId));
+                    if(!macro || !macro.conditions) return [];
+                    const arrs = [];
+                    const walk = (node) => {
+                        if(!node) return;
+                        if(node.macroRef){
+                            const sub = extractPbArrangements(node.macroRef, visited);
+                            sub.forEach(v => arrs.push(v));
+                            return;
+                        }
+                        if(node.field && node.field.startsWith('定位批量-') && node.val && node.val.startsWith('定位批量|')){
+                            const sp = node.val.split('|');
+                            let subInherit = '';
+                            let subMappingBase = '';
+                            let subMapType = '', subMapOffset = '';
+                            let subCustomMap = null;
+                            sp.forEach(pp => {
+                                if(pp.startsWith('inherit=')) subInherit = pp.replace('inherit=','');
+                                else if(pp.startsWith('mappingBase=')) subMappingBase = pp.replace('mappingBase=','');
+                                else if(pp.startsWith('mappingType=')) subMapType = pp.replace('mappingType=','');
+                                else if(pp.startsWith('mappingOffset=')) subMapOffset = pp.replace('mappingOffset=','');
+                                else if(pp.startsWith('customMap=')){ try { subCustomMap = JSON.parse(decodeURIComponent(pp.replace('customMap=',''))); } catch(e){} }
+                            });
+                            // 位置段判断（排除所有元信息段）
+                            const isPosSeg = (pp) => pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=') && !pp.startsWith('flip=') && !pp.startsWith('mapping=') && !pp.startsWith('mappingBase=') && !pp.startsWith('mappingType=') && !pp.startsWith('mappingOffset=') && !pp.startsWith('customMap=');
+                            const collectIncPos = () => {
+                                const incPos = {};
+                                sp.forEach(pp => {
+                                    if(isPosSeg(pp)){
+                                        let op2 = 'eq', v2 = pp;
+                                        if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
+                                        const [pn, pv] = v2.split('=');
+                                        if(pn && pv) incPos[pn] = { op: op2, val: pv };
+                                    }
+                                });
+                                return incPos;
+                            };
+                            if(subInherit){
+                                // 嵌套 inherit：递归展开被引用宏的排列，追加该节点的增量条件
+                                const subArrs = extractPbArrangements(subInherit, visited);
+                                const incPos = collectIncPos();
+                                subArrs.forEach(basePositions => {
+                                    const merged = { ...basePositions };
+                                    Object.assign(merged, incPos);
+                                    arrs.push(merged);
+                                });
+                            } else if(subMappingBase){
+                                // 嵌套映射：递归展开被引用宏的排列，应用该字段自身的映射规则，再追加增量条件（增量保持字面值）
+                                const subArrs = extractPbArrangements(subMappingBase, visited);
+                                const incPos = collectIncPos();
+                                subArrs.forEach(basePositions => {
+                                    const mapped = {};
+                                    for(const pos in basePositions){
+                                        mapped[pos] = { op: basePositions[pos].op, val: applyMappingValue(basePositions[pos].val, subMapType, subMapOffset, subCustomMap) };
+                                    }
+                                    const merged = { ...mapped, ...incPos };
+                                    arrs.push(merged);
+                                });
+                            } else {
+                                // 普通定位批量排列，直接收集
+                                const posObj = {};
+                                sp.forEach(pp => {
+                                    if(isPosSeg(pp)){
+                                        let op2 = 'eq', v2 = pp;
+                                        if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
+                                        const [pn, pv] = v2.split('=');
+                                        if(pn && pv) posObj[pn] = { op: op2, val: pv };
+                                    }
+                                });
+                                arrs.push(posObj);
+                            }
+                            return;
+                        }
+                        if(node.logic && node.children) node.children.forEach(walk);
+                    };
+                    walk(macro.conditions);
+                    return arrs;
+                };
                 // inherit 模式
                 if(pbInheritId){
-                    // 从条件宏列表中查找
-                    const macros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
-                    const visited = {};
-                    const extractArrangements = (macroId) => {
-                        if(!macroId || visited[macroId]) return [];
-                        visited[macroId] = true;
-                        const macro = macros.find(m => String(m.id) === String(macroId) || String(m.cloudId) === String(macroId));
-                        if(!macro || !macro.conditions) return [];
-                        const arrs = [];
-                        const walk = (node) => {
-                            if(!node) return;
-                            if(node.macroRef){
-                                const sub = extractArrangements(node.macroRef);
-                                sub.forEach(v => arrs.push(v));
-                                return;
-                            }
-                            if(node.field && node.field.startsWith('定位批量-') && node.val && node.val.startsWith('定位批量|')){
-                                let subInherit = '';
-                                const sp = node.val.split('|');
-                                sp.forEach(pp => { if(pp.startsWith('inherit=')) subInherit = pp.replace('inherit=',''); });
-                                if(subInherit){
-                                    const subArrs = extractArrangements(subInherit);
-                                    const incPos = {};
-                                    sp.forEach(pp => {
-                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=') && !pp.startsWith('flip=') && !pp.startsWith('mapping=') && !pp.startsWith('mappingBase=') && !pp.startsWith('mappingType=') && !pp.startsWith('mappingOffset=') && !pp.startsWith('customMap=')){
-                                            let op2 = 'eq', v2 = pp;
-                                            if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
-                                            const [pn, pv] = v2.split('=');
-                                            if(pn && pv) incPos[pn] = { op: op2, val: pv };
-                                        }
-                                    });
-                                    subArrs.forEach(basePositions => {
-                                        // subArrs 返回的是位置对象 {posName: {op, val}}，直接合并
-                                        const merged = { ...basePositions };
-                                        Object.assign(merged, incPos);
-                                        arrs.push(merged);
-                                    });
-                                } else {
-                                    const posObj = {};
-                                    sp.forEach(pp => {
-                                        if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=') && !pp.startsWith('flip=') && !pp.startsWith('mapping=') && !pp.startsWith('mappingBase=') && !pp.startsWith('mappingType=') && !pp.startsWith('mappingOffset=') && !pp.startsWith('customMap=')){
-                                            let op2 = 'eq', v2 = pp;
-                                            if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
-                                            const [pn, pv] = v2.split('=');
-                                            if(pn && pv) posObj[pn] = { op: op2, val: pv };
-                                        }
-                                    });
-                                    arrs.push(posObj);
-                                }
-                                return;
-                            }
-                            if(node.logic && node.children) node.children.forEach(walk);
-                        };
-                        walk(macro.conditions);
-                        return arrs;
-                    };
-                    const arrangements = extractArrangements(pbInheritId);
+                    const arrangements = extractPbArrangements(pbInheritId, {});
                     if(arrangements.length === 0){
                         res = false;
                     } else {
@@ -7676,41 +7705,7 @@
                     }
                 } else if(pbMappingBaseId){
                     // 映射模式：基于基准条件宏的排列 + 映射转换 + 增量条件
-                    const macros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
-                    const mVisited = {};
-                    const extractMappingArrangements = (macroId) => {
-                        if(!macroId || mVisited[macroId]) return [];
-                        mVisited[macroId] = true;
-                        const macro = macros.find(m => String(m.id) === String(macroId) || String(m.cloudId) === String(macroId));
-                        if(!macro || !macro.conditions) return [];
-                        const arrs = [];
-                        const walk = (node) => {
-                            if(!node) return;
-                            if(node.macroRef){
-                                const sub = extractMappingArrangements(node.macroRef);
-                                sub.forEach(v => arrs.push(v));
-                                return;
-                            }
-                            if(node.field && node.field.startsWith('定位批量-') && node.val && node.val.startsWith('定位批量|')){
-                                const sp = node.val.split('|');
-                                const posObj = {};
-                                sp.forEach(pp => {
-                                    if(pp.includes('=') && !pp.startsWith('type=') && !pp.startsWith('ganZhi=') && !pp.startsWith('scope=') && !pp.startsWith('取值=') && !pp.startsWith('inherit=') && !pp.startsWith('flip=') && !pp.startsWith('mapping=') && !pp.startsWith('mappingBase=') && !pp.startsWith('mappingType=') && !pp.startsWith('mappingOffset=') && !pp.startsWith('customMap=')){
-                                        let op2 = 'eq', v2 = pp;
-                                        if(pp.includes('!=')){ op2 = 'ne'; v2 = pp.replace('!=','='); }
-                                        const [pn, pv] = v2.split('=');
-                                        if(pn && pv) posObj[pn] = { op: op2, val: pv };
-                                    }
-                                });
-                                arrs.push(posObj);
-                                return;
-                            }
-                            if(node.logic && node.children) node.children.forEach(walk);
-                        };
-                        walk(macro.conditions);
-                        return arrs;
-                    };
-                    const mArrangements = extractMappingArrangements(pbMappingBaseId);
+                    const mArrangements = extractPbArrangements(pbMappingBaseId, {});
                     if(mArrangements.length === 0){
                         res = false;
                     } else {
