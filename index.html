@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -21369,7 +21369,8 @@ function renderMacroList() {
                 </div>
                 ${editable ? `<div class="flex gap-1 shrink-0 ml-2">
                     ${m.createdBy && m.createdBy === getCurrentUserId() ? 
-                        `<button onclick="openMacroEditor('${m.id}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">✏️ 编辑</button>
+                        `<button onclick="syncSingleMacroToCloud('${m.id}')" class="px-2 py-1 bg-cyan-500 text-white rounded text-xs hover:bg-cyan-600" title="单个同步到云端">⬆️ 同步</button>
+                         <button onclick="openMacroEditor('${m.id}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">✏️ 编辑</button>
                          <button onclick="copyMacroToMine('${m.id}')" class="px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">📋 复制</button>
                          <button onclick="deleteMacroConfirm('${m.id}')" class="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600">🗑️ 删除</button>` :
                         `<button onclick="copyMacroToMine('${m.id}')" class="px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">📋 复制到我的宏</button>`}
@@ -23770,6 +23771,271 @@ function getVisibleMacros() {
 
 function getAllMacros() {
     return cache.conditionMacros || [];
+}
+
+// ============ 条件宏专用同步（宏管理窗口手动同步） ============
+
+// 上传单个条件宏到云端（核心逻辑，供单个/全部同步复用）
+// 返回 { status: 'insert'|'update'|'dup', cloudId }
+async function uploadMacroToCloud(user, macro, idMapping, cloudMacros) {
+    if (!macro.id) macro.id = crypto.randomUUID();
+    // 优先使用宏自身的 cloudId（权威值），idMapping 丢失/损坏时仍能定位云端记录
+    const cloudId = macro.cloudId || getCloudId(idMapping, 'macros', macro.id);
+    const cloudMacro = cloudId
+        ? (cloudMacros || []).find(c => String(c.id) === String(cloudId))
+        : null;
+
+    const record = {
+        name: macro.name || '',
+        description: macro.description || '',
+        conditions: macro.conditions || { logic: 'and', children: [] },
+        permission: macro.permission !== undefined ? macro.permission : 0,
+        tags: macro.tags || [],
+        pinned: macro.pinned || false,
+        user_id: user.id,
+        usage_count: macro.usageCount || 0
+    };
+
+    if (cloudMacro) {
+        const { error } = await supabaseClient
+            .from('condition_macros')
+            .update(record)
+            .eq('id', cloudId);
+        if (error) throw error;
+        return { status: 'update', cloudId };
+    }
+
+    // 插入前查重：云端已有 user_id+name+conditions 完全一致的记录时建立映射，不重复插入
+    const condStr = normalizeConditionsForCompare(macro.conditions || { logic: 'and', children: [] });
+    const existCloud = (cloudMacros || []).find(c =>
+        c.name === (macro.name || '') &&
+        normalizeConditionsForCompare(c.conditions) === condStr
+    );
+    if (existCloud) {
+        setCloudId(idMapping, 'macros', macro.id, existCloud.id);
+        macro.cloudId = existCloud.id;
+        return { status: 'dup', cloudId: existCloud.id };
+    }
+
+    const { data: newMacro, error: insError } = await supabaseClient
+        .from('condition_macros')
+        .insert([record])
+        .select()
+        .single();
+    if (insError) throw insError;
+    setCloudId(idMapping, 'macros', macro.id, newMacro.id);
+    macro.cloudId = newMacro.id;
+    return { status: 'insert', cloudId: newMacro.id };
+}
+
+// 全部本地条件宏同步到云端
+async function syncMacrosToCloud() {
+    try {
+        const { data: userData, error: authError } = await supabaseClient.auth.getUser();
+        if (authError || !userData.user) {
+            alert('请先登录 Supabase 账号后再进行同步操作！');
+            return;
+        }
+        const user = userData.user;
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.innerHTML = '⏳ 正在同步条件宏到云端...';
+        loadingIndicator.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-6 py-4 rounded-lg shadow-lg z-50';
+        document.body.appendChild(loadingIndicator);
+        try {
+            const idMapping = getIdMapping();
+            const localMacros = getAllMacros();
+            const { data: cloudMacros, error: macrosError } = await supabaseClient
+                .from('condition_macros')
+                .select('*')
+                .eq('user_id', user.id);
+            if (macrosError) console.error('获取云端条件宏失败:', macrosError);
+
+            let added = 0, updated = 0, dup = 0, failed = 0;
+            for (const macro of localMacros) {
+                try {
+                    const r = await uploadMacroToCloud(user, macro, idMapping, cloudMacros || []);
+                    if (r.status === 'insert') added++;
+                    else if (r.status === 'update') updated++;
+                    else dup++;
+                } catch (e) {
+                    failed++;
+                    console.error('同步条件宏失败:', e, macro.name);
+                }
+            }
+            saveIdMapping(idMapping);
+            localStorage.setItem(MACRO_KEY, JSON.stringify(localMacros));
+            cache.conditionMacros = localMacros;
+            _macroIdMap = null;
+            refreshMacroListAfterSync();
+            alert(`✅ 条件宏同步到云端完成\n新增 ${added} 个，更新 ${updated} 个，去重关联 ${dup} 个${failed > 0 ? `，失败 ${failed} 个（详见控制台）` : ''}`);
+        } finally {
+            if (loadingIndicator && loadingIndicator.parentNode) {
+                loadingIndicator.parentNode.removeChild(loadingIndicator);
+            }
+        }
+    } catch (e) {
+        console.error('同步条件宏到云端失败:', e);
+        alert('同步失败：' + (e.message || e));
+    }
+}
+
+// 云端条件宏同步到本地
+async function syncMacrosFromCloud() {
+    try {
+        const { data: userData, error: authError } = await supabaseClient.auth.getUser();
+        if (authError || !userData.user) {
+            alert('请先登录 Supabase 账号后再进行同步操作！');
+            return;
+        }
+        const user = userData.user;
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.innerHTML = '⏳ 正在从云端同步条件宏...';
+        loadingIndicator.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-6 py-4 rounded-lg shadow-lg z-50';
+        document.body.appendChild(loadingIndicator);
+        try {
+            const idMapping = getIdMapping();
+            let localMacros = JSON.parse(localStorage.getItem(MACRO_KEY) || '[]');
+
+            const { data: cloudMacros, error: macrosError } = await supabaseClient
+                .from('condition_macros')
+                .select('*')
+                .or(`user_id.eq.${user.id},permission.gte.1`);
+            if (macrosError) console.error('获取云端条件宏失败:', macrosError);
+
+            let added = 0, updated = 0;
+            for (const cm of cloudMacros || []) {
+                if (!cm.id) continue;
+                // 公开加密（permission=2）且非本人/非管理员的宏 → 剥离 conditions
+                const isMacroEncrypted = cm.permission === 2;
+                const isMacroOwner = cm.user_id === user.id;
+                const stripMacroConditions = isMacroEncrypted && !isMacroOwner && !isAdmin(user.email);
+                const cloudConditions = stripMacroConditions ? null : (cm.conditions || { logic: 'and', children: [] });
+                const cloudCondStr = normalizeConditionsForCompare(cloudConditions);
+
+                const macroData = {
+                    id: crypto.randomUUID(),
+                    cloudId: cm.id,
+                    name: cm.name,
+                    description: cm.description || '',
+                    permission: cm.permission !== undefined ? cm.permission : 0,
+                    conditions: cloudConditions,
+                    tags: cm.tags || [],
+                    pinned: cm.pinned || false,
+                    usageCount: cm.usage_count || 0,
+                    createdBy: cm.user_id || '',
+                    createTime: cm.create_time || new Date().toISOString(),
+                    updateTime: cm.update_time || cm.create_time || new Date().toISOString(),
+                    lastUsedAt: cm.last_used_at || null
+                };
+
+                // 查找本地宏：优先 cloudId 映射，其次 name+createdBy+conditions，最后 name+createdBy（兼容离线创建）
+                let matchIdx = -1;
+                const localId = getLocalIdByCloudId(idMapping, 'macros', cm.id);
+                if (localId) {
+                    matchIdx = localMacros.findIndex(m => String(m.id) === String(localId));
+                }
+                if (matchIdx === -1) {
+                    matchIdx = localMacros.findIndex(m =>
+                        m.name === cm.name &&
+                        m.createdBy === cm.user_id &&
+                        normalizeConditionsForCompare(m.conditions) === cloudCondStr
+                    );
+                }
+                if (matchIdx === -1) {
+                    matchIdx = localMacros.findIndex(m =>
+                        m.name === cm.name && !m.cloudId &&
+                        (m.createdBy === cm.user_id || (cm.user_id === user.id && !m.createdBy))
+                    );
+                }
+
+                if (matchIdx !== -1) {
+                    const existing = localMacros[matchIdx];
+                    // 防止 cloudId 在云端重复记录间翻覆：本地指向的原云端记录仍存在时跳过合并
+                    if (existing.cloudId && String(existing.cloudId) !== String(cm.id)) {
+                        const origStillExists = (cloudMacros || []).some(d => String(d.id) === String(existing.cloudId));
+                        if (origStillExists) continue;
+                    }
+                    setCloudId(idMapping, 'macros', existing.id, cm.id);
+                    localMacros[matchIdx] = Object.assign({}, macroData, { id: existing.id });
+                    updated++;
+                } else {
+                    localMacros.push(macroData);
+                    setCloudId(idMapping, 'macros', macroData.id, cm.id);
+                    added++;
+                }
+            }
+            saveIdMapping(idMapping);
+            localStorage.setItem(MACRO_KEY, JSON.stringify(localMacros));
+            cache.conditionMacros = localMacros;
+            _macroIdMap = null;
+            refreshMacroListAfterSync();
+            alert(`✅ 云端条件宏同步到本地完成\n新增 ${added} 个，更新 ${updated} 个`);
+        } finally {
+            if (loadingIndicator && loadingIndicator.parentNode) {
+                loadingIndicator.parentNode.removeChild(loadingIndicator);
+            }
+        }
+    } catch (e) {
+        console.error('从云端同步条件宏失败:', e);
+        alert('同步失败：' + (e.message || e));
+    }
+}
+
+// 单个条件宏精准同步到云端
+async function syncSingleMacroToCloud(macroId) {
+    try {
+        const { data: userData, error: authError } = await supabaseClient.auth.getUser();
+        if (authError || !userData.user) {
+            alert('请先登录 Supabase 账号后再进行同步操作！');
+            return;
+        }
+        const user = userData.user;
+        const macro = getMacroById(macroId);
+        if (!macro) {
+            alert('未找到该条件宏！');
+            return;
+        }
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.innerHTML = `⏳ 正在同步「${macro.name}」到云端...`;
+        loadingIndicator.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-6 py-4 rounded-lg shadow-lg z-50';
+        document.body.appendChild(loadingIndicator);
+        try {
+            const idMapping = getIdMapping();
+            const { data: cloudMacros, error: macrosError } = await supabaseClient
+                .from('condition_macros')
+                .select('*')
+                .eq('user_id', user.id);
+            if (macrosError) throw macrosError;
+
+            const r = await uploadMacroToCloud(user, macro, idMapping, cloudMacros || []);
+            saveIdMapping(idMapping);
+            localStorage.setItem(MACRO_KEY, JSON.stringify(getAllMacros()));
+            _macroIdMap = null;
+            refreshMacroListAfterSync();
+            if (r.status === 'insert') {
+                alert(`✅ 条件宏「${macro.name}」已同步到云端（云端ID: ${r.cloudId}）`);
+            } else if (r.status === 'update') {
+                alert(`✅ 条件宏「${macro.name}」已更新到云端（云端ID: ${r.cloudId}）`);
+            } else {
+                alert(`ℹ️ 云端已存在相同内容的宏（云端ID: ${r.cloudId}），已建立关联，未重复插入`);
+            }
+        } finally {
+            if (loadingIndicator && loadingIndicator.parentNode) {
+                loadingIndicator.parentNode.removeChild(loadingIndicator);
+            }
+        }
+    } catch (e) {
+        console.error('同步单个条件宏失败:', e);
+        alert('同步失败：' + (e.message || e));
+    }
+}
+
+// 同步后刷新宏管理列表（若窗口打开）
+function refreshMacroListAfterSync() {
+    const modal = document.getElementById('macro-manager-modal');
+    if (modal && !modal.classList.contains('hidden')) {
+        renderMacroList();
+    }
 }
 
 // 宏ID查找缓存
@@ -28266,6 +28532,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button onclick="toggleAllMacros()" class="px-3 py-2 bg-blue-400 text-white rounded text-sm shrink-0">↔️ 反选</button>
                 <button onclick="openMacroEditor()" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm shrink-0">➕ 新建条件宏</button>
                 <button onclick="openMacroTagManager()" class="px-3 py-2 bg-purple-600 text-white rounded text-sm shrink-0">🏷️ 标签管理</button>
+                <button onclick="syncMacrosFromCloud()" class="px-3 py-2 bg-cyan-600 text-white rounded text-sm shrink-0">⬇️ 云端→本地</button>
+                <button onclick="syncMacrosToCloud()" class="px-3 py-2 bg-teal-600 text-white rounded text-sm shrink-0">⬆️ 本地→云端</button>
                 <button onclick="deduplicateMacros()" class="px-3 py-2 bg-red-500 text-white rounded text-sm shrink-0">🧹 清理云端冗余</button>
             </div>
             <div id="macro-batch-bar" class="hidden flex flex-wrap gap-2 mb-4 items-center p-3 bg-indigo-50 border border-indigo-200 rounded">
