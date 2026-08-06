@@ -23779,10 +23779,14 @@ async function copyMacroToMine(macroId, silent = false) {
         ? JSON.parse(JSON.stringify(macro.conditions))
         : null;
     
+    // 【需求】仅复制自己创建（或本地离线创建）的条件宏时携带原宏描述；
+    // 普通用户复制他人（如管理员公开）的宏时不携带描述
+    const isOwnMacro = !macro.createdBy || macro.createdBy === getCurrentUserId();
+    
     const newMacro = {
         id: null, // 不继承原宏的扩展属性，只取需要的字段
         name: macro.name + '（副本）',
-        description: '',
+        description: isOwnMacro ? (macro.description || '') : '',
         permission: 0,
         tags: Array.isArray(macro.tags) ? [...macro.tags] : [],
         pinned: false,
