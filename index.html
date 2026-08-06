@@ -15912,7 +15912,155 @@ function getAllTagCategories() {
             // 研究页面数量调节面板已渲染，绑定重置按钮事件
             initStatsAdjust();
             updateAllShenCardNumbers();
+            
+            // 异步加载匹配断语（通过 /api/matchDuanyu，与主排盘页一致）
+            loadResearchMatchedDuanyu(result, caseData, year, isDayun, paipanResult);
         }, 100);
+    }
+    
+    // 事项研究匹配断语请求序号（防竞态：只应用最新一次请求结果）
+    let _researchDuanyuReqSeq = 0;
+    
+    // 异步加载事项研究排盘详情的匹配断语（通过 /api/matchDuanyu，与主排盘页一致）
+    function loadResearchMatchedDuanyu(result, caseData, year, isDayun, containerEl, force) {
+        if (!containerEl) return;
+        const areaEl = containerEl.querySelector('#research-matched-duanyu-area');
+        if (!areaEl) return;
+        if (!result || !result.dayGan) return;
+        // 同步阶段已渲染匹配断语则不再重复加载（除非强制刷新）
+        if (!force && areaEl.children.length > 0) return;
+        const mySeq = ++_researchDuanyuReqSeq;
+        
+        const baziForMatch = {
+            nian: { gan: result.yearGan, zhi: result.yearZhi },
+            yue: { gan: result.monthGan, zhi: result.monthZhi },
+            ri: { gan: result.dayGan, zhi: result.dayZhi },
+            shi: { gan: result.hourGan, zhi: result.hourZhi }
+        };
+        if (!baziForMatch.ri.gan) return;
+        
+        const genderStr = (String(result.gender) === '1' || String(result.gender) === '男') ? '男' : '女';
+        
+        let currentDayunItem = null;
+        if (result.currentDaYun && typeof result.currentDaYun.getGanZhi === 'function') {
+            const dyGZ = result.currentDaYun.getGanZhi();
+            currentDayunItem = {
+                gan: dyGZ ? dyGZ.charAt(0) : '',
+                zhi: dyGZ ? dyGZ.charAt(1) : '',
+                ganZhi: dyGZ,
+                startAge: result.currentDaYun.getStartAge(),
+                startYear: result.currentDaYun.getStartYear(),
+                endYear: result.currentDaYun.getEndYear()
+            };
+        }
+        
+        let currentLiunianItem = null;
+        if (!isDayun && result.liunianData) {
+            currentLiunianItem = {
+                year: parseInt(year),
+                gan: result.liunianData.gan,
+                zhi: result.liunianData.zhi,
+                ganZhi: result.liunianData.gan + result.liunianData.zhi
+            };
+        }
+        
+        areaEl.innerHTML = '<div class="text-sm text-gray-400 text-center py-2">⏳ 正在匹配断语...</div>';
+        
+        callDuanyuMatchApi(baziForMatch, genderStr, parseInt(result.birthYear || year), [], [], currentDayunItem, currentLiunianItem, null)
+            .then(function(duanyu) {
+                if (mySeq !== _researchDuanyuReqSeq) return; // 已不是最新请求，丢弃
+                const matchedByCategory = {};
+                (duanyu || []).forEach(function(item) {
+                    const cat = item.category || '其他';
+                    const text = item.duanyu || item;
+                    if (!matchedByCategory[cat]) matchedByCategory[cat] = [];
+                    matchedByCategory[cat].push({
+                        text: text,
+                        rule: item.rule || { category: cat, duanyu: text }
+                    });
+                });
+                const categories = Object.keys(matchedByCategory).sort();
+                const totalMatched = categories.reduce((s, c) => s + matchedByCategory[c].length, 0);
+                
+                if (totalMatched === 0) {
+                    areaEl.innerHTML = '<div class="text-base text-gray-400 mt-2 text-center py-2">无匹配断语</div>';
+                    return;
+                }
+                
+                const catColorMap = {'格局':'#3B82F6','事业':'#10B981','财运':'#F59E0B','婚姻':'#EC4899','健康':'#EF4444','性格':'#8B5CF6','灾祸':'#F97316'};
+                let rulesHtml = '';
+                categories.forEach(cat => {
+                    const duanyuList = matchedByCategory[cat];
+                    const catColor = catColorMap[cat] || '#6B7280';
+                    let catRuleHtml = '';
+                    duanyuList.forEach(duanyuItem => {
+                        const duanyuText = duanyuItem.text || duanyuItem;
+                        const matchedRule = duanyuItem.rule || ((typeof cache !== 'undefined' && cache.rules) ? cache.rules.find(r => r.category === cat && r.duanyu === duanyuText) : null);
+                        if (!matchedRule) return;
+                        const ruleKey = cat + '_' + duanyuText;
+                        const stats = getRuleVerificationStats(matchedRule);
+                        catRuleHtml += `<div class="bg-white rounded-lg border border-gray-200 p-3 mb-2 rule-card" data-category="${escapeHtml(cat)}" data-duanyu="${escapeHtml(duanyuText)}" data-rulekey="${escapeHtml(ruleKey)}">
+                            <p class="text-sm mb-2">${renderDuanyu(duanyuText, matchedRule)}</p>
+                            <div class="text-xs text-gray-500 mb-2">已验证 ${stats.total} 次 | 正确率 ${stats.accuracy}%</div>
+                            <div class="flex gap-2 flex-wrap">
+                                <button class="verify-btn px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 border border-green-300" data-result="true">✓ 正确</button>
+                                <button class="verify-btn px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 border border-red-300" data-result="false">✗ 错误</button>
+                                <button class="history-btn px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 border border-blue-300">📊 验证历史</button>
+                            </div>
+                        </div>`;
+                    });
+                    if (catRuleHtml) {
+                        rulesHtml += `<div class="mb-3"><h4 class="font-bold text-sm mb-2" style="border-left:3px solid ${catColor};padding-left:8px;">【${escapeHtml(cat)}】（${duanyuList.length}条）</h4>${catRuleHtml}</div>`;
+                    }
+                });
+                areaEl.innerHTML = `<div class="mt-5 pt-3 border-t-2 border-dashed border-gray-300 matched-rules-section"><h3 class="font-bold text-base mb-3">📜 匹配断语（共${totalMatched}条）</h3>${rulesHtml}</div>`;
+                
+                // 绑定验证按钮（✓正确 / ✗错误）
+                containerEl.querySelectorAll('.verify-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const card = btn.closest('.rule-card');
+                        if (!card) return;
+                        const category = card.dataset.category;
+                        const duanyuText = card.dataset.duanyu;
+                        const resultValue = btn.dataset.result === 'true';
+                        
+                        const rule = { category, duanyu: duanyuText };
+                        addVerification(rule, caseData.id, resultValue, '');
+                        
+                        const btns = card.querySelectorAll('.verify-btn');
+                        btns.forEach(b => {
+                            b.classList.remove('bg-green-100', 'bg-red-100', 'hover:bg-green-200', 'hover:bg-red-200');
+                            b.classList.add('bg-gray-100', 'text-gray-400');
+                            b.disabled = true;
+                        });
+                        
+                        const stats = getRuleVerificationStats(rule);
+                        const statsEl = card.querySelector('.text-xs.text-gray-500');
+                        if (statsEl) {
+                            statsEl.textContent = `已验证 ${stats.total} 次 | 正确率 ${stats.accuracy}%`;
+                        }
+                        
+                        alert(resultValue ? '✅ 已标记为正确' : '❌ 已标记为错误');
+                    });
+                });
+                
+                // 绑定验证历史查看按钮
+                containerEl.querySelectorAll('.history-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const card = btn.closest('.rule-card');
+                        if (!card) return;
+                        const ruleKey = card.dataset.rulekey;
+                        if (ruleKey && typeof openVerificationHistoryModal === 'function') {
+                            openVerificationHistoryModal(ruleKey);
+                        }
+                    });
+                });
+            })
+            .catch(function(e) {
+                if (mySeq !== _researchDuanyuReqSeq) return; // 已不是最新请求，丢弃
+                console.warn('事项研究匹配断语失败:', e.message);
+                areaEl.innerHTML = '<div class="text-base text-gray-400 mt-2 text-center py-2">无匹配断语</div>';
+            });
     }
     
     // 时间线编辑功能
@@ -16449,6 +16597,15 @@ function getAllTagCategories() {
                 updateShenMarkers(baseTian, baseDi, curGroupTian, curGroupDi, 'dayun');
                 
                 setTimeout(positionResearchShenCards, 50);
+                
+                // 大运切换时重新加载匹配断语
+                const dyResult = Object.assign({}, result, {
+                    currentDaYun: dayun,
+                    currentDayunTianShen: dayunTianShenNew,
+                    currentDayunDiShen: dayunDiShenNew,
+                    liunianData: isDayun ? null : getYearGanZhi(parseInt(year))
+                });
+                loadResearchMatchedDuanyu(dyResult, caseData, year, isDayun, container, true);
             });
         });
         
@@ -16673,6 +16830,14 @@ function getAllTagCategories() {
                 updateShenMarkers(baseTian, baseDi, allGroupTian, allGroupDi, 'liunian');
                 
                 setTimeout(positionResearchShenCards, 50);
+                
+                // 流年切换时重新加载匹配断语
+                const lnResult = Object.assign({}, result, {
+                    currentDayunTianShen: currentDayunTianShen,
+                    currentDayunDiShen: currentDayunDiShen,
+                    liunianData: ygz
+                });
+                loadResearchMatchedDuanyu(lnResult, caseData, y, false, container, true);
             });
         });
     }
@@ -17371,13 +17536,22 @@ function getAllTagCategories() {
                     </div>
                 </div>
                 ` : ''}
-                ${matchedRulesHtml}
+                <div id="research-matched-duanyu-area">${matchedRulesHtml}</div>
             </div>
         `;
         
         return {
             html: html,
             dayGan: dayGan,
+            yearGan: yearGan,
+            yearZhi: yearZhi,
+            monthGan: monthGan,
+            monthZhi: monthZhi,
+            dayZhi: dayZhi,
+            hourGan: hourGan,
+            hourZhi: hourZhi,
+            gender: gender,
+            birthYear: birthYear,
             tianShenNian: tianShenNian,
             tianShenYue: tianShenYue,
             tianShenRi: tianShenRi,
