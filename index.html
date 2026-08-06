@@ -13596,7 +13596,9 @@
                 permission_level: (currentUser && isAdmin(currentUser.email)) ? (duanyuData.permissionLevel || 0) : 0,
                 description: duanyuData.description || '',
                 group_key: duanyuData.groupKey || '',
-                priority: duanyuData.priority || 0
+                priority: duanyuData.priority || 0,
+                create_time: new Date().toISOString(),
+                update_time: new Date().toISOString()
             }])
             .select();
         if (error) throw error;
