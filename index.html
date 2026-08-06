@@ -13311,8 +13311,10 @@
                 if (r.id) {
                     const local = mergedMap.get(r.id);
                     if (local) {
-                        // 远程缺失时间字段时保留本地时间，避免刷新后时间丢失或变为同一值
-                        if (!r.createTime && local.createTime) r.createTime = local.createTime;
+                        // 远程缺失 createTime 时：优先用远程 updateTime 兜底（数据库真实值），
+                        // 其次保留本地时间，避免出现"创建时间晚于修改时间"的倒挂
+                        if (!r.createTime) r.createTime = r.updateTime || local.createTime;
+                        // 远程缺失 updateTime 时保留本地时间，避免刷新后时间丢失
                         if (!r.updateTime && local.updateTime) r.updateTime = local.updateTime;
                     }
                     mergedMap.set(r.id, r);
@@ -25445,7 +25447,7 @@ async function loadDataFromSupabase() {
                 category: d.category,
                 conditions: d.conditions,
                 duanyu: d.duanyu_text,
-                createTime: d.create_time || (existingRule && existingRule.createTime) || '',
+                createTime: d.create_time || d.update_time || (existingRule && existingRule.createTime) || '',
                 updateTime: d.update_time || d.create_time || (existingRule && existingRule.updateTime) || (existingRule && existingRule.createTime) || '',
                 isPublic: d.is_public === true, // 保留公开状态
                 permissionLevel: d.permission_level !== undefined ? d.permission_level : (d.is_public === true ? 3 : 0),
