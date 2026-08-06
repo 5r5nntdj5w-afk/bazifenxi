@@ -13834,37 +13834,31 @@
                 }
             }
 
-            // --- 阶段3：去重清理（同一createdBy下同名或同conditions保留有cloudId的） ---
-            const seenKeys = {};
+            // --- 阶段3：保守去重（仅清理完全重复的本地副本，绝不删除有 cloudId 的宏） ---
+            // 【修复】原去重按 createdBy::name 或 createdBy::conditions 单独判重，
+            // 会把"同名不同内容"或"同内容不同名"的宏误判为重复并删除，导致刷新后部分宏消失。
+            // 现改为仅当 name+createdBy+conditions 三者完全一致时才去重，且只删无 cloudId 的副本；
+            // 有 cloudId 的宏一律保留（云端记录可溯源，交由手动「清理云端冗余」处理）。
+            const seenContent = new Map();
             const duplicates = [];
-            // 【修复】从前向后遍历：保证 priority 相同时保留"先见到的"（数组靠前的原宏/已映射宏），
-            // 删除后插入的重复项，避免把本地原宏误删（原宏的 cloudId 可能正被其他宏引用）
             for (let i = 0; i < cache.conditionMacros.length; i++) {
                 const m = cache.conditionMacros[i];
+                if (!m.createdBy) continue;
                 const condStr = normalizeConditionsForCompare(m.conditions);
-                const nameKey = `${m.createdBy}::name::${m.name}`;
-                const condKey = `${m.createdBy}::cond::${condStr}`;
-                // 有cloudId / 有使用计数 / 更新时间较新 → 优先级更高，保留
-                const priority = (m.cloudId ? 4 : 0) + (m.usageCount > 0 ? 2 : 0) + (m.updateTime ? 1 : 0);
-                for (const k of [nameKey, condKey]) {
-                    if (m.createdBy && (k === nameKey ? m.name : condStr)) {
-                        if (seenKeys[k] !== undefined) {
-                            const otherIdx = seenKeys[k];
-                            const other = cache.conditionMacros[otherIdx];
-                            const otherPrio = (other.cloudId ? 4 : 0) + (other.usageCount > 0 ? 2 : 0) + (other.updateTime ? 1 : 0);
-                            if (priority > otherPrio) {
-                                // 当前项优先级更高 → 删除先前保留项，改保留当前项
-                                if (!duplicates.includes(otherIdx)) duplicates.push(otherIdx);
-                                seenKeys[k] = i;
-                            } else {
-                                // 当前项优先级相同或更低 → 删除当前项（保留先见到的原宏）
-                                duplicates.push(i);
-                                break;
-                            }
-                        } else {
-                            seenKeys[k] = i;
-                        }
+                const key = `${m.createdBy}::${m.name}::${condStr}`;
+                if (seenContent.has(key)) {
+                    const otherIdx = seenContent.get(key);
+                    const other = cache.conditionMacros[otherIdx];
+                    // 有 cloudId 的一律保留；无 cloudId 且完全重复 → 删除
+                    if (m.cloudId && !other.cloudId) {
+                        duplicates.push(otherIdx);
+                        seenContent.set(key, i);
+                    } else if (!m.cloudId) {
+                        duplicates.push(i);
                     }
+                    // 两条都有 cloudId → 保留（可能是云端重复记录，交给手动清理）
+                } else {
+                    seenContent.set(key, i);
                 }
             }
             // 移除重复项（从大到小删除，索引不偏移）
