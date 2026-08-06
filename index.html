@@ -13295,15 +13295,25 @@
                 description: row.description || '',
                 groupKey: row.group_key || '',
                 priority: row.priority !== undefined && row.priority !== null ? row.priority : 0,
-                createTime: row.created_at || new Date().toISOString(),
-                updateTime: row.updated_at || row.created_at || '',
+                createTime: row.create_time || row.created_at || '',
+                updateTime: row.update_time || row.updated_at || row.create_time || row.created_at || '',
               };
             });
             
             // 合并：以 id 为 key，远程数据覆盖本地
             const mergedMap = new Map();
             cache.rules.forEach(r => { if (r.id) mergedMap.set(r.id, r); });
-            remoteRules.forEach(r => { if (r.id) mergedMap.set(r.id, r); });
+            remoteRules.forEach(r => {
+                if (r.id) {
+                    const local = mergedMap.get(r.id);
+                    if (local) {
+                        // 远程缺失时间字段时保留本地时间，避免刷新后时间丢失或变为同一值
+                        if (!r.createTime && local.createTime) r.createTime = local.createTime;
+                        if (!r.updateTime && local.updateTime) r.updateTime = local.updateTime;
+                    }
+                    mergedMap.set(r.id, r);
+                }
+            });
             
             // 按条件去重：排除本地无ID但云端已有同内容断语（同分类+同条件+同内容）
             const remoteConditionKeys = new Set(
@@ -25421,6 +25431,7 @@ async function loadDataFromSupabase() {
         for (const d of duanyuList) {
             // 查找是否有本地ID对应这个云端ID
             const localId = getLocalIdByCloudId(idMapping, 'rules', d.id);
+            const existingRule = localId ? cache.rules.find(item => item.id === localId) : null;
             
             const ruleData = {
                 id: localId || d.id, // 如果有映射用本地ID，否则用云端ID
@@ -25428,7 +25439,8 @@ async function loadDataFromSupabase() {
                 category: d.category,
                 conditions: d.conditions,
                 duanyu: d.duanyu_text,
-                createTime: d.create_time,
+                createTime: d.create_time || (existingRule && existingRule.createTime) || '',
+                updateTime: d.update_time || d.create_time || (existingRule && existingRule.updateTime) || (existingRule && existingRule.createTime) || '',
                 isPublic: d.is_public === true, // 保留公开状态
                 permissionLevel: d.permission_level !== undefined ? d.permission_level : (d.is_public === true ? 3 : 0),
                 ownerId: d.owner_id || d.user_id || '',
