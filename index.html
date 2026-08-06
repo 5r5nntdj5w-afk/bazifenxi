@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -5951,6 +5951,8 @@
 
     // 重命名分类
     window.renameCategory = async function(oldName) {
+        // 【权限】仅管理员可重命名分类（会批量影响所有该分类断语）
+        if (!currentUser || !isAdmin(currentUser.email)) { alert('⚠️ 仅管理员可管理分类'); return; }
         const newName = prompt(`将 "${oldName}" 重命名为：`, oldName);
         if (!newName || newName === oldName) return;
         
@@ -6034,6 +6036,8 @@
 
     // 添加新分类（从管理弹窗）
     window.addNewCategory = async function() {
+        // 【权限】仅管理员可添加分类
+        if (!currentUser || !isAdmin(currentUser.email)) { alert('⚠️ 仅管理员可管理分类'); return; }
         const input = document.getElementById('new-cat-input');
         if (!input) return;
         const newCat = input.value.trim();
@@ -6103,9 +6107,13 @@
         if (!target) return;
         
         let count = 0;
+        // 【权限】普通用户只能调整自己创建的断语的分类
+        const isAdminUser = currentUser && isAdmin(currentUser.email);
         for (const rule of cache.rules) {
             const ruleKey = rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
             if (selectedRulesSet.has(ruleKey)) {
+                const isOwn = (!rule.ownerId && !rule.userId) || rule.ownerId === getCurrentUserId() || rule.userId === getCurrentUserId();
+                if (!isAdminUser && !isOwn) continue;
                 try {
                     if (rule.id) {
                         await supabaseClient.from('duanyu').update({ category: target }).eq('id', rule.id);
@@ -10448,6 +10456,9 @@
             const permLevelSel = document.getElementById('rule-permission-level');
             if (permLevelSel) {
                 permLevelSel.value = '0';
+                // 非管理员隐藏权限等级设置（强制私有）
+                const permContainer = document.getElementById('permission-level-container');
+                if (permContainer) permContainer.style.display = (currentUser && isAdmin(currentUser.email)) ? '' : 'none';
             }
 
             // 重置默认取值维度
@@ -10655,6 +10666,13 @@
             try {
                 if (editIndex >= 0) {
                     const oldRule = cache.rules[editIndex];
+                    // 【权限】普通用户只能编辑自己创建的断语
+                    const isAdminUser = currentUser && isAdmin(currentUser.email);
+                    const isOwn = (!oldRule.ownerId && !oldRule.userId) || oldRule.ownerId === getCurrentUserId() || oldRule.userId === getCurrentUserId();
+                    if (!isAdminUser && !isOwn) {
+                        alert('只能编辑自己创建的断语！');
+                        return;
+                    }
                     if (oldRule.id) {
                         await updateSupabaseDuanyu(oldRule.id, duanyuData);
                     }
@@ -11316,8 +11334,12 @@
                     DOM.ruleCategory.value = rule.category;
                     DOM.ruleDuanyu.innerHTML = '（复制）' + rule.duanyu;
                     // 复制描述（仅创建者自己复制时携带描述）
+                    // ownerId/userId 均为空视为本地离线创建的本人断语；
+                    // 兼容云端只有 user_id 无 owner_id 的老数据，防止普通用户复制管理员公开断语误带描述
                     if (DOM.ruleDescription) {
-                        const isOwner = rule.ownerId && rule.ownerId === getCurrentUserId();
+                        const isOwner = (!rule.ownerId && !rule.userId)
+                            || rule.ownerId === getCurrentUserId()
+                            || rule.userId === getCurrentUserId();
                         DOM.ruleDescription.value = isOwner ? (rule.description || '') : '';
                     }
                     
@@ -11446,10 +11468,17 @@
                         DOM.ruleDescription.value = rule.description || '';
                     }
                     
-                    // 设置权限等级
+                    // 设置权限等级（非管理员隐藏权限设置并强制私有）
                     const permLevelSel = document.getElementById('rule-permission-level');
                     if (permLevelSel) {
-                        permLevelSel.value = rule.permissionLevel !== undefined ? rule.permissionLevel : (rule.isPublic === true || rule.is_public === true ? 3 : 0);
+                        const permContainer = document.getElementById('permission-level-container');
+                        if (currentUser && isAdmin(currentUser.email)) {
+                            if (permContainer) permContainer.style.display = '';
+                            permLevelSel.value = rule.permissionLevel !== undefined ? rule.permissionLevel : (rule.isPublic === true || rule.is_public === true ? 3 : 0);
+                        } else {
+                            if (permContainer) permContainer.style.display = 'none';
+                            permLevelSel.value = 0;
+                        }
                     }
                     
                     // 回填分组标识和优先级
@@ -11550,6 +11579,13 @@
             const delBtn = div.querySelector('.del-btn');
             if (delBtn) {
                 delBtn.onclick = async () => {
+                    // 【权限】普通用户只能删除自己创建的断语
+                    const isAdminUser = currentUser && isAdmin(currentUser.email);
+                    const isOwn = (!rule.ownerId && !rule.userId) || rule.ownerId === getCurrentUserId() || rule.userId === getCurrentUserId();
+                    if (!isAdminUser && !isOwn) {
+                        alert('只能删除自己创建的断语！');
+                        return;
+                    }
                     if(confirm('确定删除？')){
                         try {
                             var deleteIndex = cache.rules.findIndex(r=>r.duanyu===rule.duanyu&&r.category===rule.category);
@@ -12501,31 +12537,46 @@
                 const count = selectedRulesSet.size;
                 if (count === 0) return;
                 
-                if (confirm(`确定删除选中的 ${count} 条断语？`)) {
-                    try {
-                        for (const ruleKey of selectedRulesSet) {
-                            const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
-                            if (targetRule && targetRule.id) {
-                                await deleteSupabaseDuanyu(targetRule.id);
-                            }
-                        }
-                        
-                        selectedRulesSet.forEach(ruleKey => {
-                            cache.rules = cache.rules.filter(r => {
-                                const key = r.id || r.cloudId || (r.category + '_' + r.duanyu);
-                                return key !== ruleKey;
-                            });
-                        });
-                        
-                        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
-                        selectedRulesSet.clear();
-                        reloadAll();
-                        clearScfRuleCache();
-                        clearClientApiCache();
-                    } catch (error) {
-                        console.error('批量删除失败:', error);
-                        alert('批量删除失败：' + error.message);
+                // 【权限】普通用户只能删除自己创建的断语，非本人的跳过
+                const isAdminUser = currentUser && isAdmin(currentUser.email);
+                const isOwnRule = (r) => (!r.ownerId && !r.userId) || r.ownerId === getCurrentUserId() || r.userId === getCurrentUserId();
+                let deletableCount = 0;
+                selectedRulesSet.forEach(ruleKey => {
+                    const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                    if (targetRule && (isAdminUser || isOwnRule(targetRule))) deletableCount++;
+                });
+                if (deletableCount === 0) {
+                    alert('选中的断语均非您创建，无法删除（管理员除外）');
+                    return;
+                }
+                const skippedCount = count - deletableCount;
+                if (!confirm(`确定删除选中的 ${deletableCount} 条断语${skippedCount > 0 ? `（另有 ${skippedCount} 条非您创建的断语已跳过）` : ''}？`)) {
+                    return;
+                }
+                try {
+                    for (const ruleKey of selectedRulesSet) {
+                        const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                        if (!targetRule || !targetRule.id) continue;
+                        if (!isAdminUser && !isOwnRule(targetRule)) continue;
+                        await deleteSupabaseDuanyu(targetRule.id);
                     }
+                    
+                    selectedRulesSet.forEach(ruleKey => {
+                        cache.rules = cache.rules.filter(r => {
+                            const key = r.id || r.cloudId || (r.category + '_' + r.duanyu);
+                            if (key !== ruleKey) return true;
+                            return isAdminUser || isOwnRule(r);
+                        });
+                    });
+                    
+                    localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+                    selectedRulesSet.clear();
+                    reloadAll();
+                    clearScfRuleCache();
+                    clearClientApiCache();
+                } catch (error) {
+                    console.error('批量删除失败:', error);
+                    alert('批量删除失败：' + error.message);
                 }
             };
         }
@@ -12604,9 +12655,12 @@
                 
                 const permLevelSel = document.getElementById('batch-perm-level');
                 if (!permLevelSel) return;
-                const newLevel = parseInt(permLevelSel.value);
+                // 【权限】普通用户只能将自己的断语设为私有（强制私有，不可设为公开）
+                const isAdminUser = currentUser && isAdmin(currentUser.email);
+                const newLevel = isAdminUser ? parseInt(permLevelSel.value) : 0;
+                const newLevelLabel = isAdminUser ? permLevelSel.options[permLevelSel.selectedIndex].text : '私有（仅自己可见）';
                 
-                if (!confirm(`确定将选中的 ${count} 条断语的权限等级设置为「${permLevelSel.options[permLevelSel.selectedIndex].text}」？`)) return;
+                if (!confirm(`确定将选中的 ${count} 条断语的权限等级设置为「${newLevelLabel}」？`)) return;
                 
                 try {
                     let updatedCount = 0;
@@ -12614,6 +12668,8 @@
                         const [category, duanyu] = ruleKey.split('_');
                         const rule = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
                         if (!rule) continue;
+                        const isOwn = (!rule.ownerId && !rule.userId) || rule.ownerId === getCurrentUserId() || rule.userId === getCurrentUserId();
+                        if (!isAdminUser && !isOwn) continue;
                         
                         rule.permissionLevel = newLevel;
                         rule.isPublic = newLevel > 0;
@@ -12640,7 +12696,7 @@
                     localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
                     selectedRulesSet.clear();
                     reloadAll();
-                    alert(`✅ 已成功将 ${updatedCount} 条断语的权限等级设置为「${permLevelSel.options[permLevelSel.selectedIndex].text}」`);
+                    alert(`✅ 已成功将 ${updatedCount} 条断语的权限等级设置为「${newLevelLabel}」`);
                 } catch (error) {
                     console.error('批量设置权限失败:', error);
                     alert('批量设置权限失败：' + error.message);
@@ -13526,8 +13582,8 @@
                 category: duanyuData.category,
                 conditions: duanyuData.conditions,
                 duanyu_text: duanyuData.duanyu,
-                is_public: (duanyuData.permissionLevel || 0) > 0,
-                permission_level: duanyuData.permissionLevel || 0,
+                is_public: (currentUser && isAdmin(currentUser.email)) ? ((duanyuData.permissionLevel || 0) > 0) : false,
+                permission_level: (currentUser && isAdmin(currentUser.email)) ? (duanyuData.permissionLevel || 0) : 0,
                 description: duanyuData.description || '',
                 group_key: duanyuData.groupKey || '',
                 priority: duanyuData.priority || 0
@@ -13596,8 +13652,8 @@
                 category: duanyuData.category,
                 conditions: duanyuData.conditions,
                 duanyu_text: duanyuData.duanyu,
-                is_public: (duanyuData.permissionLevel || 0) > 0,
-                permission_level: duanyuData.permissionLevel || 0,
+                is_public: (currentUser && isAdmin(currentUser.email)) ? ((duanyuData.permissionLevel || 0) > 0) : false,
+                permission_level: (currentUser && isAdmin(currentUser.email)) ? (duanyuData.permissionLevel || 0) : 0,
                 description: duanyuData.description || '',
                 group_key: duanyuData.groupKey || '',
                 priority: duanyuData.priority || 0,
@@ -13627,7 +13683,7 @@
                 user_id: currentUser.id,
                 name: macroData.name,
                 description: macroData.description || '',
-                permission: macroData.permission !== undefined ? macroData.permission : 0,
+                permission: (currentUser && isAdmin(currentUser.email)) ? (macroData.permission !== undefined ? macroData.permission : 0) : 0,
                 conditions: macroData.conditions || null,
                 tags: macroData.tags || [],
                 pinned: macroData.pinned || false,
@@ -13809,7 +13865,7 @@
                         .insert({
                             name: localMacro.name,
                             description: localMacro.description || '',
-                            permission: localMacro.permission !== undefined ? localMacro.permission : 0,
+                            permission: (currentUser && isAdmin(currentUser.email)) ? (localMacro.permission !== undefined ? localMacro.permission : 0) : 0,
                             conditions: localMacro.conditions || { logic: 'and', children: [] },
                             tags: localMacro.tags || [],
                             pinned: localMacro.pinned || false,
@@ -21439,6 +21495,11 @@ function openMacroEditor(macroId) {
     if (macroId) {
         const macro = getMacroById(macroId);
         if (!macro) return;
+        // 【权限】普通用户只能编辑自己创建的条件宏
+        if (macro.createdBy && macro.createdBy !== getCurrentUserId() && !(currentUser && isAdmin(currentUser.email))) {
+            alert('只能编辑自己创建的条件宏！');
+            return;
+        }
         const idInfo = macro.cloudId ? `  [☁️ ${macro.cloudId}]` : `  [📋 ${macro.id}]`;
         title.textContent = `编辑条件宏：${macro.name}${idInfo}`;
         nameInput.value = macro.name || '';
@@ -22007,6 +22068,8 @@ async function applyBatchTags() {
 
 // ============ 标签管理功能 ============
 function openMacroTagManager() {
+    // 【权限】仅管理员可管理条件宏标签
+    if (!currentUser || !isAdmin(currentUser.email)) { alert('⚠️ 仅管理员可管理条件宏标签'); return; }
     renderMacroTagList();
     document.getElementById('macro-tag-manager-modal').classList.remove('hidden');
 }
@@ -23885,7 +23948,7 @@ async function uploadMacroToCloud(user, macro, idMapping, cloudMacros) {
         name: macro.name || '',
         description: macro.description || '',
         conditions: macro.conditions || { logic: 'and', children: [] },
-        permission: macro.permission !== undefined ? macro.permission : 0,
+        permission: (user && isAdmin(user.email)) ? (macro.permission !== undefined ? macro.permission : 0) : 0,
         tags: macro.tags || [],
         pinned: macro.pinned || false,
         user_id: user.id,
@@ -24282,6 +24345,11 @@ async function saveMacro(macroData) {
     const now = new Date().toISOString();
     const existing = macros.find(m => String(m.id) === String(macroData.id));
     const isNew = !existing;
+    // 【权限】普通用户只能编辑自己创建的条件宏
+    if (existing && existing.createdBy && existing.createdBy !== getCurrentUserId() && !(currentUser && isAdmin(currentUser.email))) {
+        alert('只能编辑自己创建的条件宏！');
+        return false;
+    }
     if (existing) {
         Object.assign(existing, macroData, { updateTime: now });
         if (!existing.createdBy) existing.createdBy = getCurrentUserId() || '';
