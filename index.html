@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -6115,19 +6115,18 @@
         let count = 0;
         // 【权限】普通用户只能调整自己创建的断语的分类
         const isAdminUser = currentUser && isAdmin(currentUser.email);
-        for (const rule of cache.rules) {
-            const ruleKey = rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
-            if (selectedRulesSet.has(ruleKey)) {
-                const isOwn = (!rule.ownerId && !rule.userId) || rule.ownerId === getCurrentUserId() || rule.userId === getCurrentUserId();
-                if (!isAdminUser && !isOwn) continue;
-                try {
-                    if (rule.id) {
-                        await supabaseClient.from('duanyu').update({ category: target }).eq('id', rule.id);
-                    }
-                    rule.category = target;
-                    count++;
-                } catch (e) { console.error('批量调整分类失败:', e); }
-            }
+        for (const ruleKey of selectedRulesSet) {
+            const rule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
+            if (!rule) continue;
+            const isOwn = (!rule.ownerId && !rule.userId) || rule.ownerId === getCurrentUserId() || rule.userId === getCurrentUserId();
+            if (!isAdminUser && !isOwn) continue;
+            try {
+                if (rule.id) {
+                    await supabaseClient.from('duanyu').update({ category: target }).eq('id', rule.id);
+                }
+                rule.category = target;
+                count++;
+            } catch (e) { console.error('批量调整分类失败:', e); }
         }
         
         localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
@@ -10788,7 +10787,7 @@
                 // 导出选中的断语（跨页选择）— 仅限自己的私有断语
                 let exportCount = 0;
                 selectedRulesSet.forEach(ruleKey => {
-                    const rule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                    const rule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
                     if (rule && canExportRule(rule)) {
                         rulesToExport.push(rule);
                         exportCount++;
@@ -11127,6 +11126,14 @@
     
     // 跨页选择状态（存储选中的断语key: category_duanyu）
     let selectedRulesSet = new Set();
+    
+    // 宽松匹配规则键（ruleKey 可能来自 checkbox 字符串化的 id/cloudId 或 category_duanyu，统一字符串化比较）
+    function ruleKeyMatches(r, key) {
+        if (!r || key === undefined || key === null || key === '') return false;
+        if (r.id !== undefined && r.id !== null && r.id !== '' && String(r.id) === String(key)) return true;
+        if (r.cloudId !== undefined && r.cloudId !== null && r.cloudId !== '' && String(r.cloudId) === String(key)) return true;
+        return (r.category + '_' + r.duanyu) === String(key);
+    }
     
     // 字段配置缓存（从 field_config 表动态加载）
     let _fieldConfigCache = null;
@@ -12633,7 +12640,7 @@
                 const isOwnRule = (r) => (!r.ownerId && !r.userId) || r.ownerId === getCurrentUserId() || r.userId === getCurrentUserId();
                 let deletableCount = 0;
                 selectedRulesSet.forEach(ruleKey => {
-                    const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                    const targetRule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
                     if (targetRule && (isAdminUser || isOwnRule(targetRule))) deletableCount++;
                 });
                 if (deletableCount === 0) {
@@ -12646,7 +12653,7 @@
                 }
                 try {
                     for (const ruleKey of selectedRulesSet) {
-                        const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                        const targetRule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
                         if (!targetRule || !targetRule.id) continue;
                         if (!isAdminUser && !isOwnRule(targetRule)) continue;
                         await deleteSupabaseDuanyu(targetRule.id);
@@ -12654,9 +12661,9 @@
                     
                     selectedRulesSet.forEach(ruleKey => {
                         cache.rules = cache.rules.filter(r => {
-                            const key = r.id || r.cloudId || (r.category + '_' + r.duanyu);
-                            if (key !== ruleKey) return true;
-                            return isAdminUser || isOwnRule(r);
+                            // 匹配且本人/管理员 → 移除（false）；非本人 → 保留（true）；不匹配 → 保留（true）
+                            if (!ruleKeyMatches(r, ruleKey)) return true;
+                            return !(isAdminUser || isOwnRule(r));
                         });
                     });
                     
@@ -12686,7 +12693,7 @@
                 const isOwnRule = (r) => (!r.ownerId && !r.userId) || r.ownerId === currentUserId || r.userId === currentUserId;
                 let affectedCount = 0;
                 selectedRulesSet.forEach(ruleKey => {
-                    const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                    const targetRule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
                     if (targetRule && (isAdminUser || isOwnRule(targetRule))) affectedCount++;
                 });
                 if (affectedCount === 0) {
@@ -12698,7 +12705,7 @@
                 
                 const s = getDuanyuSwitchState();
                 selectedRulesSet.forEach(ruleKey => {
-                    const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                    const targetRule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
                     if (!targetRule || !(isAdminUser || isOwnRule(targetRule))) return;
                     if (isEnable) delete s.rules[ruleKey]; else s.rules[ruleKey] = true;
                 });
@@ -12739,7 +12746,7 @@
                 
                 for (const ruleKey of selectedRulesSet) {
                     try {
-                        const sourceRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                        const sourceRule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
                         if (!sourceRule) { failCount++; continue; }
                         
                         const isOwner = sourceRule.ownerId && sourceRule.ownerId === currentUserId;
@@ -12803,8 +12810,7 @@
                 try {
                     let updatedCount = 0;
                     for (const ruleKey of selectedRulesSet) {
-                        const [category, duanyu] = ruleKey.split('_');
-                        const rule = cache.rules.find(r => r.duanyu === duanyu && r.category === category);
+                        const rule = cache.rules.find(r => ruleKeyMatches(r, ruleKey));
                         if (!rule) continue;
                         const isOwn = (!rule.ownerId && !rule.userId) || rule.ownerId === getCurrentUserId() || rule.userId === getCurrentUserId();
                         if (!isAdminUser && !isOwn) continue;
@@ -29544,7 +29550,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="十神组自定义">十神组自定义</option>
                     <option value="五行自定义">五行自定义</option>
                 </select>
-                <select id="mapping-rule-offset" class="p-2 border rounded text-sm">
+                <select id="mapping-rule-offset" class="p-2 border rounded text-sm" onchange="refreshCustomMappingFromOffset()">
                     <option value="1">偏移1</option>
                     <option value="2">偏移2</option>
                     <option value="3">偏移3</option>
@@ -29558,8 +29564,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </select>
                 <button onclick="addMappingRule()" class="px-3 py-2 bg-emerald-600 text-white rounded text-sm shrink-0">➕ 添加</button>
             </div>
-            <div id="custom-mapping-area" class="mb-3 hidden">
-                <div class="text-xs text-gray-500 mb-1">自定义映射关系（每行一个，格式：原值→目标值）：</div>
+            <div id="custom-mapping-area" class="mb-3">
+                <div class="text-xs text-gray-500 mb-1">映射关系（每行一个，格式：原值→目标值，可直接修改；偏移型规则会自动展开，修改后保存为自定义映射）：</div>
                 <textarea id="custom-mapping-text" class="w-full p-2 border rounded text-sm font-mono" rows="5" placeholder="比劫→印星&#10;食伤→比劫&#10;财星→食伤&#10;官杀→财星&#10;印星→官杀"></textarea>
             </div>
             <div class="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
@@ -29705,22 +29711,63 @@ function flipPositions(positions, pbGanZhi) {
     return flipped;
 }
 
-// 切换自定义映射区域显示
+// 展开偏移映射为具体的映射关系文本（每行一个：原值→目标值）
+function expandOffsetMappingText(type, offset) {
+    var cycle = (String(type).includes('五行')) ? PB_WU_CYCLE : PB_SHEN_GROUP_CYCLE;
+    var off = parseInt(offset, 10);
+    if (isNaN(off)) off = 1;
+    return cycle.map(function(v, i) { return v + '→' + cycle[(i + off) % cycle.length]; }).join('\n');
+}
+
+// 规范化映射关系文本（逐行去首尾空格、去空行）
+function normalizeCustomMappingText(text) {
+    return String(text || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean).join('\n');
+}
+
+// 解析映射关系文本为 {原值:目标值}
+function parseCustomMappingText(text) {
+    var customMap = {};
+    var lines = String(text || '').split('\n');
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line) continue;
+        var parts = line.split('→');
+        if (parts.length === 2) {
+            var key = parts[0].trim();
+            var val = parts[1].trim();
+            if (key && val) customMap[key] = val;
+        }
+    }
+    return customMap;
+}
+
+// 偏移值变化时同步刷新映射关系文本
+window.refreshCustomMappingFromOffset = function() {
+    var type = document.getElementById('mapping-rule-type').value;
+    if (String(type).includes('自定义')) return;
+    var offset = parseInt(document.getElementById('mapping-rule-offset').value) || 1;
+    document.getElementById('custom-mapping-text').value = expandOffsetMappingText(type, offset);
+};
+
+// 切换偏移下拉显示（映射关系文本域始终显示）
 window.toggleCustomMappingArea = function() {
     var type = document.getElementById('mapping-rule-type').value;
-    var customArea = document.getElementById('custom-mapping-area');
     var offsetSel = document.getElementById('mapping-rule-offset');
 
     if (type.includes('自定义')) {
-        customArea.classList.remove('hidden');
         offsetSel.classList.add('hidden');
     } else {
-        customArea.classList.add('hidden');
         offsetSel.classList.remove('hidden');
     }
 };
 
 window.openMappingRuleManager = function() {
+    // 权限限制：仅管理员可管理映射规则（普通用户仅可使用，无权管理）
+    var isAdminUser = (typeof currentUser !== 'undefined' && currentUser) && (typeof isAdmin === 'function') && isAdmin(currentUser.email);
+    if (!isAdminUser) {
+        alert('仅管理员可管理映射规则');
+        return;
+    }
     document.getElementById('mapping-rule-modal').classList.remove('hidden');
     _editingRuleId = null;
     document.getElementById('mapping-rule-name').value = '';
@@ -29753,20 +29800,7 @@ window.addMappingRule = function() {
     if (type.includes('自定义')) {
         var customText = document.getElementById('custom-mapping-text').value.trim();
         if (!customText) { alert('请输入自定义映射关系'); return; }
-
-        // 解析映射关系：比劫→印星,食伤→比劫
-        var customMap = {};
-        var lines = customText.split('\n');
-        for (var i = 0; i < lines.length; i++) {
-            var line = lines[i].trim();
-            if (!line) continue;
-            var parts = line.split('→');
-            if (parts.length === 2) {
-                var key = parts[0].trim();
-                var val = parts[1].trim();
-                if (key && val) customMap[key] = val;
-            }
-        }
+        var customMap = parseCustomMappingText(customText);
         if (Object.keys(customMap).length === 0) { alert('未解析到有效的映射关系'); return; }
         ruleData.customMap = customMap;
         ruleData.customText = customText; // 保存原文便于编辑
@@ -29774,7 +29808,18 @@ window.addMappingRule = function() {
         // 偏移映射
         var offset = parseInt(document.getElementById('mapping-rule-offset').value);
         if (isNaN(offset)) { alert('请选择有效的偏移值'); return; }
-        ruleData.offset = offset;
+        // 若用户修改了映射关系文本（与偏移展开不一致）→ 转为自定义映射
+        var offsetText = document.getElementById('custom-mapping-text').value;
+        var normalizedText = normalizeCustomMappingText(offsetText);
+        if (normalizedText && normalizedText !== expandOffsetMappingText(type, offset)) {
+            var customMap2 = parseCustomMappingText(normalizedText);
+            if (Object.keys(customMap2).length === 0) { alert('未解析到有效的映射关系'); return; }
+            ruleData.type = type + '自定义';
+            ruleData.customMap = customMap2;
+            ruleData.customText = normalizedText;
+        } else {
+            ruleData.offset = offset;
+        }
     }
 
     var rules = getMappingRules();
@@ -29812,17 +29857,19 @@ window.editMappingRule = function(id) {
     document.getElementById('mapping-rule-name').value = rule.name;
     document.getElementById('mapping-rule-type').value = rule.type;
 
-    // 触发UI切换
-    window.toggleCustomMappingArea();
-
-    // 根据类型填充不同的值
+    // 根据类型填充不同的值（先填类型与偏移，再刷新偏移下拉显隐与映射文本）
     if (rule.type.includes('自定义')) {
         // 自定义映射：填充原文
+        document.getElementById('mapping-rule-offset').value = '1';
         document.getElementById('custom-mapping-text').value = rule.customText || '';
     } else {
-        // 偏移映射：填充偏移值
+        // 偏移映射：填充偏移值，并把偏移展开为具体的映射关系文本（可直接修改）
         document.getElementById('mapping-rule-offset').value = rule.offset || 1;
+        document.getElementById('custom-mapping-text').value = expandOffsetMappingText(rule.type, rule.offset || 1);
     }
+
+    // 触发UI切换（控制偏移下拉显隐）
+    window.toggleCustomMappingArea();
 
     // 更新按钮文字
     var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
