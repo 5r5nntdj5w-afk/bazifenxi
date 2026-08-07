@@ -9609,23 +9609,23 @@
         }
     }
 
-    // ===== 条件编辑器拖拽：给元素添加拖拽手柄与 draggable（动态创建的元素自动生效） =====
+    // ===== 条件编辑器拖拽：给元素添加拖拽手柄（动态创建的元素自动生效） =====
+    // 注意：draggable=true 必须设置在手柄上（手柄是拖拽源）。
+    // HTML5 DnD 中 dragstart 的 target 是 draggable 元素本身，若设在 item/组上，
+    // 则 e.target 恒为 item/组，无法用手柄 closest 判断，拖拽会被误取消。
     function ensureDragHandle(el) {
-        if (el.draggable) return;
-        el.draggable = true;
-        let handle = el.querySelector(':scope > .drag-handle');
-        if (!handle) {
-            handle = document.createElement('span');
-            handle.className = 'drag-handle';
-            handle.title = '按住拖动调整位置';
-            handle.textContent = '⋮⋮';
-            if (el.classList.contains('condition-group')) {
-                // 插入到组标题行最前
-                const head = el.querySelector(':scope > .flex');
-                if (head) head.insertBefore(handle, head.firstChild);
-            } else {
-                el.insertBefore(handle, el.firstChild);
-            }
+        if (el.querySelector(':scope > .drag-handle')) return; // 已有手柄
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.title = '按住拖动调整位置';
+        handle.textContent = '⋮⋮';
+        handle.draggable = true;
+        if (el.classList.contains('condition-group')) {
+            // 插入到组标题行最前
+            const head = el.querySelector(':scope > .flex');
+            if (head) head.insertBefore(handle, head.firstChild);
+        } else {
+            el.insertBefore(handle, el.firstChild);
         }
     }
 
@@ -9672,11 +9672,12 @@
         document.querySelectorAll('.condition-group.drag-into-group').forEach(g => g.classList.remove('drag-into-group'));
     }
 
-    // dragstart：仅从拖拽手柄开始拖动
+    // dragstart：拖拽源是手柄（draggable=true 设在手柄上），由手柄找到所属条件项/条件组
     function handleConditionDragStart(e) {
-        const el = e.target.closest('.condition-item, .condition-group');
-        if (!el) return;
-        if (!e.target.closest('.drag-handle')) { e.preventDefault(); return; }
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) { e.preventDefault(); return; }
+        const el = handle.closest('.condition-item, .condition-group');
+        if (!el) { e.preventDefault(); return; }
         _condDragEl = el;
         el.classList.add('drag-source');
         e.dataTransfer.effectAllowed = 'move';
