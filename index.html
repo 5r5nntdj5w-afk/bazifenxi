@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4967,7 +4967,7 @@
             if(resultFilter === 'all'){
                 const categories = Object.keys(matchedByCategory).sort();
                 categories.forEach(cat => {
-                    const duanyus = matchedByCategory[cat];
+                    const duanyus = sortDuanyuByText(matchedByCategory[cat]);
                     text += `【${cat}】\n`;
                     duanyus.forEach((d, i) => {
                         const dt = typeof d === 'string' ? d : d.text;
@@ -4976,7 +4976,7 @@
                     text += '\n';
                 });
             } else {
-                const duanyus = matchedByCategory[resultFilter] || [];
+                const duanyus = sortDuanyuByText(matchedByCategory[resultFilter]);
                 text += `【${resultFilter}】\n`;
                 duanyus.forEach((d, i) => {
                     const dt = typeof d === 'string' ? d : d.text;
@@ -8840,6 +8840,15 @@
         displayDuanyuResult();
     }
 
+    // 分类内断语按名称（断语文本）排序显示
+    function sortDuanyuByText(duanyus) {
+        return (duanyus || []).slice().sort((a, b) => {
+            const ta = (typeof a === 'string' ? a : (a && a.text) || '').trim();
+            const tb = (typeof b === 'string' ? b : (b && b.text) || '').trim();
+            return ta.localeCompare(tb, 'zh-Hans-CN');
+        });
+    }
+
     function displayDuanyuResult() {
         const resultFilter = DOM.resultFilterCategory ? DOM.resultFilterCategory.value : 'all';
         const matchedByCategory = cache.matchedByCategory || {};
@@ -8866,7 +8875,7 @@
             } else {
                 categories.forEach(cat => {
                     const colorClass = categoryColors[cat] || defaultColor;
-                    const duanyus = matchedByCategory[cat];
+                    const duanyus = sortDuanyuByText(matchedByCategory[cat]);
                     html += `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br ${colorClass} border-l-4">
                         <div class="font-bold text-gray-700 mb-2">【${cat}】</div>
                         <div class="space-y-2">${duanyus.map((d, i) => `<div class="text-gray-800 flex items-start gap-2"><span class="text-amber-600 flex-shrink-0">${icons[i % icons.length]}</span><div class="result-duanyu-text">${renderDuanyu(d.text, d.rule)}</div></div>`).join('')}</div>
@@ -8874,7 +8883,7 @@
                 });
             }
         } else {
-            const duanyus = matchedByCategory[resultFilter] || [];
+            const duanyus = sortDuanyuByText(matchedByCategory[resultFilter]);
             if(duanyus.length === 0){
                 html = '<p class="text-gray-500 text-center">暂无匹配的断语</p>';
             } else {
