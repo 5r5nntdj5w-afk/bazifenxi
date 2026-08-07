@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1651,6 +1651,41 @@
                 }
                 .group-children > .condition-group {
                     border-color: #a855f7;
+                }
+                /* ===== 条件编辑器拖拽排序 ===== */
+                .condition-item .drag-handle,
+                .condition-group .drag-handle {
+                    cursor: grab;
+                    color: #9ca3af;
+                    user-select: none;
+                    -webkit-user-select: none;
+                    font-weight: bold;
+                    letter-spacing: -2px;
+                    padding: 0 2px;
+                    flex-shrink: 0;
+                }
+                .condition-item .drag-handle:hover,
+                .condition-group .drag-handle:hover {
+                    color: #3b82f6;
+                }
+                .condition-item.drag-source,
+                .condition-group.drag-source {
+                    opacity: 0.4;
+                }
+                .condition-group.drag-into-group {
+                    outline: 2px solid #3b82f6;
+                    outline-offset: 2px;
+                }
+                #drag-insert-line {
+                    position: fixed;
+                    left: 0;
+                    right: 0;
+                    height: 2px;
+                    background: #3b82f6;
+                    box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
+                    z-index: 99999;
+                    pointer-events: none;
+                    display: none;
                 }
             </style>
             
@@ -9557,6 +9592,174 @@
         // 初始化所有现有元素的事件
         document.querySelectorAll('.condition-group').forEach(group => bindGroupEvents(group));
         document.querySelectorAll('.condition-item').forEach(item => bindItemEvents(item));
+
+        // ===== 条件编辑器拖拽移动（断语编辑器 + 条件宏编辑器共用） =====
+        // 断语编辑器的条件根容器
+        initConditionDrag(rootContainer);
+        // 条件宏编辑器的条件根容器
+        const macroRoot = document.getElementById('macro-condition-root');
+        if (macroRoot) initConditionDrag(macroRoot);
+        // 事件委托只需注册一次
+        if (!window.__condDragBound) {
+            window.__condDragBound = true;
+            document.addEventListener('dragstart', handleConditionDragStart);
+            document.addEventListener('dragend', handleConditionDragEnd);
+            document.addEventListener('dragover', handleConditionDragOver);
+            document.addEventListener('drop', handleConditionDrop);
+        }
+    }
+
+    // ===== 条件编辑器拖拽：给元素添加拖拽手柄与 draggable（动态创建的元素自动生效） =====
+    function ensureDragHandle(el) {
+        if (el.draggable) return;
+        el.draggable = true;
+        let handle = el.querySelector(':scope > .drag-handle');
+        if (!handle) {
+            handle = document.createElement('span');
+            handle.className = 'drag-handle';
+            handle.title = '按住拖动调整位置';
+            handle.textContent = '⋮⋮';
+            if (el.classList.contains('condition-group')) {
+                // 插入到组标题行最前
+                const head = el.querySelector(':scope > .flex');
+                if (head) head.insertBefore(handle, head.firstChild);
+            } else {
+                el.insertBefore(handle, el.firstChild);
+            }
+        }
+    }
+
+    // 为容器内所有条件项/条件组开启拖拽，并用 MutationObserver 覆盖动态新增元素
+    function initConditionDrag(container) {
+        if (!container) return;
+        container.querySelectorAll('.condition-item, .condition-group').forEach(ensureDragHandle);
+        if (!container.__condDragObserver) {
+            container.__condDragObserver = new MutationObserver(function(muts) {
+                muts.forEach(function(m) {
+                    m.addedNodes.forEach(function(n) {
+                        if (n.nodeType !== 1) return;
+                        if (n.matches && n.matches('.condition-item, .condition-group')) ensureDragHandle(n);
+                        if (n.querySelectorAll) n.querySelectorAll('.condition-item, .condition-group').forEach(ensureDragHandle);
+                    });
+                });
+            });
+            container.__condDragObserver.observe(container, { childList: true, subtree: true });
+        }
+    }
+
+    // ===== 拖拽状态与委托处理 =====
+    let _condDragEl = null;
+    let _condDragIntoGroup = null;   // 组标题栏高亮：移入该组末尾
+    let _condDragRef = null;         // 插入到某行前/后 {el, after}
+    let _condDragAppend = null;      // 追加到某容器末尾
+    let _condDragInsertLine = null;
+
+    function showInsertLine(top) {
+        if (!_condDragInsertLine) {
+            _condDragInsertLine = document.createElement('div');
+            _condDragInsertLine.id = 'drag-insert-line';
+            document.body.appendChild(_condDragInsertLine);
+        }
+        _condDragInsertLine.style.display = 'block';
+        _condDragInsertLine.style.top = top + 'px';
+    }
+
+    function hideInsertLine() {
+        if (_condDragInsertLine) _condDragInsertLine.style.display = 'none';
+    }
+
+    function clearDragTargets() {
+        document.querySelectorAll('.condition-group.drag-into-group').forEach(g => g.classList.remove('drag-into-group'));
+    }
+
+    // dragstart：仅从拖拽手柄开始拖动
+    function handleConditionDragStart(e) {
+        const el = e.target.closest('.condition-item, .condition-group');
+        if (!el) return;
+        if (!e.target.closest('.drag-handle')) { e.preventDefault(); return; }
+        _condDragEl = el;
+        el.classList.add('drag-source');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', 'condition-drag'); } catch(err) {}
+    }
+
+    function handleConditionDragEnd() {
+        if (_condDragEl) _condDragEl.classList.remove('drag-source');
+        _condDragEl = null;
+        _condDragIntoGroup = null;
+        _condDragRef = null;
+        _condDragAppend = null;
+        clearDragTargets();
+        hideInsertLine();
+    }
+
+    // dragover：计算放置目标并给出指示（不移动 DOM，drop 时执行）
+    function handleConditionDragOver(e) {
+        if (!_condDragEl) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        clearDragTargets();
+        hideInsertLine();
+        _condDragIntoGroup = null;
+        _condDragRef = null;
+        _condDragAppend = null;
+
+        // 1. 拖到组标题栏 → 移入该组（末尾）
+        const head = e.target.closest('.condition-group > .flex');
+        if (head) {
+            const group = head.closest('.condition-group');
+            if (group && group !== _condDragEl && !group.contains(_condDragEl)) {
+                _condDragIntoGroup = group;
+                group.classList.add('drag-into-group');
+            }
+            return;
+        }
+
+        // 2. 拖到条件行之间 → 插入线（前/后）
+        const row = e.target.closest('.condition-item, .condition-group');
+        if (row) {
+            if (row === _condDragEl || _condDragEl.contains(row)) return; // 不能插入自己内部
+            const rect = row.getBoundingClientRect();
+            const after = e.clientY > rect.top + rect.height / 2;
+            showInsertLine(after ? rect.bottom : rect.top);
+            _condDragRef = { el: row, after: after };
+            return;
+        }
+
+        // 3. 拖到容器空白区 → 追加到容器末尾
+        //    仅拒绝拖入"被拖元素自身内部"（防循环嵌套）；拖到自身所在容器空白区 = 排到该容器末尾
+        const container = e.target.closest('.group-children, .condition-group-root');
+        if (container && !_condDragEl.contains(container)) {
+            // 根容器只允许放置条件组
+            if (container.classList.contains('condition-group-root') && !_condDragEl.classList.contains('condition-group')) return;
+            showInsertLine(container.getBoundingClientRect().bottom - 1);
+            _condDragAppend = container;
+        }
+    }
+
+    // drop：执行放置
+    function handleConditionDrop(e) {
+        if (!_condDragEl) return;
+        e.preventDefault();
+        const el = _condDragEl;
+
+        if (_condDragIntoGroup) {
+            // 移入组末尾
+            const children = _condDragIntoGroup.querySelector(':scope > .group-children');
+            if (children) children.appendChild(el);
+        } else if (_condDragRef && _condDragRef.el) {
+            const { el: ref, after } = _condDragRef;
+            if (after) {
+                if (ref.nextSibling) ref.parentNode.insertBefore(el, ref.nextSibling);
+                else ref.parentNode.appendChild(el);
+            } else {
+                ref.parentNode.insertBefore(el, ref);
+            }
+        } else if (_condDragAppend) {
+            _condDragAppend.appendChild(el);
+        }
+
+        handleConditionDragEnd();
     }
     
     // 创建条件组元素
