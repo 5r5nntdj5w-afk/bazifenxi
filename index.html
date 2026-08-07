@@ -2213,7 +2213,7 @@
                 <button id="batch-copy" class="px-3 py-1 bg-yellow-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量复制</button>
                 <button id="batch-enable" class="px-3 py-1 bg-green-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量开启</button>
                 <button id="batch-disable" class="px-3 py-1 bg-gray-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量关闭</button>
-                <button id="category-switch-btn" class="px-3 py-1 bg-cyan-700 text-white rounded text-sm">分类开关</button>
+                <button id="prefix-merge-btn" class="px-3 py-1 bg-cyan-700 text-white rounded text-sm" style="display:none">🔗 合并前缀设置</button>
                 <button id="batch-delete" class="px-3 py-1 bg-red-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量删除</button>
             </div>
             
@@ -3708,9 +3708,10 @@
           isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false,
           macroIdMapping: (function() { try { return (getIdMapping() || {}).macros || {}; } catch(e) { return {}; } })(),
           mappingRules: (typeof getMappingRules === 'function') ? getMappingRules() : [],
-          // 本地开关状态：关闭的断语与分类不参与匹配（后端过滤）
+          // 本地开关状态：关闭的断语不参与匹配（后端过滤）
           disabledRuleIds: (function() { const s = getDuanyuSwitchState(); return Object.keys(s.rules || {}).filter(function(k) { return s.rules[k]; }); })(),
-          disabledCategories: (function() { const s = getDuanyuSwitchState(); return Object.keys(s.categories || {}).filter(function(k) { return s.categories[k]; }); })(),
+          // 分类开关：管理员全局配置，所有用户生效（后端过滤）
+          disabledCategories: (function() { const cfg = getGlobalDisplayConfig(); return Object.keys(cfg.categorySwitch || {}).filter(function(k) { return cfg.categorySwitch[k]; }); })(),
           debug: biDebug ? true : undefined
         }));
       });
@@ -4964,24 +4965,26 @@
 
             let text = '';
 
+            // 复制时同样按全局分类顺序 + 同前缀合并 + 数字序号
+            const buildCopyText = (duanyus) => {
+                return groupDuanyuByPrefix(sortDuanyuByText(duanyus)).map((entry, i) => {
+                    return `${i + 1}. ${mergedDuanyuText(entry)}\n`;
+                }).join('');
+            };
+
             if(resultFilter === 'all'){
-                const categories = Object.keys(matchedByCategory).sort();
+                let categories = Object.keys(matchedByCategory).filter(cat => !isGlobalCategoryDisabled(cat));
+                categories = sortCategoriesByConfig(categories);
                 categories.forEach(cat => {
-                    const duanyus = sortDuanyuByText(matchedByCategory[cat]);
                     text += `【${cat}】\n`;
-                    duanyus.forEach((d, i) => {
-                        const dt = typeof d === 'string' ? d : d.text;
-                        text += `${i + 1}. ${dt}\n`;
-                    });
+                    text += buildCopyText(matchedByCategory[cat]);
                     text += '\n';
                 });
             } else {
-                const duanyus = sortDuanyuByText(matchedByCategory[resultFilter]);
-                text += `【${resultFilter}】\n`;
-                duanyus.forEach((d, i) => {
-                    const dt = typeof d === 'string' ? d : d.text;
-                    text += `${i + 1}. ${dt}\n`;
-                });
+                if (!isGlobalCategoryDisabled(resultFilter)) {
+                    text += `【${resultFilter}】\n`;
+                    text += buildCopyText(matchedByCategory[resultFilter]);
+                }
             }
 
             if(!text.trim()){
@@ -5908,6 +5911,11 @@
             alert('⚠️ 仅管理员可管理分类');
             return;
         }
+        renderCategoryManagerModal();
+    }
+
+    // 渲染分类管理弹窗（打开或排序/开关操作后刷新）
+    function renderCategoryManagerModal() {
         // 收集所有分类及断语数量
         const catCount = {};
         (cache.rules || []).forEach(r => {
@@ -5919,6 +5927,11 @@
             alert('暂无分类');
             return;
         }
+        const ordered = sortCategoriesByConfig(allCats);
+        
+        // 移除旧弹窗（排序/开关后重新渲染）
+        const old = document.getElementById('category-manager-modal');
+        if (old) old.remove();
         
         const modal = document.createElement('div');
         modal.id = 'category-manager-modal';
@@ -5929,19 +5942,28 @@
                     <h3 class="text-lg font-bold text-amber-800">📂 分类管理</h3>
                     <button onclick="document.getElementById('category-manager-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
+                <p class="text-xs text-gray-500 mb-2">↑↓ 调整匹配结果中的分类显示顺序；开关控制该分类是否参与断语匹配。两者均为全局设置（仅管理员可操作）。</p>
                 <div class="max-h-80 overflow-y-auto space-y-2">
-                    ${allCats.map(cat => `
+                    ${ordered.map((cat, idx) => {
+                        const off = isGlobalCategoryDisabled(cat);
+                        return `
                         <div class="flex items-center justify-between p-2 bg-gray-50 rounded border">
-                            <div>
-                                <span class="font-medium">${cat}</span>
-                                <span class="text-xs text-gray-400 ml-2">${catCount[cat] || 0} 条断语</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-400 text-xs w-5">${idx + 1}.</span>
+                                <div>
+                                    <span class="font-medium">${cat}</span>
+                                    <span class="text-xs text-gray-400 ml-2">${catCount[cat] || 0} 条断语</span>
+                                </div>
                             </div>
-                            <div class="flex gap-1">
+                            <div class="flex gap-1 items-center">
+                                <button onclick="moveCategoryOrder('${cat}', -1)" class="px-2 py-1 bg-gray-500 text-white rounded text-xs ${idx === 0 ? 'opacity-30 cursor-not-allowed' : ''}">↑ 上移</button>
+                                <button onclick="moveCategoryOrder('${cat}', 1)" class="px-2 py-1 bg-gray-500 text-white rounded text-xs ${idx === ordered.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}">↓ 下移</button>
+                                <button onclick="toggleGlobalCategorySwitch('${cat}')" class="px-2 py-1 text-white rounded text-xs ${off ? 'bg-gray-600' : 'bg-green-600'}">${off ? '⏸ 已关闭' : '✅ 开启'}</button>
                                 <button onclick="renameCategory('${cat}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️ 重命名</button>
                                 <button onclick="deleteCategory('${cat}')" class="px-2 py-1 bg-red-500 text-white rounded text-xs">🗑️ 删除</button>
                             </div>
-                        </div>
-                    `).join('')}
+                        </div>`;
+                    }).join('')}
                 </div>
                 <div class="mt-4 flex gap-2">
                     <input type="text" id="new-cat-input" class="flex-1 p-2 border rounded" placeholder="新分类名称">
@@ -5953,6 +5975,37 @@
             </div>
         `;
         document.body.appendChild(modal);
+    }
+
+    // 上移/下移分类顺序（全局设置）
+    window.moveCategoryOrder = async function(cat, dir) {
+        if (!currentUser || !isAdmin(currentUser.email)) { alert('⚠️ 仅管理员可管理分类'); return; }
+        const catCount = {};
+        (cache.rules || []).forEach(r => { if (r.category) catCount[r.category] = (catCount[r.category] || 0) + 1; });
+        const allCats = [...new Set([...Object.keys(catCount), ...(cache.categories || [])])];
+        const ordered = sortCategoriesByConfig(allCats);
+        const idx = ordered.indexOf(cat);
+        const target = idx + dir;
+        if (idx < 0 || target < 0 || target >= ordered.length) return;
+        [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
+        const cfg = getGlobalDisplayConfig();
+        cfg.categoryOrder = ordered;
+        await saveGlobalDisplayConfig(cfg);
+        renderCategoryManagerModal();
+        // 刷新匹配结果显示顺序
+        reloadAll();
+    }
+
+    // 切换分类全局开关（true=关闭该分类，全局生效）
+    window.toggleGlobalCategorySwitch = async function(cat) {
+        if (!currentUser || !isAdmin(currentUser.email)) { alert('⚠️ 仅管理员可管理分类'); return; }
+        const off = isGlobalCategoryDisabled(cat);
+        await setGlobalCategoryDisabled(cat, !off);
+        renderCategoryManagerModal();
+        // 刷新匹配结果与断语缓存
+        reloadAll();
+        clearScfRuleCache();
+        clearClientApiCache();
     }
 
     // 重命名分类
@@ -6137,60 +6190,70 @@
         alert(`已将 ${count} 条断语调整到分类 "${target}"`);
     }
 
-    // 分类整体开关设置弹窗（本地状态，分类开关优先于单条开关）
-    function openCategorySwitchModal() {
-        const allCats = [...new Set([...(cache.rules || []).map(r => r.category).filter(Boolean), ...(cache.categories || [])])];
-        if (allCats.length === 0) return alert('暂无可用分类');
-        
-        const s = getDuanyuSwitchState();
-        
+    // 合并前缀设置弹窗（仅管理员，全局生效）
+    function openPrefixMergeSettings() {
+        if (!currentUser || !isAdmin(currentUser.email)) {
+            alert('⚠️ 仅管理员可设置合并前缀');
+            return;
+        }
+        const cfg = getGlobalDisplayConfig();
+        const pm = cfg.prefixMerge || { mergePrefixes: [], excludePrefixes: [] };
+        const mergeAll = (pm.mergePrefixes || []).length === 0;
+
         const overlay = document.createElement('div');
+        overlay.id = 'prefix-merge-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
-        
+
         const modal = document.createElement('div');
-        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:380px;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
-        
-        const catRows = allCats.map(cat => {
-            const off = !!(s.categories && s.categories[cat]);
-            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
-                <span style="font-size:14px;font-weight:500;">${cat}</span>
-                <span class="cat-switch" data-cat="${cat}" data-state="${off ? 'off' : 'on'}" style="cursor:pointer;padding:6px 16px;border-radius:20px;font-size:13px;color:#fff;${off ? 'background:#6b7280;' : 'background:#16a34a;'}">${off ? '已关闭' : '已开启'}</span>
-            </div>`;
-        }).join('');
-        
+        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:420px;max-width:560px;max-height:85vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
+
         modal.innerHTML = `
-            <h3 style="margin:0 0 4px;font-size:16px;font-weight:600;">分类开关设置</h3>
-            <p style="margin:0 0 12px;font-size:13px;color:#888;">关闭的分类将不参与断语匹配（仅当前浏览器生效）。分类开关优先于单条开关。</p>
-            ${catRows}
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
-                <button id="cat-switch-close" style="padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;">关闭</button>
+            <h3 style="margin:0 0 6px;font-size:16px;font-weight:600;">🔗 合并前缀设置</h3>
+            <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.6;">
+                匹配输出时，前缀相同的断语将合并为一条显示，如：<br>
+                <span style="color:#b45309;">地支：比劫泄印、财星制印星、食伤泄比劫！</span><br>
+                此设置为全局配置，对所有用户生效（仅管理员可修改）。
+            </p>
+            <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:4px;">
+                <input type="checkbox" id="prefix-merge-all" ${mergeAll ? 'checked' : ''}> 默认合并所有带前缀的断语
+            </label>
+            <p style="margin:0 0 10px;font-size:12px;color:#999;">取消勾选后，仅合并下方"需合并前缀"列表中的前缀。</p>
+            <div style="margin-bottom:12px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">需合并的前缀（每行一个，如：地支 / 天干 / 大运）</div>
+                <textarea id="prefix-merge-list" rows="4" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">${(pm.mergePrefixes || []).join('\n')}</textarea>
+            </div>
+            <div style="margin-bottom:16px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">不合并的前缀（始终不合并，优先级最高，每行一个）</div>
+                <textarea id="prefix-exclude-list" rows="4" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">${(pm.excludePrefixes || []).join('\n')}</textarea>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button id="prefix-merge-save" style="padding:8px 20px;border:none;border-radius:6px;background:#0d9488;color:#fff;cursor:pointer;font-size:14px;">保存</button>
+                <button id="prefix-merge-close" style="padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;">取消</button>
             </div>
         `;
-        
+
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
-        
-        overlay.querySelectorAll('.cat-switch').forEach(el => {
-            el.onclick = function() {
-                const cat = this.dataset.cat;
-                const off = this.dataset.state === 'off';
-                // 当前已关闭则开启，当前开启则关闭
-                setCategoryDisabled(cat, !off);
-                this.dataset.state = off ? 'on' : 'off';
-                this.textContent = off ? '已开启' : '已关闭';
-                this.style.background = off ? '#16a34a' : '#6b7280';
+
+        const closeModal = () => { document.body.removeChild(overlay); };
+        overlay.querySelector('#prefix-merge-close').onclick = closeModal;
+        overlay.querySelector('#prefix-merge-save').onclick = async function() {
+            const parseLines = (v) => [...new Set((v || '').split(/[\n，,、；;]+/).map(s => s.trim()).filter(Boolean))];
+            const mergeAllChecked = document.getElementById('prefix-merge-all').checked;
+            const cfg = getGlobalDisplayConfig();
+            cfg.prefixMerge = {
+                mergePrefixes: mergeAllChecked ? [] : parseLines(document.getElementById('prefix-merge-list').value),
+                excludePrefixes: parseLines(document.getElementById('prefix-exclude-list').value)
             };
-        });
-        overlay.querySelector('#cat-switch-close').onclick = function() {
-            document.body.removeChild(overlay);
+            await saveGlobalDisplayConfig(cfg);
+            closeModal();
+            // 刷新匹配结果
             reloadAll();
+            clearScfRuleCache();
+            clearClientApiCache();
+            alert('✅ 合并前缀设置已保存（全局生效）');
         };
-        overlay.onclick = function(e) {
-            if (e.target === overlay) {
-                document.body.removeChild(overlay);
-                reloadAll();
-            }
-        };
+        overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
     }
 
     // 获取当前用户允许的断语分类（需暴露为全局，给 matchRules 使用）
@@ -8849,6 +8912,66 @@
         });
     }
 
+    // 按全局配置的分类显示顺序排序（未配置顺序时按字母序）
+    function sortCategoriesByConfig(categories) {
+        const order = getGlobalDisplayConfig().categoryOrder || [];
+        if (!order.length) return (categories || []).slice().sort();
+        const pos = {};
+        order.forEach((c, i) => pos[c] = i);
+        return (categories || []).slice().sort((a, b) => {
+            const pa = pos[a] !== undefined ? pos[a] : order.length;
+            const pb = pos[b] !== undefined ? pos[b] : order.length;
+            if (pa !== pb) return pa - pb;
+            return String(a).localeCompare(String(b), 'zh-Hans-CN');
+        });
+    }
+
+    // 同前缀断语合并（仅显示层，不改变匹配数据）
+    // 例：['地支：比劫泄印！','地支：财星制印星！','天干：比劫克财！']
+    //   → [{type:'group',prefix:'地支',contents:[...]},{type:'single',...}]
+    // 规则：按全角/半角冒号识别前缀；未配置合并列表时默认全部合并；
+    //      excludePrefixes 中的前缀始终不合并；mergePrefixes 非空时仅合并列表内前缀。
+    function groupDuanyuByPrefix(duanyus) {
+        const cfg = getGlobalDisplayConfig().prefixMerge || {};
+        const mergeList = cfg.mergePrefixes || [];
+        const excludeList = cfg.excludePrefixes || [];
+        const mergeAll = mergeList.length === 0;
+
+        const result = []; // {type:'group',prefix,contents:[{d,content}]} | {type:'single',d,text}
+        const groupMap = {}; // prefix → index in result
+
+        (duanyus || []).forEach(d => {
+            const text = (typeof d === 'string' ? d : (d && d.text) || '').trim();
+            const m = text.match(/^([^\s：:]{1,12})[：:]\s*(.+)$/);
+            if (m) {
+                const prefix = m[1];
+                let content = m[2].trim();
+                // 去掉内容尾部标点（！。. ! 、，）
+                content = content.replace(/[！!。.、，,；;]+$/g, '');
+                const shouldMerge = !excludeList.includes(prefix) && (mergeAll || mergeList.includes(prefix));
+                if (shouldMerge) {
+                    if (groupMap[prefix] !== undefined) {
+                        result[groupMap[prefix]].contents.push({ d, content });
+                    } else {
+                        groupMap[prefix] = result.length;
+                        result.push({ type: 'group', prefix, contents: [{ d, content }] });
+                    }
+                    return;
+                }
+            }
+            result.push({ type: 'single', d, text });
+        });
+        return result;
+    }
+
+    // 合并结果显示文本（用于复制与渲染）
+    function mergedDuanyuText(entry) {
+        if (entry.type === 'group') {
+            return entry.prefix + '：' + entry.contents.map(c => c.content).join('、') + '！';
+        }
+        return entry.text;
+    }
+
     function displayDuanyuResult() {
         const resultFilter = DOM.resultFilterCategory ? DOM.resultFilterCategory.value : 'all';
         const matchedByCategory = cache.matchedByCategory || {};
@@ -8863,13 +8986,23 @@
             '灾祸':'from-orange-50 to-orange-100 border-orange-300'
         };
         
-        const icons = ['◆', '◇', '✦', '✧', '●', '○', '■', '□', '▲', '△', '▶', '▷'];
-        
         let html = '';
         const defaultColor = 'from-gray-50 to-gray-100 border-gray-300';
         
+        // 渲染单个分类：数字序号 + 同前缀合并
+        const renderCategoryDuanyus = (duanyus) => {
+            return groupDuanyuByPrefix(duanyus).map((entry, i) => {
+                const displayText = mergedDuanyuText(entry);
+                const rule = entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.rule) : (entry.d && entry.d.rule);
+                return `<div class="text-gray-800 flex items-start gap-2"><span class="text-amber-600 flex-shrink-0 font-bold">${i + 1}.</span><div class="result-duanyu-text">${renderDuanyu(displayText, rule)}</div></div>`;
+            }).join('');
+        };
+        
         if(resultFilter === 'all'){
-            const categories = Object.keys(matchedByCategory).sort();
+            let categories = Object.keys(matchedByCategory);
+            // 全局关闭的分类不显示
+            categories = categories.filter(cat => !isGlobalCategoryDisabled(cat));
+            categories = sortCategoriesByConfig(categories);
             if(categories.length === 0){
                 html = '<p class="text-gray-500 text-center">暂无匹配的断语</p>';
             } else {
@@ -8878,20 +9011,24 @@
                     const duanyus = sortDuanyuByText(matchedByCategory[cat]);
                     html += `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br ${colorClass} border-l-4">
                         <div class="font-bold text-gray-700 mb-2">【${cat}】</div>
-                        <div class="space-y-2">${duanyus.map((d, i) => `<div class="text-gray-800 flex items-start gap-2"><span class="text-amber-600 flex-shrink-0">${icons[i % icons.length]}</span><div class="result-duanyu-text">${renderDuanyu(d.text, d.rule)}</div></div>`).join('')}</div>
+                        <div class="space-y-2">${renderCategoryDuanyus(duanyus)}</div>
                     </div>`;
                 });
             }
         } else {
-            const duanyus = sortDuanyuByText(matchedByCategory[resultFilter]);
-            if(duanyus.length === 0){
-                html = '<p class="text-gray-500 text-center">暂无匹配的断语</p>';
+            if (isGlobalCategoryDisabled(resultFilter)) {
+                html = '<p class="text-gray-500 text-center">该分类已被管理员关闭</p>';
             } else {
-                const colorClass = categoryColors[resultFilter] || defaultColor;
-                html = `<div class="p-3 rounded-lg bg-gradient-to-br ${colorClass} border-l-4">
-                    <div class="font-bold text-gray-700 mb-2">【${resultFilter}】</div>
-                    <div class="space-y-2">${duanyus.map((d, i) => `<div class="text-gray-800 flex items-start gap-2"><span class="text-amber-600 flex-shrink-0">${icons[i % icons.length]}</span><div class="result-duanyu-text">${renderDuanyu(d.text, d.rule)}</div></div>`).join('')}</div>
-                </div>`;
+                const duanyus = sortDuanyuByText(matchedByCategory[resultFilter]);
+                if(duanyus.length === 0){
+                    html = '<p class="text-gray-500 text-center">暂无匹配的断语</p>';
+                } else {
+                    const colorClass = categoryColors[resultFilter] || defaultColor;
+                    html = `<div class="p-3 rounded-lg bg-gradient-to-br ${colorClass} border-l-4">
+                        <div class="font-bold text-gray-700 mb-2">【${resultFilter}】</div>
+                        <div class="space-y-2">${renderCategoryDuanyus(duanyus)}</div>
+                    </div>`;
+                }
             }
         }
         
@@ -12729,10 +12866,11 @@
         bindBatchSwitch(true);
         bindBatchSwitch(false);
         
-        // 分类开关设置
-        const categorySwitchBtn = document.getElementById('category-switch-btn');
-        if (categorySwitchBtn) {
-            categorySwitchBtn.onclick = function() { openCategorySwitchModal(); };
+        // 合并前缀设置（仅管理员，全局生效）
+        const prefixMergeBtn = document.getElementById('prefix-merge-btn');
+        if (prefixMergeBtn) {
+            prefixMergeBtn.onclick = function() { openPrefixMergeSettings(); };
+            prefixMergeBtn.style.display = (currentUser && isAdmin(currentUser.email)) ? 'inline-block' : 'none';
         }
         
         // 批量复制
@@ -23417,6 +23555,8 @@ async function initApp() {
     updateAuthUI(isLoggedIn);
     // 先加载用户权限（含免费用户默认分类），供 loadCategories 使用
     await getUserPermissions();
+    // 加载断语显示全局配置（前缀合并/分类顺序/分类开关）
+    try { await loadGlobalDisplayConfig(); } catch (e) { console.error('加载断语显示全局配置失败:', e); }
     // 无论是否登录，都初始化页面
     initAll();
     if (isLoggedIn) {
@@ -23547,6 +23687,11 @@ function updateAuthUI(isLoggedIn) {
             if (isAdminUser) tabData.classList.remove('hidden');
             else tabData.classList.add('hidden');
         }
+        // 合并前缀设置按钮仅管理员可见
+        const prefixMergeBtn = document.getElementById('prefix-merge-btn');
+        if (prefixMergeBtn) {
+            prefixMergeBtn.style.display = isAdminUser ? 'inline-block' : 'none';
+        }
     } else {
         if (userStatus) userStatus.innerHTML = '<span class="text-gray-500">未登录</span>';
         if (authForms) authForms.classList.remove('hidden');
@@ -23554,6 +23699,9 @@ function updateAuthUI(isLoggedIn) {
         if (adminSection) adminSection.classList.add('hidden');
         // 未登录时隐藏数据管理标签
         if (tabData) tabData.classList.add('hidden');
+        // 未登录时隐藏合并前缀设置按钮
+        const prefixMergeBtn = document.getElementById('prefix-merge-btn');
+        if (prefixMergeBtn) prefixMergeBtn.style.display = 'none';
     }
 }
 
@@ -24150,9 +24298,11 @@ function getRuleSwitchKey(rule) {
     return rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
 }
 
-// 断语是否关闭：分类整体关闭优先，其次单条关闭
+// 断语是否关闭：全局分类关闭优先，其次本地单条关闭
 function isRuleDisabled(rule) {
     if (!rule) return false;
+    // 管理员全局分类开关
+    if (isGlobalCategoryDisabled(rule.category)) return true;
     const s = getDuanyuSwitchState();
     if (s.categories && s.categories[rule.category]) return true;
     const key = getRuleSwitchKey(rule);
@@ -24160,6 +24310,7 @@ function isRuleDisabled(rule) {
 }
 
 function isCategoryDisabled(cat) {
+    if (isGlobalCategoryDisabled(cat)) return true;
     const s = getDuanyuSwitchState();
     return !!(s.categories && s.categories[cat]);
 }
@@ -24174,6 +24325,94 @@ function setCategoryDisabled(cat, disabled) {
     const s = getDuanyuSwitchState();
     if (disabled) s.categories[cat] = true; else delete s.categories[cat];
     saveDuanyuSwitchState(s);
+}
+
+// ============ 断语显示全局配置（site_settings 存储，管理员维护，全用户生效） ============
+// 配置结构：
+// {
+//   prefixMerge: { mergePrefixes: [], excludePrefixes: [] },  // 两者均为空 = 默认全部前缀合并；
+//     // mergePrefixes 非空时仅合并列表内前缀；excludePrefixes 优先级最高（始终不合并）
+//   categoryOrder: ['格局', '事业', ...],   // 匹配结果分类显示顺序（空 = 默认字母序）
+//   categorySwitch: { '分类': true }        // true = 关闭该分类（全局生效，不参与匹配）
+// }
+let _globalDisplayConfig = null; // 缓存，null = 尚未加载
+
+const GLOBAL_DISPLAY_CONFIG_KEY = 'duanyu_display_config';
+
+function _defaultDisplayConfig() {
+    return { prefixMerge: { mergePrefixes: [], excludePrefixes: [] }, categoryOrder: [], categorySwitch: {} };
+}
+
+// 读取当前生效的显示配置（未加载时返回默认值）
+function getGlobalDisplayConfig() {
+    return _globalDisplayConfig || _defaultDisplayConfig();
+}
+
+// 从 site_settings 加载全局显示配置
+async function loadGlobalDisplayConfig() {
+    try {
+        const { data } = await supabaseClient
+            .from('site_settings')
+            .select('setting_value')
+            .eq('setting_key', GLOBAL_DISPLAY_CONFIG_KEY)
+            .maybeSingle();
+        if (data && data.setting_value) {
+            const parsed = JSON.parse(data.setting_value);
+            _globalDisplayConfig = {
+                prefixMerge: Object.assign({ mergePrefixes: [], excludePrefixes: [] }, parsed.prefixMerge || {}),
+                categoryOrder: Array.isArray(parsed.categoryOrder) ? parsed.categoryOrder : [],
+                categorySwitch: parsed.categorySwitch && typeof parsed.categorySwitch === 'object' ? parsed.categorySwitch : {}
+            };
+        } else {
+            _globalDisplayConfig = _defaultDisplayConfig();
+        }
+    } catch (e) {
+        console.error('加载断语显示全局配置失败:', e);
+        _globalDisplayConfig = _defaultDisplayConfig();
+    }
+    return _globalDisplayConfig;
+}
+
+// 保存全局显示配置到 site_settings（仅管理员调用）
+async function saveGlobalDisplayConfig(config) {
+    try {
+        const { data: existing } = await supabaseClient
+            .from('site_settings')
+            .select('id')
+            .eq('setting_key', GLOBAL_DISPLAY_CONFIG_KEY);
+        const value = JSON.stringify(config || _defaultDisplayConfig());
+        if (existing && existing.length > 0) {
+            await supabaseClient.from('site_settings')
+                .update({ setting_value: value, updated_at: new Date().toISOString() })
+                .eq('id', existing[0].id);
+        } else {
+            await supabaseClient.from('site_settings').insert({
+                setting_key: GLOBAL_DISPLAY_CONFIG_KEY,
+                setting_value: value,
+                description: '断语匹配结果显示全局配置（前缀合并/分类顺序/分类开关）',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            });
+        }
+        // 更新内存缓存
+        _globalDisplayConfig = config;
+    } catch (e) {
+        console.error('保存断语显示全局配置失败:', e);
+        alert('⚠️ 保存全局配置失败，请重试');
+    }
+}
+
+// 设置某个分类的全局开关状态（true=关闭），管理员操作
+async function setGlobalCategoryDisabled(cat, disabled) {
+    const cfg = getGlobalDisplayConfig();
+    if (disabled) cfg.categorySwitch[cat] = true; else delete cfg.categorySwitch[cat];
+    await saveGlobalDisplayConfig(cfg);
+}
+
+// 当前全局配置中是否关闭了该分类
+function isGlobalCategoryDisabled(cat) {
+    const cfg = getGlobalDisplayConfig();
+    return !!(cfg.categorySwitch && cfg.categorySwitch[cat]);
 }
 
 // 获取宏对当前用户的有效权限等级（考虑套餐限制）
