@@ -2211,6 +2211,9 @@
                     导入断语<input type="file" id="import-rule" class="hidden" accept=".json">
                 </label>
                 <button id="batch-copy" class="px-3 py-1 bg-yellow-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量复制</button>
+                <button id="batch-enable" class="px-3 py-1 bg-green-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量开启</button>
+                <button id="batch-disable" class="px-3 py-1 bg-gray-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量关闭</button>
+                <button id="category-switch-btn" class="px-3 py-1 bg-cyan-700 text-white rounded text-sm">分类开关</button>
                 <button id="batch-delete" class="px-3 py-1 bg-red-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量删除</button>
             </div>
             
@@ -3705,6 +3708,9 @@
           isAdmin: (typeof currentUser !== 'undefined' && currentUser) ? isAdmin(currentUser.email) : false,
           macroIdMapping: (function() { try { return (getIdMapping() || {}).macros || {}; } catch(e) { return {}; } })(),
           mappingRules: (typeof getMappingRules === 'function') ? getMappingRules() : [],
+          // 本地开关状态：关闭的断语与分类不参与匹配（后端过滤）
+          disabledRuleIds: (function() { const s = getDuanyuSwitchState(); return Object.keys(s.rules || {}).filter(function(k) { return s.rules[k]; }); })(),
+          disabledCategories: (function() { const s = getDuanyuSwitchState(); return Object.keys(s.categories || {}).filter(function(k) { return s.categories[k]; }); })(),
           debug: biDebug ? true : undefined
         }));
       });
@@ -6130,6 +6136,62 @@
         loadCategories();
         reloadAll();
         alert(`已将 ${count} 条断语调整到分类 "${target}"`);
+    }
+
+    // 分类整体开关设置弹窗（本地状态，分类开关优先于单条开关）
+    function openCategorySwitchModal() {
+        const allCats = [...new Set([...(cache.rules || []).map(r => r.category).filter(Boolean), ...(cache.categories || [])])];
+        if (allCats.length === 0) return alert('暂无可用分类');
+        
+        const s = getDuanyuSwitchState();
+        
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:380px;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
+        
+        const catRows = allCats.map(cat => {
+            const off = !!(s.categories && s.categories[cat]);
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+                <span style="font-size:14px;font-weight:500;">${cat}</span>
+                <span class="cat-switch" data-cat="${cat}" data-state="${off ? 'off' : 'on'}" style="cursor:pointer;padding:6px 16px;border-radius:20px;font-size:13px;color:#fff;${off ? 'background:#6b7280;' : 'background:#16a34a;'}">${off ? '已关闭' : '已开启'}</span>
+            </div>`;
+        }).join('');
+        
+        modal.innerHTML = `
+            <h3 style="margin:0 0 4px;font-size:16px;font-weight:600;">分类开关设置</h3>
+            <p style="margin:0 0 12px;font-size:13px;color:#888;">关闭的分类将不参与断语匹配（仅当前浏览器生效）。分类开关优先于单条开关。</p>
+            ${catRows}
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+                <button id="cat-switch-close" style="padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;">关闭</button>
+            </div>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        overlay.querySelectorAll('.cat-switch').forEach(el => {
+            el.onclick = function() {
+                const cat = this.dataset.cat;
+                const off = this.dataset.state === 'off';
+                // 当前已关闭则开启，当前开启则关闭
+                setCategoryDisabled(cat, !off);
+                this.dataset.state = off ? 'on' : 'off';
+                this.textContent = off ? '已开启' : '已关闭';
+                this.style.background = off ? '#16a34a' : '#6b7280';
+            };
+        });
+        overlay.querySelector('#cat-switch-close').onclick = function() {
+            document.body.removeChild(overlay);
+            reloadAll();
+        };
+        overlay.onclick = function(e) {
+            if (e.target === overlay) {
+                document.body.removeChild(overlay);
+                reloadAll();
+            }
+        };
     }
 
     // 获取当前用户允许的断语分类（需暴露为全局，给 matchRules 使用）
@@ -11174,7 +11236,9 @@
         
         pageData.forEach((rule, idx) => {
             const div = document.createElement('div');
-            div.className='p-3 border rounded bg-gray-50';
+            // 关闭状态的断语卡片置灰
+            const ruleDisabled = isRuleDisabled(rule);
+            div.className = 'p-3 border rounded ' + (ruleDisabled ? 'bg-gray-100 opacity-70' : 'bg-gray-50');
             const ruleCreateTime = rule.createTime || '';
             const ruleUpdateTime = rule.updateTime || '';
             // 同时显示创建时间与修改时间；未修改过（修改时间等于创建时间）时仅显示创建时间
@@ -11239,6 +11303,10 @@
             if (isAdminUser || isOwner) {
                 actionButtons += `<button class="del-btn px-2 py-1 bg-red-500 text-white rounded text-xs">删除</button>`;
             }
+            // 开启/关闭开关（仅自己创建的断语可操作，管理员可操作全部）
+            if (isAdminUser || isOwner) {
+                actionButtons += `<button class="switch-btn px-2 py-1 rounded text-xs ${ruleDisabled ? 'bg-gray-500 text-white' : 'bg-green-600 text-white'}">${ruleDisabled ? '已关闭' : '已开启'}</button>`;
+            }
             
             div.innerHTML = `
                 <div class="flex justify-between items-start">
@@ -11248,6 +11316,7 @@
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="font-bold">【${rule.category}】</span>
                                 ${sourceLabel}
+                                ${ruleDisabled ? '<span class="text-xs bg-gray-500 text-white px-1.5 py-0.5 rounded">⏸ 已关闭</span>' : ''}
                                 ${hasMacroRef(rule) ? '<span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">🧩 宏</span>' : ''}
                                 ${hasRuleRef(rule) ? '<span class="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">🔗 引用</span>' : ''}
                             </div>
@@ -11326,6 +11395,19 @@
                         console.error('切换公开状态失败:', error);
                         alert('切换公开状态失败：' + error.message);
                     }
+                };
+            }
+            
+            // 开启/关闭开关（本地状态，仅影响当前浏览器的匹配）
+            const switchBtn = div.querySelector('.switch-btn');
+            if (switchBtn) {
+                switchBtn.onclick = function() {
+                    const key = rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
+                    const newDisabled = !isRuleDisabled(rule);
+                    setRuleDisabled(key, newDisabled);
+                    reloadAll();
+                    clearScfRuleCache();
+                    clearClientApiCache();
                 };
             }
             
@@ -12472,6 +12554,11 @@
         if (batchPermLevel) batchPermLevel.disabled = count === 0;
         if (batchSetPerm) batchSetPerm.disabled = count === 0;
         
+        const batchEnable = document.getElementById('batch-enable');
+        const batchDisable = document.getElementById('batch-disable');
+        if (batchEnable) batchEnable.disabled = count === 0;
+        if (batchDisable) batchDisable.disabled = count === 0;
+        
         // 更新全选当前页状态
         if (selectAll) {
             const checkboxes = document.querySelectorAll('.rule-checkbox');
@@ -12583,6 +12670,53 @@
                     alert('批量删除失败：' + error.message);
                 }
             };
+        }
+        
+        // 批量开启/关闭（本地开关状态，仅自己创建的断语可操作）
+        function bindBatchSwitch(isEnable) {
+            const btn = document.getElementById(isEnable ? 'batch-enable' : 'batch-disable');
+            if (!btn) return;
+            btn.onclick = function() {
+                const count = selectedRulesSet.size;
+                if (count === 0) return;
+                
+                // 【权限】普通用户只能开关自己创建的断语，非本人的跳过
+                const isAdminUser = currentUser && isAdmin(currentUser.email);
+                const currentUserId = getCurrentUserId();
+                const isOwnRule = (r) => (!r.ownerId && !r.userId) || r.ownerId === currentUserId || r.userId === currentUserId;
+                let affectedCount = 0;
+                selectedRulesSet.forEach(ruleKey => {
+                    const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                    if (targetRule && (isAdminUser || isOwnRule(targetRule))) affectedCount++;
+                });
+                if (affectedCount === 0) {
+                    alert('选中的断语均非您创建，无法操作');
+                    return;
+                }
+                const skippedCount = count - affectedCount;
+                if (!confirm(`确定${isEnable ? '开启' : '关闭'}选中的 ${affectedCount} 条断语${skippedCount > 0 ? `（另有 ${skippedCount} 条非您创建的断语已跳过）` : ''}？`)) return;
+                
+                const s = getDuanyuSwitchState();
+                selectedRulesSet.forEach(ruleKey => {
+                    const targetRule = cache.rules.find(r => (r.id && r.id === ruleKey) || (r.cloudId && r.cloudId === ruleKey) || (r.category + '_' + r.duanyu === ruleKey));
+                    if (!targetRule || !(isAdminUser || isOwnRule(targetRule))) return;
+                    if (isEnable) delete s.rules[ruleKey]; else s.rules[ruleKey] = true;
+                });
+                saveDuanyuSwitchState(s);
+                selectedRulesSet.clear();
+                updateSelectionUI();
+                reloadAll();
+                clearScfRuleCache();
+                clearClientApiCache();
+            };
+        }
+        bindBatchSwitch(true);
+        bindBatchSwitch(false);
+        
+        // 分类开关设置
+        const categorySwitchBtn = document.getElementById('category-switch-btn');
+        if (categorySwitchBtn) {
+            categorySwitchBtn.onclick = function() { openCategorySwitchModal(); };
         }
         
         // 批量复制
@@ -23976,6 +24110,55 @@ function dispatchGroupVisibilityChange() {
 // 宏权限辅助函数
 function getCurrentUserId() {
     return currentUser ? currentUser.id : null;
+}
+
+// ============ 断语开关状态（纯本地） ============
+const DUANYU_SWITCH_KEY = 'duanyu_switch_state';
+
+// 读取断语开关状态：{ rules: {key:true}, categories: {分类:true} }
+function getDuanyuSwitchState() {
+    try {
+        const raw = localStorage.getItem(DUANYU_SWITCH_KEY);
+        if (!raw) return { rules: {}, categories: {} };
+        const s = JSON.parse(raw);
+        if (!s || typeof s !== 'object') return { rules: {}, categories: {} };
+        return { rules: s.rules || {}, categories: s.categories || {} };
+    } catch(e) { return { rules: {}, categories: {} }; }
+}
+
+function saveDuanyuSwitchState(state) {
+    try { localStorage.setItem(DUANYU_SWITCH_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+// 断语唯一键（与批量操作一致：id → cloudId → 分类_断语文本）
+function getRuleSwitchKey(rule) {
+    return rule.id || rule.cloudId || (rule.category + '_' + rule.duanyu);
+}
+
+// 断语是否关闭：分类整体关闭优先，其次单条关闭
+function isRuleDisabled(rule) {
+    if (!rule) return false;
+    const s = getDuanyuSwitchState();
+    if (s.categories && s.categories[rule.category]) return true;
+    const key = getRuleSwitchKey(rule);
+    return !!(s.rules && s.rules[key]);
+}
+
+function isCategoryDisabled(cat) {
+    const s = getDuanyuSwitchState();
+    return !!(s.categories && s.categories[cat]);
+}
+
+function setRuleDisabled(key, disabled) {
+    const s = getDuanyuSwitchState();
+    if (disabled) s.rules[key] = true; else delete s.rules[key];
+    saveDuanyuSwitchState(s);
+}
+
+function setCategoryDisabled(cat, disabled) {
+    const s = getDuanyuSwitchState();
+    if (disabled) s.categories[cat] = true; else delete s.categories[cat];
+    saveDuanyuSwitchState(s);
 }
 
 // 获取宏对当前用户的有效权限等级（考虑套餐限制）

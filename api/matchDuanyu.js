@@ -2375,6 +2375,16 @@ module.exports = async (req, res) => {
       rules = filterRulesByAccess(rules, currentUserId, isAdminUser === true);
     }
 
+    // 按用户本地开关状态过滤：关闭的断语（disabledRuleIds）与关闭的分类（disabledCategories）不参与匹配
+    if (rules && rules.length > 0) {
+      if (Array.isArray(body.disabledRuleIds) && body.disabledRuleIds.length > 0) {
+        rules = rules.filter(function(r) { return body.disabledRuleIds.indexOf(String(r.id)) === -1; });
+      }
+      if (Array.isArray(body.disabledCategories) && body.disabledCategories.length > 0) {
+        rules = rules.filter(function(r) { return body.disabledCategories.indexOf(r.category) === -1; });
+      }
+    }
+
     if (!rules || rules.length === 0) {
       var failReason = rules === null ? 'Supabase 返回空或请求失败' : 'Supabase 中没有有效的断语规则';
       return res.json({
