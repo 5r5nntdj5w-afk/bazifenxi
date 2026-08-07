@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -5942,13 +5942,14 @@
                     <h3 class="text-xl font-bold text-amber-800">📂 分类管理</h3>
                     <button onclick="document.getElementById('category-manager-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
-                <p class="text-sm text-gray-500 mb-3">↑↓ 调整匹配结果中的分类显示顺序；开关控制该分类是否参与断语匹配。两者均为全局设置（仅管理员可操作）。</p>
-                <div class="max-h-[65vh] overflow-y-auto space-y-3">
+                <p class="text-sm text-gray-500 mb-3">按住分类行拖动调整顺序（全局生效）；开关控制该分类是否参与断语匹配。仅管理员可操作。</p>
+                <div id="cat-drag-list" class="max-h-[65vh] overflow-y-auto space-y-3">
                     ${ordered.map((cat, idx) => {
                         const off = isGlobalCategoryDisabled(cat);
                         return `
-                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                        <div class="cat-row flex items-center justify-between p-3 bg-gray-50 rounded-lg border cursor-grab" draggable="true" data-cat="${cat}">
                             <div class="flex items-center gap-3">
+                                <span class="text-gray-300 cursor-move select-none text-sm" title="按住拖动调整顺序">⋮⋮</span>
                                 <span class="text-gray-400 text-sm w-6">${idx + 1}.</span>
                                 <div>
                                     <span class="font-medium text-base">${cat}</span>
@@ -5956,11 +5957,9 @@
                                 </div>
                             </div>
                             <div class="flex gap-2 items-center">
-                                <button onclick="moveCategoryOrder('${cat}', -1)" class="px-3 py-1.5 bg-gray-500 text-white rounded text-xs ${idx === 0 ? 'opacity-30 cursor-not-allowed' : ''}">↑ 上移</button>
-                                <button onclick="moveCategoryOrder('${cat}', 1)" class="px-3 py-1.5 bg-gray-500 text-white rounded text-xs ${idx === ordered.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}">↓ 下移</button>
-                                <button onclick="toggleGlobalCategorySwitch('${cat}')" class="px-3 py-1.5 text-white rounded text-xs ${off ? 'bg-gray-600' : 'bg-green-600'}">${off ? '⏸ 已关闭' : '✅ 开启'}</button>
-                                <button onclick="renameCategory('${cat}')" class="px-3 py-1.5 bg-blue-500 text-white rounded text-xs">✏️ 重命名</button>
-                                <button onclick="deleteCategory('${cat}')" class="px-3 py-1.5 bg-red-500 text-white rounded text-xs">🗑️ 删除</button>
+                                <button draggable="false" onclick="toggleGlobalCategorySwitch('${cat}')" class="px-3 py-1.5 text-white rounded text-xs ${off ? 'bg-gray-600' : 'bg-green-600'}">${off ? '⏸ 已关闭' : '✅ 开启'}</button>
+                                <button draggable="false" onclick="renameCategory('${cat}')" class="px-3 py-1.5 bg-blue-500 text-white rounded text-xs">✏️ 重命名</button>
+                                <button draggable="false" onclick="deleteCategory('${cat}')" class="px-3 py-1.5 bg-red-500 text-white rounded text-xs">🗑️ 删除</button>
                             </div>
                         </div>`;
                     }).join('')}
@@ -5975,25 +5974,54 @@
             </div>
         `;
         document.body.appendChild(modal);
-    }
 
-    // 上移/下移分类顺序（全局设置）
-    window.moveCategoryOrder = async function(cat, dir) {
-        if (!currentUser || !isAdmin(currentUser.email)) { alert('⚠️ 仅管理员可管理分类'); return; }
-        const catCount = {};
-        (cache.rules || []).forEach(r => { if (r.category) catCount[r.category] = (catCount[r.category] || 0) + 1; });
-        const allCats = [...new Set([...Object.keys(catCount), ...(cache.categories || [])])];
-        const ordered = sortCategoriesByConfig(allCats);
-        const idx = ordered.indexOf(cat);
-        const target = idx + dir;
-        if (idx < 0 || target < 0 || target >= ordered.length) return;
-        [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
-        const cfg = getGlobalDisplayConfig();
-        cfg.categoryOrder = ordered;
-        await saveGlobalDisplayConfig(cfg);
-        renderCategoryManagerModal();
-        // 刷新匹配结果显示顺序
-        reloadAll();
+        // ===== 拖拽排序 =====
+        const dragList = modal.querySelector('#cat-drag-list');
+        let dragCat = null;
+        let dragEl = null;
+        dragList.querySelectorAll('.cat-row').forEach(row => {
+            row.addEventListener('dragstart', function(e) {
+                dragCat = this.dataset.cat;
+                dragEl = this;
+                this.classList.add('opacity-40');
+                e.dataTransfer.effectAllowed = 'move';
+                try { e.dataTransfer.setData('text/plain', this.dataset.cat); } catch(err) {}
+            });
+            row.addEventListener('dragend', function() {
+                this.classList.remove('opacity-40');
+                dragCat = null;
+                dragEl = null;
+            });
+            // 拖动经过时实时把被拖行插入目标行前/后
+            row.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                if (!dragEl || dragEl === this) return;
+                e.dataTransfer.dropEffect = 'move';
+                const rect = this.getBoundingClientRect();
+                const after = e.clientY > rect.top + rect.height / 2;
+                if (after) {
+                    dragList.insertBefore(dragEl, this.nextElementSibling);
+                } else {
+                    dragList.insertBefore(dragEl, this);
+                }
+            });
+        });
+        // 容器空白区域也允许放置
+        dragList.addEventListener('dragover', function(e) { e.preventDefault(); });
+        dragList.addEventListener('drop', async function(e) {
+            e.preventDefault();
+            if (!dragCat) return;
+            const newOrder = Array.from(dragList.querySelectorAll('.cat-row')).map(r => r.dataset.cat);
+            dragCat = null;
+            dragEl = null;
+            const cfg = getGlobalDisplayConfig();
+            cfg.categoryOrder = newOrder;
+            await saveGlobalDisplayConfig(cfg);
+            // 刷新弹窗序号、下拉列表顺序与匹配结果显示
+            renderCategoryManagerModal();
+            loadCategories();
+            reloadAll();
+        });
     }
 
     // 切换分类全局开关（true=关闭该分类，全局生效）
@@ -6389,7 +6417,8 @@
         cache.categories = customCats;
         
         // 合并：规则分类 + 自定义分类（自定义但尚无为规则的）
-        const allCats = [...new Set([...ruleCats, ...customCats])];
+        // 按全局配置的分类显示顺序排序（与分类管理窗口保持一致）
+        const allCats = sortCategoriesByConfig([...new Set([...ruleCats, ...customCats])]);
         
         DOM.ruleCategory.innerHTML = '<option value="">请选择分类</option>';
         DOM.filterCategory.innerHTML = '<option value="all">全部分类</option>';
@@ -6456,11 +6485,11 @@
                 loadCategories();
             } else {
                 // 云端保存失败（如 RLS 权限不足），仅刷新本地分类下拉框
-                // 合并：已有规则中的分类 + 本地缓存的自定义分类（含新分类）
-                const localAllCats = [...new Set([
+                // 合并：已有规则中的分类 + 本地缓存的自定义分类（含新分类），并按全局配置顺序排列
+                const localAllCats = sortCategoriesByConfig([...new Set([
                     ...(cache.rules || []).map(r => r.category).filter(Boolean),
                     ...(cache.categories || [])
-                ])];
+                ])]);
                 DOM.ruleCategory.innerHTML = '<option value="">请选择分类</option>';
                 DOM.filterCategory.innerHTML = '<option value="all">全部分类</option>';
                 DOM.resultFilterCategory.innerHTML = '<option value="all">全部断语</option>';
