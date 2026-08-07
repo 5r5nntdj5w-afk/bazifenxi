@@ -9673,13 +9673,17 @@
     }
 
     // dragstart：拖拽源是手柄（draggable=true 设在手柄上），由手柄找到所属条件项/条件组
+    // 注意：先判断目标是否为条件元素，非条件元素直接放行（不 preventDefault），
+    // 避免误拦截分类管理弹窗等其它拖拽功能
     function handleConditionDragStart(e) {
+        const el = e.target.closest('.condition-item, .condition-group');
+        if (!el) return;
         const handle = e.target.closest('.drag-handle');
         if (!handle) { e.preventDefault(); return; }
-        const el = handle.closest('.condition-item, .condition-group');
-        if (!el) { e.preventDefault(); return; }
-        _condDragEl = el;
-        el.classList.add('drag-source');
+        const src = handle.closest('.condition-item, .condition-group');
+        if (!src) { e.preventDefault(); return; }
+        _condDragEl = src;
+        src.classList.add('drag-source');
         e.dataTransfer.effectAllowed = 'move';
         try { e.dataTransfer.setData('text/plain', 'condition-drag'); } catch(err) {}
     }
