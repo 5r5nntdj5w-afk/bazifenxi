@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -5193,9 +5193,31 @@
                     
                     (function(y, g, zh, yr2, gz, d) {
                         d.onclick = function() {
+                            var isActive = d.classList.contains('active');
                             document.querySelectorAll('.liunian-item').forEach(function(item) {
                                 item.classList.remove('active');
                             });
+                            if (isActive) {
+                                // 再次点击：取消选中流年，恢复无流年状态
+                                var liunianGanSelect = document.querySelector('.tiangan[data-type="liunian"]');
+                                var liunianZhiSelect = document.querySelector('.dizhi[data-type="liunian"]');
+                                if (liunianGanSelect) liunianGanSelect.value = '';
+                                if (liunianZhiSelect) {
+                                    liunianZhiSelect.value = '';
+                                    liunianZhiSelect.innerHTML = '<option value="">支</option>';
+                                }
+                                var liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
+                                var liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
+                                if (liuyueGanSelect) liuyueGanSelect.value = '';
+                                if (liuyueZhiSelect) {
+                                    liuyueZhiSelect.value = '';
+                                    liuyueZhiSelect.innerHTML = '<option value="">支</option>';
+                                }
+                                var liuyueListDiv = document.getElementById('liuyue-list');
+                                if (liuyueListDiv) liuyueListDiv.classList.add('hidden');
+                                refreshApiDuanyu();
+                                return;
+                            }
                             d.classList.add('active');
                             
                             var liunianGanSelect = document.querySelector('.tiangan[data-type="liunian"]');
@@ -5261,7 +5283,20 @@
                 div.innerHTML = '<div class="liuyue-month">' + monthName + '</div><div class="liuyue-ganzhi">' + gan + zhi + '</div>';
                 (function(g, zh) {
                     div.onclick = function() {
+                        var isActive = div.classList.contains('active');
                         document.querySelectorAll('.liuyue-item').forEach(function(item) { item.classList.remove('active'); });
+                        if (isActive) {
+                            // 再次点击：取消选中流月，恢复无流月状态
+                            var liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
+                            var liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
+                            if (liuyueGanSelect) liuyueGanSelect.value = '';
+                            if (liuyueZhiSelect) {
+                                liuyueZhiSelect.value = '';
+                                liuyueZhiSelect.innerHTML = '<option value="">支</option>';
+                            }
+                            refreshApiDuanyu();
+                            return;
+                        }
                         div.classList.add('active');
                         var liuyueGanSelect = document.querySelector('.tiangan[data-type="liuyue"]');
                         var liuyueZhiSelect = document.querySelector('.dizhi[data-type="liuyue"]');
@@ -5434,7 +5469,27 @@
                             
                             (function(dy, gg, zzh) {
                                 div.onclick = function() {
+                                    var isActive = div.classList.contains('active');
                                     document.querySelectorAll('.dayun-item').forEach(function(item) { item.classList.remove('active'); });
+                                    if (isActive) {
+                                        // 再次点击：取消选中大运，恢复无大运状态
+                                        currentDaYun = null;
+                                        window.currentDaYun = null;
+                                        var dayunGanSelect = document.querySelector('.tiangan[data-type="dayun"]');
+                                        var dayunZhiSelect = document.querySelector('.dizhi[data-type="dayun"]');
+                                        if (dayunGanSelect) dayunGanSelect.value = '';
+                                        if (dayunZhiSelect) {
+                                            dayunZhiSelect.value = '';
+                                            dayunZhiSelect.innerHTML = '<option value="">支</option>';
+                                        }
+                                        clearLiuNianSelection();
+                                        var liunianListDiv = document.getElementById('liunian-list');
+                                        if (liunianListDiv) liunianListDiv.classList.add('hidden');
+                                        var liunianContainer = document.getElementById('liunian-container');
+                                        if (liunianContainer) liunianContainer.innerHTML = '';
+                                        refreshApiDuanyu();
+                                        return;
+                                    }
                                     div.classList.add('active');
                                     currentDaYun = wrapDayunObject(dy);
                                     window.currentDaYun = wrapDayunObject(dy);
@@ -16992,6 +17047,44 @@ function getAllTagCategories() {
         
         container.querySelectorAll('.dayun-item').forEach(dyItem => {
             dyItem.addEventListener('click', () => {
+                if (dyItem.classList.contains('active')) {
+                    // 再次点击：取消选中大运，恢复仅八字状态
+                    dyItem.classList.remove('active');
+                    const resetRows = [
+                        container.querySelectorAll('tr:nth-child(2) td'),
+                        container.querySelectorAll('tr:nth-child(3) td'),
+                        container.querySelectorAll('tr:nth-child(4) td'),
+                        container.querySelectorAll('tr:nth-child(5) td')
+                    ];
+                    resetRows.forEach(function(cells) {
+                        if (cells[4]) { cells[4].innerHTML = '-'; cells[4].className = 'border p-2'; }
+                        if (cells[5]) { cells[5].innerHTML = ''; cells[5].className = 'border p-2'; }
+                    });
+                    const lnc = container.querySelector('#research-liunian-container');
+                    if (lnc) lnc.innerHTML = '';
+                    // 十神卡片恢复为仅四柱基准
+                    const baseTian2 = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    const baseDi2 = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    [tianShenNian, tianShenYue, tianShenRi, tianShenShi].forEach(function(shen) {
+                        const g2 = getShenGroupName(shen); if (g2) baseTian2[g2]++;
+                    });
+                    [diShenNian, diShenYue, diShenRi, diShenShi].forEach(function(shen) {
+                        const g2 = getShenGroupName(shen); if (g2) baseDi2[g2]++;
+                    });
+                    const gm2 = {'bijie':'比劫','shishang':'食伤','caixing':'财星','guansha':'官杀','yinxing':'印星'};
+                    ['bijie','shishang','caixing','guansha','yinxing'].forEach(function(name) {
+                        const cn = gm2[name];
+                        const ts = document.getElementById('research-shen-tian-' + name);
+                        const ds = document.getElementById('research-shen-di-' + name);
+                        const tl = document.getElementById('research-shen-total-' + name);
+                        if (ts) ts.textContent = baseTian2[cn];
+                        if (ds) ds.textContent = baseDi2[cn];
+                        if (tl) tl.textContent = baseTian2[cn] + baseDi2[cn];
+                    });
+                    clearShenMarkers();
+                    loadResearchMatchedDuanyu(Object.assign({}, result, { currentDaYun: null, currentDayunTianShen: null, currentDayunDiShen: null, liunianData: null }), caseData, year, isDayun, container, true);
+                    return;
+                }
                 const idx = parseInt(dyItem.dataset.index);
                 const dayun = daYunList[idx];
                 const dgz = getDaYunGanZhi(dayun);
@@ -17268,6 +17361,41 @@ function getAllTagCategories() {
         
         container.querySelectorAll('.liunian-item').forEach(lnItem => {
             lnItem.addEventListener('click', () => {
+                if (lnItem.classList.contains('active')) {
+                    // 再次点击：取消选中流年，恢复为八字+大运状态
+                    lnItem.classList.remove('active');
+                    const resetLnRows = [
+                        container.querySelectorAll('tr:nth-child(2) td'),
+                        container.querySelectorAll('tr:nth-child(3) td'),
+                        container.querySelectorAll('tr:nth-child(4) td'),
+                        container.querySelectorAll('tr:nth-child(5) td')
+                    ];
+                    resetLnRows.forEach(function(cells) {
+                        if (cells[5]) { cells[5].innerHTML = ''; cells[5].className = 'border p-2'; }
+                    });
+                    // 十神卡片恢复为八字+大运基准
+                    const baseLnTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    const baseLnDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    [tianShenNian, tianShenYue, tianShenRi, tianShenShi, currentDayunTianShen].forEach(function(shen) {
+                        const g = getShenGroupName(shen); if (g) baseLnTian[g]++;
+                    });
+                    [diShenNian, diShenYue, diShenRi, diShenShi, currentDayunDiShen].forEach(function(shen) {
+                        const g = getShenGroupName(shen); if (g) baseLnDi[g]++;
+                    });
+                    const gm = {'bijie':'比劫','shishang':'食伤','caixing':'财星','guansha':'官杀','yinxing':'印星'};
+                    ['bijie','shishang','caixing','guansha','yinxing'].forEach(function(name) {
+                        const cn = gm[name];
+                        const ts = document.getElementById('research-shen-tian-' + name);
+                        const ds = document.getElementById('research-shen-di-' + name);
+                        const tl = document.getElementById('research-shen-total-' + name);
+                        if (ts) ts.textContent = baseLnTian[cn];
+                        if (ds) ds.textContent = baseLnDi[cn];
+                        if (tl) tl.textContent = baseLnTian[cn] + baseLnDi[cn];
+                    });
+                    clearShenMarkers('liunian');
+                    loadResearchMatchedDuanyu(Object.assign({}, result, { liunianData: null }), caseData, year, false, container, true);
+                    return;
+                }
                 const y = parseInt(lnItem.dataset.year);
                 const ygz = getYearGanZhi(y);
                 const liunianTianShenNew = getExactShen(ygz.gan, dayGan);
@@ -18696,6 +18824,42 @@ function getAllTagCategories() {
         function setupLiuNianHandlers() {
             modal.querySelectorAll('.liunian-item').forEach(lnItem => {
                 lnItem.addEventListener('click', () => {
+                    if (lnItem.classList.contains('active')) {
+                        // 再次点击：取消选中流年，恢复为八字+大运状态
+                        lnItem.classList.remove('active');
+                        const resetLnRows = [
+                            modal.querySelectorAll('tr:nth-child(2) td'),
+                            modal.querySelectorAll('tr:nth-child(3) td'),
+                            modal.querySelectorAll('tr:nth-child(4) td'),
+                            modal.querySelectorAll('tr:nth-child(5) td')
+                        ];
+                        resetLnRows.forEach(function(cells) {
+                            if (cells[5]) { cells[5].innerHTML = ''; cells[5].className = 'border p-2'; }
+                        });
+                        // 十神卡片恢复为八字+大运基准（含数量调节偏移）
+                        const baseLnTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                        const baseLnDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                        [tianShenNian, tianShenYue, tianShenRi, tianShenShi, currentDayunTianShen].forEach(shen => {
+                            const g = getShenGroupName(shen);
+                            if(g) baseLnTian[g]++;
+                        });
+                        [diShenNian, diShenYue, diShenRi, diShenShi, currentDayunDiShen].forEach(shen => {
+                            const g = getShenGroupName(shen);
+                            if(g) baseLnDi[g]++;
+                        });
+                        const gm = {'bijie':'比劫','shishang':'食伤','caixing':'财星','guansha':'官杀','yinxing':'印星'};
+                        ['bijie','shishang','caixing','guansha','yinxing'].forEach(name => {
+                            const cn = gm[name];
+                            const tianSpan = document.getElementById('research-shen-tian-' + name + '-detail');
+                            const diSpan = document.getElementById('research-shen-di-' + name + '-detail');
+                            if (tianSpan) tianSpan.dataset.base = baseLnTian[cn];
+                            if (diSpan) diSpan.dataset.base = baseLnDi[cn];
+                        });
+                        updateAllShenCardNumbers();
+                        clearShenMarkers('liunian');
+                        setTimeout(() => positionResearchShenCards('research-shen-container-detail'), 50);
+                        return;
+                    }
                     const y = parseInt(lnItem.dataset.year);
                     const ygz = getYearGanZhi(y);
                     const liunianTianShenNew = getExactShen(ygz.gan, dayGan);
@@ -18958,6 +19122,47 @@ function getAllTagCategories() {
         // 绑定大运和流年项点击事件
         modal.querySelectorAll('.dayun-item').forEach(item => {
             item.addEventListener('click', () => {
+                if (item.classList.contains('active')) {
+                    // 再次点击：取消选中大运，恢复为仅八字状态
+                    item.classList.remove('active');
+                    currentDayunTianShen = '';
+                    currentDayunDiShen = '';
+                    const resetRows = [
+                        modal.querySelectorAll('tr:nth-child(2) td'),
+                        modal.querySelectorAll('tr:nth-child(3) td'),
+                        modal.querySelectorAll('tr:nth-child(4) td'),
+                        modal.querySelectorAll('tr:nth-child(5) td')
+                    ];
+                    resetRows.forEach(function(cells) {
+                        if (cells[4]) { cells[4].innerHTML = '-'; cells[4].className = 'border p-2'; }
+                        if (cells[5]) { cells[5].innerHTML = ''; cells[5].className = 'border p-2'; }
+                    });
+                    const lnc2 = modal.querySelector('#research-liunian-container');
+                    if (lnc2) lnc2.innerHTML = '';
+                    // 十神卡片恢复为仅四柱基准（含数量调节偏移）
+                    const baseDyTian = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    const baseDyDi = {比劫:0, 食伤:0, 财星:0, 官杀:0, 印星:0};
+                    [tianShenNian, tianShenYue, tianShenRi, tianShenShi].forEach(shen => {
+                        const g = getShenGroupName(shen);
+                        if(g) baseDyTian[g]++;
+                    });
+                    [diShenNian, diShenYue, diShenRi, diShenShi].forEach(shen => {
+                        const g = getShenGroupName(shen);
+                        if(g) baseDyDi[g]++;
+                    });
+                    const gm2 = {'bijie':'比劫','shishang':'食伤','caixing':'财星','guansha':'官杀','yinxing':'印星'};
+                    ['bijie','shishang','caixing','guansha','yinxing'].forEach(name => {
+                        const cn = gm2[name];
+                        const tianSpan = document.getElementById('research-shen-tian-' + name + '-detail');
+                        const diSpan = document.getElementById('research-shen-di-' + name + '-detail');
+                        if (tianSpan) tianSpan.dataset.base = baseDyTian[cn];
+                        if (diSpan) diSpan.dataset.base = baseDyDi[cn];
+                    });
+                    updateAllShenCardNumbers();
+                    clearShenMarkers();
+                    setTimeout(() => positionResearchShenCards('research-shen-container-detail'), 50);
+                    return;
+                }
                 const index = parseInt(item.dataset.index);
                 const selectedDayun = daYunList[index];
                 const dgz = getDaYunGanZhi(selectedDayun);
@@ -19333,7 +19538,9 @@ function getAllTagCategories() {
                         
                         (function(dy) {
                             div.onclick = function() {
+                                var isActive = div.classList.contains('active');
                                 document.querySelectorAll('#case-dayun-container .dayun-item').forEach(function(item) { item.classList.remove('active'); });
+                                if (isActive) return; // 再次点击：取消选中（仅视觉，已添加事件不删除）
                                 div.classList.add('active');
                                 addDayunEventFromDayun(dy);
                                 updateCaseLiuNianList(dy);
@@ -19415,10 +19622,13 @@ function getAllTagCategories() {
                 
                 // 点击流年直接添加事件
                 div.onclick = function() {
+                    // 再次点击已选中的流年：取消选中（仅视觉）
+                    var isActive = div.classList.contains('active');
                     // 移除其他选中状态
                     document.querySelectorAll('#case-liunian-container .liunian-item').forEach(item => {
                         item.classList.remove('active');
                     });
+                    if (isActive) return;
                     // 添加当前选中状态
                     div.classList.add('active');
                     
@@ -20337,9 +20547,11 @@ function getAllTagCategories() {
                 div.innerHTML = `<div class="dayun-year">${startYear}</div><div class="dayun-age">${startAge}岁起</div><div class="dayun-ganzhi">${ganzhi}</div>${isAdded ? '<div class="dayun-status">已添加</div>' : ''}`;
                 
                 div.onclick = function() {
+                    var isActive = div.classList.contains('active');
                     document.querySelectorAll('#case-dayun-container .dayun-item').forEach(item => {
                         item.classList.remove('active');
                     });
+                    if (isActive) return; // 再次点击：取消选中（仅视觉，已添加事件不删除）
                     div.classList.add('active');
                     
                     // 添加大运事件
