@@ -8917,7 +8917,14 @@
                 if (refRule && refRule.conditions) {
                     const newVisited = new Set(visitedMacros);
                     newVisited.add('rule:' + child.ruleRef);
-                    return evaluateConditionGroup(refRule.conditions, depth + 1, newVisited, ctxMapping);
+                    // 被引用断语自身的断语级默认取值维度/默认映射规则优先（断语级最高优先级），未设置时回退外层
+                    const newCtx = {
+                        ruleDefaultQuZhi: (refRule.conditions.defaultQuZhi) || ctxMapping.ruleDefaultQuZhi || '',
+                        macroDefaultQuZhi: ctxMapping.macroDefaultQuZhi || '',
+                        ruleDefaultMapping: (refRule.conditions.defaultMapping) || ctxMapping.ruleDefaultMapping || null,
+                        macroDefaultMapping: ctxMapping.macroDefaultMapping || null
+                    };
+                    return evaluateConditionGroup(refRule.conditions, depth + 1, newVisited, newCtx);
                 }
                 return false;
             }
