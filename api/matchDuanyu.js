@@ -245,10 +245,8 @@ function evaluateConditionNode(data, condNode, context) {
 
   // ruleRef 节点：查找被引用的断语并递归评估
   if (condNode && condNode.ruleRef) {
-    var rDbg = function(msg){ if (data && Array.isArray(data.biDebug)) data.biDebug.push(msg); };
     var ruleRefId = String(condNode.ruleRef);
     var rulesList = data && data.rules;
-    rDbg('[引用断语] 引用键=' + ruleRefId);
     if (rulesList && rulesList.length > 0) {
       for (var ri = 0; ri < rulesList.length; ri++) {
         var rr = rulesList[ri];
@@ -266,14 +264,10 @@ function evaluateConditionNode(data, condNode, context) {
           // 兼容旧格式：conditions 为线性条件数组时包装为 and 组
           var rrCond = rr.conditions;
           if (Array.isArray(rrCond)) rrCond = { logic: 'and', children: rrCond };
-          rDbg('[引用断语] 找到 名称=' + String(rr.duanyu || rr.duanyu_text || '').replace(/<[^>]*>/g, '').slice(0, 40) + ' 条件格式=' + (Array.isArray(rr.conditions) ? '数组(' + rr.conditions.length + ')' : ('对象(children=' + ((rr.conditions.children || []).length) + ', defaultMapping=' + (rr.conditions.defaultMapping ? JSON.stringify(rr.conditions.defaultMapping) : '无') + ', defaultQuZhi=' + (rr.conditions.defaultQuZhi || '无') + ')')));
-          var rResult = evaluateConditionNode(data, rrCond, refCtx);
-          rDbg('[引用断语] 评估结果=' + rResult);
-          return rResult;
+          return evaluateConditionNode(data, rrCond, refCtx);
         }
       }
     }
-    rDbg('[引用断语] 未找到被引用断语');
     return false;
   }
 
