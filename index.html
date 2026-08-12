@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8912,9 +8912,15 @@
                 return false;
             }
             if (child.ruleRef) {
+                const biDbgR = (window.__BI_DEBUG === true || /[?&]bidebug=1/.test(window.location.search));
+                if (biDbgR) console.log('%c[BI-DEBUG][引用断语] 引用键=' + child.ruleRef + ' 已在链上=' + visitedMacros.has('rule:' + child.ruleRef), 'color:#b45309;font-weight:bold');
                 if (visitedMacros.has('rule:' + child.ruleRef)) return false;
                 const refRule = (cache.rules || []).find(r => String(r.id) === String(child.ruleRef) || String(r.cloudId) === String(child.ruleRef));
+                if (biDbgR) console.log('%c[BI-DEBUG][引用断语] 找到=' + (refRule ? '是' : '否') + (refRule ? (' 名称=' + (refRule.duanyu || '').replace(/<[^>]*>/g, '').slice(0, 40)) : '') + (refRule ? (' id=' + refRule.id + ' cloudId=' + (refRule.cloudId || '')) : '') + ' 条件格式=' + (refRule && refRule.conditions ? (Array.isArray(refRule.conditions) ? '数组(' + refRule.conditions.length + ')' : ('对象(children=' + (refRule.conditions.children || []).length + ', defaultMapping=' + (refRule.conditions.defaultMapping ? JSON.stringify(refRule.conditions.defaultMapping) : '无') + ', defaultQuZhi=' + (refRule.conditions.defaultQuZhi || '无') + ')')) : '无'), 'color:#b45309;font-weight:bold');
                 if (refRule && refRule.conditions) {
+                    // 兼容旧格式：conditions 为线性条件数组时包装为 and 组
+                    let refCond = refRule.conditions;
+                    if (Array.isArray(refCond)) refCond = { logic: 'and', children: refCond };
                     const newVisited = new Set(visitedMacros);
                     newVisited.add('rule:' + child.ruleRef);
                     // 被引用断语自身的断语级默认取值维度/默认映射规则优先（断语级最高优先级），未设置时回退外层
@@ -8924,7 +8930,9 @@
                         ruleDefaultMapping: (refRule.conditions.defaultMapping) || ctxMapping.ruleDefaultMapping || null,
                         macroDefaultMapping: ctxMapping.macroDefaultMapping || null
                     };
-                    return evaluateConditionGroup(refRule.conditions, depth + 1, newVisited, newCtx);
+                    const rRes = evaluateConditionGroup(refCond, depth + 1, newVisited, newCtx);
+                    if (biDbgR) console.log('%c[BI-DEBUG][引用断语] 评估结果=' + rRes, 'color:#b45309;font-weight:bold');
+                    return rRes;
                 }
                 return false;
             }
