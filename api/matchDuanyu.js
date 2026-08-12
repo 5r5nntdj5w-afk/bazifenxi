@@ -251,7 +251,17 @@ function evaluateConditionNode(data, condNode, context) {
       for (var ri = 0; ri < rulesList.length; ri++) {
         var rr = rulesList[ri];
         if (rr && rr.conditions && (String(rr.id) === ruleRefId || String(rr.cloudId) === ruleRefId)) {
-          return evaluateConditionNode(data, rr.conditions, context);
+          // 被引用断语自身的断语级默认取值维度/默认映射规则优先（断语级最高优先级），未设置时回退外层
+          var refCtx = {};
+          var refDefQz = (rr.conditions && rr.conditions.defaultQuZhi) || '';
+          if (refDefQz) refCtx.ruleDefaultQuZhi = refDefQz;
+          else if (context.ruleDefaultQuZhi) refCtx.ruleDefaultQuZhi = context.ruleDefaultQuZhi;
+          var refDefMap = (rr.conditions && rr.conditions.defaultMapping) || null;
+          if (refDefMap) refCtx.ruleDefaultMapping = refDefMap;
+          else if (context.ruleDefaultMapping) refCtx.ruleDefaultMapping = context.ruleDefaultMapping;
+          if (context.macroDefaultQuZhi) refCtx.macroDefaultQuZhi = context.macroDefaultQuZhi;
+          if (context.macroDefaultMapping) refCtx.macroDefaultMapping = context.macroDefaultMapping;
+          return evaluateConditionNode(data, rr.conditions, refCtx);
         }
       }
     }
