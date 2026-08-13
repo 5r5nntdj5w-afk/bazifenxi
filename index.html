@@ -9218,8 +9218,14 @@
         window.currentShenChart = type || 'relation';
         const rel = document.getElementById('shen-container');
         const bar = document.getElementById('shen-bar-container');
-        if (rel) rel.classList.toggle('hidden', window.currentShenChart !== 'relation');
-        if (bar) bar.classList.toggle('hidden', window.currentShenChart !== 'bar');
+        const isRel = window.currentShenChart === 'relation';
+        if (rel) rel.classList.toggle('hidden', !isRel);
+        if (bar) bar.classList.toggle('hidden', isRel);
+        // 关系图的连线 SVG 与中心图例为绝对定位元素，位于 shen-container 之外，需随图表切换同步隐藏，避免覆盖柱状对比图
+        const arrows = document.getElementById('shen-arrows');
+        if (arrows) arrows.classList.toggle('hidden', !isRel);
+        const legend = document.querySelector('.shengke-legend');
+        if (legend) legend.classList.toggle('hidden', !isRel);
         document.querySelectorAll('.shen-chart-btn').forEach(function(btn) {
             btn.classList.toggle('shen-chart-active', btn.dataset.chart === window.currentShenChart);
         });
@@ -31071,7 +31077,10 @@ function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMappin
 
 // 生成原局位置翻转后的 positions 副本（年↔时、月↔日），大运/流年/流月位置保持不变
 function flipPositions(positions, pbGanZhi) {
-    var flipMap = (pbGanZhi === '通用') ? PB_FLIP_MAP_COL : PB_FLIP_MAP;
+    // 原局翻转映射：正序→反序（天干键 / 通用柱键），定义在函数内自包含（外部脚本块 IIFE 内同名常量不可见）
+    var FLIP_MAP_TG = {'年干':'时干','月干':'日干','日干':'月干','时干':'年干'};
+    var FLIP_MAP_COL = {'年柱':'时柱','月柱':'日柱','日柱':'月柱','时柱':'年柱'};
+    var flipMap = (pbGanZhi === '通用') ? FLIP_MAP_COL : FLIP_MAP_TG;
     var flipped = {};
     for (var pos in positions) {
         if (!Object.prototype.hasOwnProperty.call(positions, pos)) continue;
