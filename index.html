@@ -1663,18 +1663,18 @@
             </div>
             <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel" id="ref-output-panel-rule">
                 <div class="flex items-center justify-between mb-1">
-                    <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本断语时作为十神柱状对比图的参考值基准；支持 = / ≥ / ≤ / 区间）</span></label>
-                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="autoImportRefFromConditions(this)">⬇ 从条件自动导入</button>
+                    <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本断语时作为十神柱状对比图的参考值基准；从下方模板库中选择，模板修改后自动生效）</span></label>
+                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出参考值设置</button>
                 </div>
-                <div class="mb-1">
-                    <label class="block text-xs text-gray-600 mb-0.5">显示名称 <span class="text-gray-400">（留空默认使用断语名称）</span></label>
-                    <input type="text" class="ref-display-name w-full p-1.5 border rounded text-sm" placeholder="例如：食伤格·身强">
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="relative flex-1 min-w-[180px]">
+                        <input type="text" class="ref-tpl-search w-full p-1.5 border rounded text-sm" placeholder="🔍 搜索并选择参考值模板（如：食伤格）..." autocomplete="off" onfocus="openRefTplList(this)" oninput="filterRefTplList(this)">
+                        <div class="ref-tpl-list hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto z-30"></div>
+                    </div>
+                    <input type="hidden" class="ref-tpl-id">
+                    <button type="button" class="ref-tpl-clear hidden px-2 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600 shrink-0" onclick="clearRefTpl(this)">✕ 清除</button>
                 </div>
-                <div id="ref-values-box-rule" class="space-y-1"></div>
-                <details class="mt-2">
-                    <summary class="text-xs text-amber-700 font-medium cursor-pointer select-none">🔗 关联关系参考比例（可选：用于相生/相克表标注与高亮，支持多个精确值或区间）</summary>
-                    <div id="ref-relations-box-rule" class="mt-1 space-y-1"></div>
-                </details>
+                <div class="ref-tpl-tip text-[11px] text-amber-700/80 mt-1 hidden"></div>
             </div>
             <div id="rule-conditions" class="mb-4">
                 <!-- 根条件组容器 -->
@@ -4449,11 +4449,9 @@
         initStatsAdjust();
         // 初始化默认映射规则下拉框选项
         if (typeof refreshDefaultMappingSelects === 'function') refreshDefaultMappingSelects();
-        // 初始化参考值输出面板（断语/条件宏编辑器）
-        if (typeof buildRefOutputPanel === 'function') {
-            buildRefOutputPanel('ref-values-box-rule', 'ref-relations-box-rule');
-            buildRefOutputPanel('ref-values-box-macro', 'ref-relations-box-macro');
-        }
+        // 初始化参考值模板选择器（断语/条件宏编辑器）并加载云端模板（非阻塞）
+        if (typeof initRefTplPickers === 'function') initRefTplPickers();
+        if (typeof loadRefTemplatesFromCloud === 'function') loadRefTemplatesFromCloud();
         initGroupKeyCombo();
         refreshGroupFilter();
         refreshGroupKeyDropdown();
@@ -9204,8 +9202,13 @@
         return { ok: ok, diff: diff };
     }
 
-    // 参考值规则显示名称：displayName > 宏名/断语文本(截断)
+    // 参考值规则显示名称：模板引用时显示模板名；旧版 displayName > 宏名/断语文本(截断)
     function getRefDisplayName(ref) {
+        if (ref.refOutput && ref.refOutput.refTemplateId) {
+            const tpl = getRefTemplateById(ref.refOutput.refTemplateId);
+            if (tpl) return (tpl.displayName || tpl.name || '参考值模板');
+            return '参考值模板（缺失）';
+        }
         if (ref.refOutput && ref.refOutput.displayName && String(ref.refOutput.displayName).trim()) return String(ref.refOutput.displayName).trim();
         if (ref.source === 'macro') return ref.name || '未命名宏';
         const txt = String(ref.name || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
@@ -9249,6 +9252,8 @@
         if (selIdx < 0) selIdx = 0;
         const selRef = rules[selIdx] || null;
         const mode = window.currentShenDisplayMode || 'all';
+        // 解析参考值：模板引用实时解析（含缺失检测）；旧版内嵌格式兼容
+        if (selRef) selRef._resolved = resolveRefOutput(selRef.refOutput);
 
         // 参考值来源栏
         let refBarHtml = '';
@@ -9265,6 +9270,10 @@
                 '<span class="text-gray-500">共' + rules.length + '条命中，可切换参考值</span>' +
                 '</div>';
         }
+        // 模板缺失提示（引用的模板被删除或本地拉不到）
+        if (selRef && selRef._resolved && selRef._resolved.missing) {
+            refBarHtml += '<div class="mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">⚠ 参考值模板已缺失（可能已被删除或未同步到本机），当前仅显示实际数量统计。</div>';
+        }
         refBarBox.innerHTML = refBarHtml;
 
         // 柱状图
@@ -9276,7 +9285,7 @@
     // 渲染柱状图主体
     function renderShenBarChart(stats, selRef, mode) {
         const groups = GROUPED_SHEN;
-        const refVals = selRef ? normalizeRefValues(selRef.refOutput.values) : {};
+        const refVals = (selRef && selRef._resolved) ? normalizeRefValues(selRef._resolved.values) : {};
         // 实际值（跟随当前模式：全部/天干/地支，含用户调节偏移量）
         const actualMap = {};
         groups.forEach(function(g) {
@@ -9334,8 +9343,8 @@
     function renderShenBarTables(stats, rules, selIdx, mode) {
         const selRef = rules[selIdx] || null;
         const relMap = {};  // relation -> ref entry
-        if (selRef && selRef.refOutput && Array.isArray(selRef.refOutput.relationRefs)) {
-            selRef.refOutput.relationRefs.forEach(function(rr) {
+        if (selRef && selRef._resolved && Array.isArray(selRef._resolved.relationRefs)) {
+            selRef._resolved.relationRefs.forEach(function(rr) {
                 if (rr && rr.relation) relMap[rr.relation] = rr;
             });
         }
@@ -9434,11 +9443,175 @@
         if (window.currentShenChart === 'bar') renderShenBar();
     }
 
-    // ============ 参考值输出面板（断语/条件宏编辑器） ============
-    // 生成五种十神的参考值配置行与关联关系配置行
-    function buildRefOutputPanel(valuesBoxId, relBoxId) {
-        const vBox = document.getElementById(valuesBoxId);
-        const rBox = document.getElementById(relBoxId);
+    // ============ 参考值模板（十神柱状对比图参考值基准模板库） ============
+    // 模板云端表 ref_templates（见 create_ref_templates.sql）+ 本地缓存 cache.refTemplates（离线可用）
+    // 断语/条件宏通过 conditions.referenceOutput = { refTemplateId } 引用模板，渲染时实时解析，模板修改后自动生效
+
+    function loadLocalRefTemplates() {
+        try {
+            const raw = localStorage.getItem('bazi_ref_templates');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) { return []; }
+    }
+    function saveLocalRefTemplates(list) {
+        try { localStorage.setItem('bazi_ref_templates', JSON.stringify(list)); } catch (e) {}
+    }
+    function getRefTemplates() {
+        if (!cache.refTemplates) cache.refTemplates = loadLocalRefTemplates();
+        return cache.refTemplates;
+    }
+    function getRefTemplateById(id) {
+        if (!id) return null;
+        return (getRefTemplates() || []).find(function(t) {
+            return String(t.cloudId) === String(id) || String(t.id) === String(id);
+        }) || null;
+    }
+    // 从云端拉取当前用户的参考值模板（登录后自动调用；失败时回退本地缓存）
+    async function loadRefTemplatesFromCloud() {
+        if (!supabaseClient) { cache.refTemplates = loadLocalRefTemplates(); return; }
+        try {
+            const { data: ud } = await supabaseClient.auth.getUser();
+            if (!ud || !ud.user) { cache.refTemplates = loadLocalRefTemplates(); return; }
+            const { data, error } = await supabaseClient
+                .from('ref_templates')
+                .select('*')
+                .order('update_time', { ascending: false });
+            if (error) throw error;
+            const list = (data || []).map(function(r) {
+                return { id: r.id, cloudId: r.id, name: r.name || '', displayName: r.display_name || '', values: r.values || {}, relationRefs: r.relation_refs || [] };
+            });
+            cache.refTemplates = list;
+            saveLocalRefTemplates(list);
+            refreshRefTplPickers();
+            const modal = document.getElementById('ref-template-modal');
+            if (modal && !modal.classList.contains('hidden')) renderRefTemplateList();
+        } catch (e) {
+            console.warn('参考值模板加载失败:', e);
+            cache.refTemplates = loadLocalRefTemplates();
+        }
+    }
+    // 解析断语/宏的 referenceOutput：模板引用实时解析；兼容旧版内嵌 values/relationRefs 格式
+    function resolveRefOutput(ro) {
+        if (!ro) return null;
+        if (ro.refTemplateId) {
+            const tpl = getRefTemplateById(ro.refTemplateId);
+            if (tpl) {
+                return { displayName: tpl.displayName || tpl.name || '', values: tpl.values || {}, relationRefs: tpl.relationRefs || [], templateName: tpl.name || '', missing: false };
+            }
+            return { displayName: '', values: {}, relationRefs: [], templateName: '', missing: true };
+        }
+        return { displayName: ro.displayName || '', values: ro.values || {}, relationRefs: ro.relationRefs || [], templateName: '', missing: false };
+    }
+    // 模板摘要文本（模板列表中展示）
+    function refTemplateSummary(tpl) {
+        const vals = (tpl && tpl.values) || {};
+        const parts = GROUPED_SHEN.map(function(g) {
+            const v = vals[g];
+            if (!v) return '';
+            if (v.op === 'range') return g + ':' + v.min + '~' + v.max;
+            return g + ':' + v.value;
+        }).filter(Boolean);
+        const relCnt = ((tpl && tpl.relationRefs) || []).length;
+        const relTxt = relCnt ? '，关系' + relCnt + '组' : '';
+        return (parts.length ? parts.join('、') : '未配置十神参考值') + relTxt;
+    }
+
+    // ============ 参考值模板管理窗口 ============
+    var _editingRefTplId = null; // 当前编辑的模板云端ID（null=新建）
+    function isRefTplLoggedIn() {
+        return !!(supabaseClient && (typeof currentUser !== 'undefined' && currentUser));
+    }
+    function openRefTemplateManager() {
+        document.getElementById('ref-template-modal').classList.remove('hidden');
+        backToRefTplList();
+    }
+    function closeRefTemplateManager() {
+        document.getElementById('ref-template-modal').classList.add('hidden');
+    }
+    function backToRefTplList() {
+        _editingRefTplId = null;
+        document.getElementById('ref-tpl-edit-view').classList.add('hidden');
+        document.getElementById('ref-tpl-list-view').classList.remove('hidden');
+        renderRefTemplateList();
+    }
+    function renderRefTemplateList() {
+        const box = document.getElementById('ref-tpl-list');
+        if (!box) return;
+        const kw = String(document.getElementById('ref-tpl-list-search').value || '').trim();
+        const list = getRefTemplates();
+        const filtered = list.filter(function(t) {
+            if (!kw) return true;
+            return (t.name || '').indexOf(kw) >= 0 || (t.displayName || '').indexOf(kw) >= 0 || refTemplateSummary(t).indexOf(kw) >= 0;
+        });
+        if (!filtered.length) {
+            box.innerHTML = '<p class="text-gray-400 text-center py-4">' + (list.length ? '没有匹配的模板' : '暂无参考值模板，点击「➕ 新建模板」创建') + '</p>';
+            return;
+        }
+        box.innerHTML = filtered.map(function(t) {
+            const refCount = countRefTemplateUsers(t.cloudId || t.id);
+            const tplId = String(t.cloudId || t.id);
+            return '<div class="flex items-start gap-2 bg-white border border-gray-200 rounded p-2">' +
+                '<div class="flex-1 min-w-0">' +
+                '<div class="flex items-center gap-2">' +
+                '<span class="font-bold text-sm text-amber-800 truncate">' + escapeHtml(t.name || '未命名模板') + '</span>' +
+                (t.displayName && t.displayName !== t.name ? '<span class="text-[10px] text-gray-400 bg-gray-100 rounded px-1 py-px">显示:' + escapeHtml(t.displayName) + '</span>' : '') +
+                '</div>' +
+                '<div class="text-[11px] text-gray-500 mt-0.5 truncate">' + escapeHtml(refTemplateSummary(t)) + '</div>' +
+                '<div class="text-[11px] text-gray-400 mt-0.5">被引用 <span class="' + (refCount ? 'text-indigo-600 font-medium' : 'text-gray-400') + '">' + refCount + '</span> 处（断语+宏）</div>' +
+                '</div>' +
+                '<div class="flex gap-1 shrink-0">' +
+                '<button class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs" onclick="editRefTemplate(\'' + tplId + '\')">✏️ 编辑</button>' +
+                '<button class="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs" onclick="deleteRefTemplate(\'' + tplId + '\')">🗑 删除</button>' +
+                '</div></div>';
+        }).join('');
+    }
+    // 统计某模板被断语/宏引用次数
+    function countRefTemplateUsers(tplId) {
+        let n = 0;
+        function scan(ro) { if (ro && ro.refTemplateId && String(ro.refTemplateId) === String(tplId)) n++; }
+        (cache.rules || []).forEach(function(r) { if (r.conditions) scan(r.conditions.referenceOutput); });
+        (cache.conditionMacros || []).forEach(function(m) { if (m.conditions) scan(m.conditions.referenceOutput); });
+        return n;
+    }
+    function newRefTemplate() {
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再创建参考值模板！'); return; }
+        _editingRefTplId = null;
+        document.getElementById('ref-tpl-name').value = '';
+        document.getElementById('ref-tpl-display-name').value = '';
+        buildRefTemplateEditor({ values: {}, relationRefs: [] });
+        document.getElementById('ref-tpl-list-view').classList.add('hidden');
+        document.getElementById('ref-tpl-edit-view').classList.remove('hidden');
+    }
+    function editRefTemplate(id) {
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再编辑参考值模板！'); return; }
+        const tpl = getRefTemplateById(id);
+        if (!tpl) { alert('模板不存在或已被删除！'); renderRefTemplateList(); return; }
+        _editingRefTplId = tpl.cloudId || tpl.id;
+        document.getElementById('ref-tpl-name').value = tpl.name || '';
+        document.getElementById('ref-tpl-display-name').value = tpl.displayName || '';
+        buildRefTemplateEditor({ values: tpl.values || {}, relationRefs: tpl.relationRefs || [] });
+        document.getElementById('ref-tpl-list-view').classList.add('hidden');
+        document.getElementById('ref-tpl-edit-view').classList.remove('hidden');
+    }
+    async function deleteRefTemplate(id) {
+        if (!confirm('确认删除该参考值模板？所有引用它的断语/宏将显示"模板缺失"提示。')) return;
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再删除参考值模板！'); return; }
+        try {
+            const { error } = await supabaseClient.from('ref_templates').delete().eq('id', id);
+            if (error) throw error;
+            cache.refTemplates = (cache.refTemplates || []).filter(function(t) { return String(t.cloudId) !== String(id); });
+            saveLocalRefTemplates(cache.refTemplates);
+            renderRefTemplateList();
+        } catch (e) {
+            console.error('删除模板失败:', e);
+            alert('删除失败：' + (e.message || e));
+        }
+    }
+    // 构建模板编辑视图的十神参考值与关系比例配置区
+    function buildRefTemplateEditor(tpl) {
+        const vBox = document.getElementById('ref-tpl-values-box');
+        const rBox = document.getElementById('ref-tpl-relations-box');
+        const values = (tpl && tpl.values) || {};
         if (vBox) {
             let html = '';
             GROUPED_SHEN.forEach(function(g) {
@@ -9452,11 +9625,27 @@
                     '<option value="range">区间</option>' +
                     '</select>' +
                     '<input type="number" class="ref-val text-xs p-1 border rounded w-14 hidden" placeholder="值" min="0">' +
+                    '<input type="number" class="ref-min text-xs p-1 border rounded w-14 hidden" placeholder="下限" min="0">' +
                     '<span class="ref-range-sep text-xs text-gray-500 hidden">~</span>' +
                     '<input type="number" class="ref-max text-xs p-1 border rounded w-14 hidden" placeholder="上限" min="0">' +
                     '</div>';
             });
             vBox.innerHTML = html;
+            GROUPED_SHEN.forEach(function(g) {
+                const v = values[g];
+                if (!v) return;
+                const row = vBox.querySelector('[data-shen="' + g + '"]');
+                if (!row) return;
+                const sel = row.querySelector('.ref-op');
+                sel.value = v.op || 'eq';
+                toggleRefValInput(sel);
+                if (v.op === 'range') {
+                    row.querySelector('.ref-min').value = v.min !== undefined ? v.min : '';
+                    row.querySelector('.ref-max').value = v.max !== undefined ? v.max : '';
+                } else {
+                    row.querySelector('.ref-val').value = v.value !== undefined ? v.value : '';
+                }
+            });
         }
         if (rBox) {
             const rels = [];
@@ -9474,22 +9663,203 @@
                     '</div>';
             });
             rBox.innerHTML = html;
+            ((tpl && tpl.relationRefs) || []).forEach(function(rr) {
+                if (!rr || !rr.relation) return;
+                const row = rBox.querySelector('.ref-rel-row[data-rel="' + rr.relation + '"]');
+                if (!row) return;
+                const valsBox = row.querySelector('.ref-rel-vals');
+                if (rr.type === 'range' && rr.min && rr.max) {
+                    valsBox.appendChild(createRefRelRangeItem(rr.min.n, rr.min.d, rr.max.n, rr.max.d));
+                } else {
+                    (rr.values || []).forEach(function(v) { valsBox.appendChild(createRefRelValueItem(v.n, v.d)); });
+                }
+            });
         }
     }
+    // 收集模板编辑视图的输入（保存时调用）
+    function collectRefTemplateEditor() {
+        const ro = {};
+        const values = {};
+        document.querySelectorAll('#ref-tpl-values-box .ref-op').forEach(function(sel) {
+            const row = sel.closest('[data-shen]');
+            if (!row) return;
+            const g = row.dataset.shen;
+            const op = sel.value;
+            if (!op) return;
+            const valInput = row.querySelector('.ref-val');
+            const minInput = row.querySelector('.ref-min');
+            const maxInput = row.querySelector('.ref-max');
+            if (op === 'range') {
+                const min = parseFloat(minInput.value);
+                const max = parseFloat(maxInput.value);
+                if (!isNaN(min) && !isNaN(max)) values[g] = { op: 'range', min: min, max: max };
+            } else {
+                const v = parseFloat(valInput.value);
+                if (!isNaN(v)) values[g] = { op: op, value: v };
+            }
+        });
+        if (Object.keys(values).length) ro.values = values;
+        const relationRefs = [];
+        document.querySelectorAll('#ref-tpl-relations-box .ref-rel-row').forEach(function(row) {
+            const relation = row.dataset.rel;
+            const rangeItem = row.querySelector('.ref-rel-vals > .ref-range-item');
+            if (rangeItem) {
+                const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
+                const minD = parseInt(rangeItem.querySelector('.ref-min-d').value);
+                const maxN = parseInt(rangeItem.querySelector('.ref-max-n').value);
+                const maxD = parseInt(rangeItem.querySelector('.ref-max-d').value);
+                if (!isNaN(minN) && !isNaN(minD) && !isNaN(maxN) && !isNaN(maxD) && !(minN === 0 && minD === 0)) {
+                    relationRefs.push({ relation: relation, type: 'range', min: { n: minN, d: minD }, max: { n: maxN, d: maxD } });
+                    return;
+                }
+            }
+            const exactVals = [];
+            row.querySelectorAll('.ref-rel-vals > div:not(.ref-range-item)').forEach(function(item) {
+                const n = parseInt(item.querySelector('.ref-n').value);
+                const d = parseInt(item.querySelector('.ref-d').value);
+                if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) exactVals.push({ n: n, d: d });
+            });
+            if (exactVals.length) relationRefs.push({ relation: relation, type: 'eq', values: exactVals });
+        });
+        if (relationRefs.length) ro.relationRefs = relationRefs;
+        return Object.keys(ro).length ? ro : null;
+    }
+    // 保存模板（新建/更新到云端）
+    async function saveRefTemplate() {
+        const name = document.getElementById('ref-tpl-name').value.trim();
+        if (!name) { alert('请填写模板名称！'); return; }
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再保存参考值模板！'); return; }
+        const content = collectRefTemplateEditor() || {};
+        const record = {
+            name: name,
+            display_name: document.getElementById('ref-tpl-display-name').value.trim(),
+            values: content.values || {},
+            relation_refs: content.relationRefs || []
+        };
+        try {
+            if (_editingRefTplId) {
+                const { error } = await supabaseClient.from('ref_templates').update(record).eq('id', _editingRefTplId);
+                if (error) throw error;
+            } else {
+                const { data: ud } = await supabaseClient.auth.getUser();
+                if (ud && ud.user) record.user_id = ud.user.id;
+                const { data, error } = await supabaseClient.from('ref_templates').insert([record]).select().single();
+                if (error) throw error;
+                if (data) _editingRefTplId = data.id;
+            }
+            await loadRefTemplatesFromCloud();
+            backToRefTplList();
+            alert('模板保存成功！所有引用的断语/宏将自动生效。');
+        } catch (e) {
+            console.error('保存模板失败:', e);
+            alert('保存失败：' + (e.message || e));
+        }
+    }
+
+    // ============ 断语/宏编辑器中的参考值模板选择器（搜索式下拉） ============
+    // 刷新所有面板的选中显示与下拉列表（模板加载/保存后调用）
+    function refreshRefTplPickers() {
+        document.querySelectorAll('.ref-output-panel').forEach(function(panel) {
+            const tplId = panel.querySelector('.ref-tpl-id') ? panel.querySelector('.ref-tpl-id').value : '';
+            if (tplId) {
+                const tpl = getRefTemplateById(tplId);
+                const search = panel.querySelector('.ref-tpl-search');
+                const tip = panel.querySelector('.ref-tpl-tip');
+                if (tpl && search) { search.value = tpl.displayName || tpl.name || ''; if (tip) tip.classList.add('hidden'); }
+                else if (!tpl && search) { search.value = ''; if (tip) { tip.textContent = '⚠ 引用的参考值模板已缺失，请重新选择或到「输出参考值设置」中恢复。'; tip.classList.remove('hidden'); } }
+            }
+        });
+    }
+    // 渲染某个输入框的下拉列表
+    function renderRefTplList(input) {
+        const wrap = input.closest('.ref-output-panel') || input.parentElement;
+        const listBox = wrap.querySelector('.ref-tpl-list');
+        const kw = String(input.value || '').trim();
+        const list = getRefTemplates().filter(function(t) {
+            if (!kw) return true;
+            return (t.name || '').indexOf(kw) >= 0 || (t.displayName || '').indexOf(kw) >= 0 || refTemplateSummary(t).indexOf(kw) >= 0;
+        });
+        if (!list.length) {
+            listBox.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">' + (getRefTemplates().length ? '没有匹配的模板' : '暂无模板，点击「⚙️ 输出参考值设置」创建') + '</div>';
+            return;
+        }
+        listBox.innerHTML = list.map(function(t) {
+            const tplId = String(t.cloudId || t.id);
+            return '<div class="px-3 py-1.5 hover:bg-amber-50 cursor-pointer flex items-baseline gap-2 border-b border-gray-50 last:border-0" data-tpl-id="' + tplId + '" onclick="selectRefTpl(this)">' +
+                '<span class="font-medium text-sm text-amber-800 truncate">' + escapeHtml(t.displayName || t.name || '未命名模板') + '</span>' +
+                '<span class="text-[10px] text-gray-400 truncate">' + escapeHtml(refTemplateSummary(t)) + '</span>' +
+                '</div>';
+        }).join('');
+        listBox.dataset.kw = kw;
+        listBox.classList.remove('hidden');
+    }
+    function openRefTplList(input) {
+        document.querySelectorAll('.ref-tpl-list').forEach(function(b) { if (b !== input.parentElement.querySelector('.ref-tpl-list')) b.classList.add('hidden'); });
+        renderRefTplList(input);
+    }
+    function filterRefTplList(input) {
+        renderRefTplList(input);
+    }
+    // 点击选中模板（将云端ID存入隐藏域并回显名称）
+    function selectRefTpl(item) {
+        const panel = item.closest('.ref-output-panel');
+        if (!panel) return;
+        const tpl = getRefTemplateById(item.dataset.tplId);
+        if (!tpl) return;
+        const listBox = panel.querySelector('.ref-tpl-list');
+        const search = panel.querySelector('.ref-tpl-search');
+        const tip = panel.querySelector('.ref-tpl-tip');
+        panel.querySelector('.ref-tpl-id').value = tpl.cloudId || tpl.id;
+        search.value = tpl.displayName || tpl.name || '';
+        const clear = panel.querySelector('.ref-tpl-clear');
+        if (clear) clear.classList.remove('hidden');
+        if (tip) tip.classList.add('hidden');
+        if (listBox) listBox.classList.add('hidden');
+    }
+    function clearRefTpl(btn) {
+        const panel = btn.closest('.ref-output-panel');
+        if (!panel) return;
+        const search = panel.querySelector('.ref-tpl-search');
+        const tip = panel.querySelector('.ref-tpl-tip');
+        if (search) search.value = '';
+        panel.querySelector('.ref-tpl-id').value = '';
+        btn.classList.add('hidden');
+        if (tip) tip.classList.add('hidden');
+    }
+    // 初始化所有面板选择器（initAll 时调用）
+    function initRefTplPickers() {
+        document.querySelectorAll('.ref-output-panel').forEach(function(panel) {
+            const search = panel.querySelector('.ref-tpl-search');
+            if (search) search.value = '';
+            const clear = panel.querySelector('.ref-tpl-clear');
+            if (clear) clear.classList.add('hidden');
+        });
+        refreshRefTplPickers();
+    }
+
+    // 点击面板外部时关闭模板下拉列表
+    document.addEventListener('click', function(e) {
+        if (!e.target || !e.target.closest('.ref-output-panel')) {
+            document.querySelectorAll('.ref-tpl-list').forEach(function(b) { b.classList.add('hidden'); });
+        }
+    });
 
     // 操作符切换时显示/隐藏对应的输入框
     function toggleRefValInput(sel) {
         const row = sel.closest('[data-shen]');
         if (!row) return;
         const val = row.querySelector('.ref-val');
+        const min = row.querySelector('.ref-min');
         const sep = row.querySelector('.ref-range-sep');
         const max = row.querySelector('.ref-max');
         const isRange = sel.value === 'range';
         const hasOp = !!sel.value;
         val.classList.toggle('hidden', !hasOp || isRange);
+        min.classList.toggle('hidden', !isRange);
         sep.classList.toggle('hidden', !isRange);
         max.classList.toggle('hidden', !isRange);
         val.disabled = !hasOp;
+        min.disabled = !isRange;
         max.disabled = !isRange;
     }
 
@@ -9530,140 +9900,51 @@
         return div;
     }
 
-    // 收集参考值输出数据（保存时调用）
+    // 收集参考值输出数据（保存时调用）：模板引用模式，仅存 refTemplateId
     function collectRefOutput(panel) {
         if (!panel) return null;
-        const ro = {};
-        const nameInput = panel.querySelector('.ref-display-name');
-        if (nameInput && nameInput.value.trim()) ro.displayName = nameInput.value.trim();
-        // 五种十神参考值
-        const values = {};
-        panel.querySelectorAll('.ref-op').forEach(function(sel) {
-            const row = sel.closest('[data-shen]');
-            if (!row) return;
-            const g = row.dataset.shen;
-            const op = sel.value;
-            if (!op) return;
-            const valInput = row.querySelector('.ref-val');
-            const maxInput = row.querySelector('.ref-max');
-            if (op === 'range') {
-                const min = parseFloat(valInput.value);
-                const max = parseFloat(maxInput.value);
-                if (!isNaN(min) && !isNaN(max)) values[g] = { op: 'range', min: min, max: max };
-            } else {
-                const v = parseFloat(valInput.value);
-                if (!isNaN(v)) values[g] = { op: op, value: v };
-            }
-        });
-        if (Object.keys(values).length) ro.values = values;
-        // 关联关系参考比例
-        const relationRefs = [];
-        panel.querySelectorAll('.ref-rel-row').forEach(function(row) {
-            const relation = row.dataset.rel;
-            const rangeItem = row.querySelector('.ref-rel-vals > .ref-range-item');
-            if (rangeItem) {
-                const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
-                const minD = parseInt(rangeItem.querySelector('.ref-min-d').value);
-                const maxN = parseInt(rangeItem.querySelector('.ref-max-n').value);
-                const maxD = parseInt(rangeItem.querySelector('.ref-max-d').value);
-                if (!isNaN(minN) && !isNaN(minD) && !isNaN(maxN) && !isNaN(maxD) && !(minN === 0 && minD === 0)) {
-                    relationRefs.push({ relation: relation, type: 'range', min: { n: minN, d: minD }, max: { n: maxN, d: maxD } });
-                    return;
-                }
-            }
-            const exactVals = [];
-            row.querySelectorAll('.ref-rel-vals > div:not(.ref-range-item)').forEach(function(item) {
-                const n = parseInt(item.querySelector('.ref-n').value);
-                const d = parseInt(item.querySelector('.ref-d').value);
-                if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) exactVals.push({ n: n, d: d });
-            });
-            if (exactVals.length) relationRefs.push({ relation: relation, type: 'eq', values: exactVals });
-        });
-        if (relationRefs.length) ro.relationRefs = relationRefs;
-        return Object.keys(ro).length ? ro : null;
+        const idInput = panel.querySelector('.ref-tpl-id');
+        const tplId = idInput ? idInput.value.trim() : '';
+        if (!tplId) return null;
+        return { refTemplateId: tplId };
     }
 
-    // 回显参考值输出数据（编辑时调用）
+    // 回显参考值输出数据（编辑时调用）：回显选中的模板；兼容旧版内嵌格式（提示不可编辑）
     function loadRefOutput(panel, ro) {
         if (!panel || !ro) return;
-        const nameInput = panel.querySelector('.ref-display-name');
-        if (nameInput && ro.displayName) nameInput.value = ro.displayName;
-        const values = ro.values || {};
-        GROUPED_SHEN.forEach(function(g) {
-            const row = panel.querySelector('[data-shen="' + g + '"]');
-            if (!row) return;
-            const sel = row.querySelector('.ref-op');
-            const v = values[g];
-            if (!v) return;
-            sel.value = v.op || 'eq';
-            toggleRefValInput(sel);
-            if (v.op === 'range') {
-                row.querySelector('.ref-val').value = v.min !== undefined ? v.min : '';
-                row.querySelector('.ref-max').value = v.max !== undefined ? v.max : '';
+        const search = panel.querySelector('.ref-tpl-search');
+        const idInput = panel.querySelector('.ref-tpl-id');
+        const clearBtn = panel.querySelector('.ref-tpl-clear');
+        const tip = panel.querySelector('.ref-tpl-tip');
+        if (ro.refTemplateId) {
+            const tpl = getRefTemplateById(ro.refTemplateId);
+            if (idInput) idInput.value = ro.refTemplateId;
+            if (tpl) {
+                if (search) search.value = tpl.displayName || tpl.name || '';
+                if (clearBtn) clearBtn.classList.remove('hidden');
+                if (tip) tip.classList.add('hidden');
             } else {
-                row.querySelector('.ref-val').value = v.value !== undefined ? v.value : '';
+                if (search) search.value = '';
+                if (clearBtn) clearBtn.classList.add('hidden');
+                if (tip) { tip.textContent = '⚠ 引用的参考值模板已缺失，请重新选择或到「输出参考值设置」中恢复。'; tip.classList.remove('hidden'); }
             }
-        });
-        const rels = ro.relationRefs || [];
-        rels.forEach(function(rr) {
-            const row = panel.querySelector('.ref-rel-row[data-rel="' + rr.relation + '"]');
-            if (!row) return;
-            const valsBox = row.querySelector('.ref-rel-vals');
-            if (rr.type === 'range' && rr.min && rr.max) {
-                valsBox.appendChild(createRefRelRangeItem(rr.min.n, rr.min.d, rr.max.n, rr.max.d));
-            } else {
-                (rr.values || []).forEach(function(v) {
-                    valsBox.appendChild(createRefRelValueItem(v.n, v.d));
-                });
-            }
-        });
+        } else if (ro.values || ro.relationRefs) {
+            // 旧版内嵌参考值：仍可正常渲染，但编辑器不再支持手动编辑
+            if (tip) { tip.textContent = 'ℹ 该断语/宏保存的是旧版内嵌参考值（不再支持编辑）。如需改为模板引用，请从上方选择模板并重新保存。'; tip.classList.remove('hidden'); }
+        }
     }
 
     // 清空参考值输出面板（新建时调用）
     function resetRefOutput(panel) {
         if (!panel) return;
-        const nameInput = panel.querySelector('.ref-display-name');
-        if (nameInput) nameInput.value = '';
-        panel.querySelectorAll('.ref-op').forEach(function(sel) { sel.value = ''; toggleRefValInput(sel); });
-        panel.querySelectorAll('.ref-rel-vals').forEach(function(box) { box.innerHTML = ''; });
-    }
-
-    // 从断语/宏的条件中自动导入十神数量参考值
-    function autoImportRefFromConditions(btn) {
-        const panel = btn.closest('.ref-output-panel');
-        if (!panel) return;
-        const parent = panel.parentElement;
-        const root = parent ? parent.querySelector('.condition-group-root') : null;
-        if (!root) { alert('未找到条件区域，无法导入！'); return; }
-        let imported = 0;
-        root.querySelectorAll('.condition-item').forEach(function(item) {
-            const fieldSel = item.querySelector('.condition-field');
-            if (!fieldSel) return;
-            const field = fieldSel.value || '';
-            if (field.indexOf('十神数量') < 0 || field.indexOf('对比') >= 0) return;
-            let g = '';
-            GROUPED_SHEN.forEach(function(gn) { if (!g && field.indexOf(gn) >= 0) g = gn; });
-            if (!g) return;
-            const opSel = item.querySelector('.condition-op');
-            const valSel = item.querySelector('.condition-val-select');
-            const valInput = item.querySelector('.condition-val-input');
-            let val = '';
-            if (valSel && !valSel.classList.contains('hidden')) val = valSel.value;
-            else if (valInput && !valInput.classList.contains('hidden')) val = valInput.value;
-            if (!val || isNaN(Number(val))) return;
-            let opMap = 'eq';
-            const op = opSel ? opSel.value : 'eq';
-            if (['ge', 'gte', 'gt'].indexOf(op) >= 0) opMap = 'gte';
-            else if (['le', 'lte', 'lt'].indexOf(op) >= 0) opMap = 'lte';
-            const row = panel.querySelector('[data-shen="' + g + '"]');
-            if (!row) return;
-            const sel = row.querySelector('.ref-op');
-            sel.value = opMap;
-            toggleRefValInput(sel);
-            row.querySelector('.ref-val').value = Number(val);
-            imported++;
-        });
-        alert(imported ? '已从条件中导入 ' + imported + ' 条十神参考值，可在下方继续调整。' : '未在条件中找到可导入的十神数量条件。');
+        const search = panel.querySelector('.ref-tpl-search');
+        if (search) search.value = '';
+        const idInput = panel.querySelector('.ref-tpl-id');
+        if (idInput) idInput.value = '';
+        const clearBtn = panel.querySelector('.ref-tpl-clear');
+        if (clearBtn) clearBtn.classList.add('hidden');
+        const tip = panel.querySelector('.ref-tpl-tip');
+        if (tip) tip.classList.add('hidden');
     }
 
     // 分类内断语按名称（断语文本）排序显示
@@ -30566,18 +30847,18 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel" id="ref-output-panel-macro">
                 <div class="flex items-center justify-between mb-1">
-                    <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本条件宏时作为十神柱状对比图的参考值基准；支持 = / ≥ / ≤ / 区间）</span></label>
-                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="autoImportRefFromConditions(this)">⬇ 从条件自动导入</button>
+                    <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本条件宏时作为十神柱状对比图的参考值基准；从下方模板库中选择，模板修改后自动生效）</span></label>
+                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出参考值设置</button>
                 </div>
-                <div class="mb-1">
-                    <label class="block text-xs text-gray-600 mb-0.5">显示名称 <span class="text-gray-400">（留空默认使用宏名称）</span></label>
-                    <input type="text" class="ref-display-name w-full p-1.5 border rounded text-sm" placeholder="例如：食伤格·身强">
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="relative flex-1 min-w-[180px]">
+                        <input type="text" class="ref-tpl-search w-full p-1.5 border rounded text-sm" placeholder="🔍 搜索并选择参考值模板（如：食伤格）..." autocomplete="off" onfocus="openRefTplList(this)" oninput="filterRefTplList(this)">
+                        <div class="ref-tpl-list hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto z-30"></div>
+                    </div>
+                    <input type="hidden" class="ref-tpl-id">
+                    <button type="button" class="ref-tpl-clear hidden px-2 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600 shrink-0" onclick="clearRefTpl(this)">✕ 清除</button>
                 </div>
-                <div id="ref-values-box-macro" class="space-y-1"></div>
-                <details class="mt-2">
-                    <summary class="text-xs text-amber-700 font-medium cursor-pointer select-none">🔗 关联关系参考比例（可选：用于相生/相克表标注与高亮，支持多个精确值或区间）</summary>
-                    <div id="ref-relations-box-macro" class="mt-1 space-y-1"></div>
-                </details>
+                <div class="ref-tpl-tip text-[11px] text-amber-700/80 mt-1 hidden"></div>
             </div>
             <div class="mb-3">
                 <label class="block text-sm font-medium text-gray-700 mb-2">条件定义</label>
@@ -30954,6 +31235,52 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div id="mapping-rule-list" class="space-y-2">
                 <p class="text-gray-400 text-center py-4">暂无映射规则</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 参考值模板管理窗口（十神柱状对比图参考值基准模板） -->
+<div id="ref-template-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[760px] max-h-[85vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-lg font-bold text-amber-800">📊 参考值模板管理</h3>
+            <button onclick="closeRefTemplateManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <!-- 列表视图 -->
+        <div id="ref-tpl-list-view" class="p-4 flex-1 overflow-y-auto">
+            <div class="flex gap-2 mb-3 flex-wrap">
+                <input type="text" id="ref-tpl-list-search" class="flex-1 p-2 border rounded text-sm min-w-[150px]" placeholder="🔍 搜索模板名称..." oninput="renderRefTemplateList()">
+                <button onclick="newRefTemplate()" class="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm shrink-0">➕ 新建模板</button>
+            </div>
+            <div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-gray-600">
+                <p class="font-medium text-amber-700 mb-0.5">模板说明：</p>
+                <p>• 一个模板包含<b>五种十神参考值</b>（= / ≥ / ≤ / 区间）与<b>十组相生/相克关系比例</b>（多个精确值或区间）。</p>
+                <p>• 断语/条件宏通过下拉框选择引用模板；<b>修改模板后，所有引用的断语/宏自动生效</b>。</p>
+            </div>
+            <div id="ref-tpl-list" class="space-y-2">
+                <p class="text-gray-400 text-center py-4">模板加载中...</p>
+            </div>
+        </div>
+        <!-- 编辑视图 -->
+        <div id="ref-tpl-edit-view" class="p-4 flex-1 overflow-y-auto hidden">
+            <div class="mb-3">
+                <label class="block text-xs text-gray-600 mb-0.5">模板名称 <span class="text-red-500">*</span></label>
+                <input type="text" id="ref-tpl-name" class="w-full p-1.5 border rounded text-sm" placeholder="如：食伤格·身强">
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs text-gray-600 mb-0.5">显示名称 <span class="text-gray-400">（留空默认使用模板名称；在柱状图参考值来源下拉中显示）</span></label>
+                <input type="text" id="ref-tpl-display-name" class="w-full p-1.5 border rounded text-sm" placeholder="如：食伤格·身强">
+            </div>
+            <div class="mb-1 font-medium text-amber-700 text-sm">十神参考值（命中后作为柱状图的参考值基准）</div>
+            <div id="ref-tpl-values-box" class="space-y-1 mb-3"></div>
+            <details class="mb-3">
+                <summary class="text-xs text-amber-700 font-medium cursor-pointer select-none">🔗 关联关系参考比例（可选：用于相生/相克表标注与高亮，支持多个精确值或区间）</summary>
+                <div id="ref-tpl-relations-box" class="mt-1 space-y-1"></div>
+            </details>
+            <div class="flex gap-2">
+                <button onclick="saveRefTemplate()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm">💾 保存模板</button>
+                <button onclick="backToRefTplList()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-sm">← 返回列表</button>
             </div>
         </div>
     </div>
