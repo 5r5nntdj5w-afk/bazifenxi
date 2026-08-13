@@ -1675,6 +1675,13 @@
                     <button type="button" class="ref-tpl-clear hidden px-2 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600 shrink-0" onclick="clearRefTpl(this)">✕ 清除</button>
                 </div>
                 <div class="ref-tpl-tip text-[11px] text-amber-700/80 mt-1 hidden"></div>
+                <div class="mt-2 pt-2 border-t border-amber-200">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-medium text-gray-600">🔗 关联生克关系 <span class="text-gray-400">（命中本断语/宏时，勾选的关系在柱状图关系表中打 ✓ 提醒）</span></label>
+                        <span class="text-[10px] text-gray-400 shrink-0">已选 <span class="rel-binding-count">0</span>/10</span>
+                    </div>
+                    <div class="rel-binding-box grid grid-cols-2 gap-x-3 gap-y-1"></div>
+                </div>
             </div>
             <div id="rule-conditions" class="mb-4">
                 <!-- 根条件组容器 -->
@@ -7781,6 +7788,7 @@
         let matchedByCategory = {};
         // 参考值规则收集（十神柱状对比图使用）
         const matchedRefRules = [];
+        const boundRelations = [];  // 命中规则/宏绑定的相生/相克关系集合（用于关系表 ✓ 标记）
 
         // 预计算统计数据，避免在循环中重复计算
         const stats = getStats(data);
@@ -9081,6 +9089,10 @@
                 if (rule.conditions && rule.conditions.referenceOutput) {
                     matchedRefRules.push({ source: 'rule', name: rule.duanyu || '', refOutput: rule.conditions.referenceOutput, rule: rule, priority: (rule.priority !== undefined ? rule.priority : 0) });
                 }
+                // 关联生克关系收集：命中且绑定了相生/相克关系的断语（关系表打钩提醒）
+                if (rule.conditions && Array.isArray(rule.conditions.relationBindings) && rule.conditions.relationBindings.length) {
+                    boundRelations.push.apply(boundRelations, rule.conditions.relationBindings);
+                }
                 // 检查用户是否有该分类的权限
                 const allowedCategories = getCurrentUserAllowedCategories();
                 if (allowedCategories.includes(rule.category)) {
@@ -9092,13 +9104,21 @@
 
         // ===== 参考值规则收集（十神柱状对比图）：遍历条件宏 =====
         (cache.conditionMacros || []).forEach(function(mac) {
-            if (!mac.conditions || !mac.conditions.referenceOutput) return;
+            if (!mac.conditions) return;
+            const hasRef = !!mac.conditions.referenceOutput;
+            const hasRel = Array.isArray(mac.conditions.relationBindings) && mac.conditions.relationBindings.length;
+            if (!hasRef && !hasRel) return;
             try {
                 const macroCtx = {};
                 if (mac.conditions.defaultQuZhi) macroCtx.ruleDefaultQuZhi = mac.conditions.defaultQuZhi;
                 if (mac.conditions.defaultMapping) macroCtx.ruleDefaultMapping = mac.conditions.defaultMapping;
                 if (evaluateConditionGroup(mac.conditions, 0, new Set(), macroCtx)) {
-                    matchedRefRules.push({ source: 'macro', name: mac.name || '', refOutput: mac.conditions.referenceOutput, rule: mac, priority: (mac.priority !== undefined ? mac.priority : 0) });
+                    if (hasRef) {
+                        matchedRefRules.push({ source: 'macro', name: mac.name || '', refOutput: mac.conditions.referenceOutput, rule: mac, priority: (mac.priority !== undefined ? mac.priority : 0) });
+                    }
+                    if (hasRel) {
+                        boundRelations.push.apply(boundRelations, mac.conditions.relationBindings);
+                    }
                 }
             } catch (e) { console.warn('参考值规则收集失败:', mac.name, e); }
         });
@@ -9113,6 +9133,8 @@
                 return (b.priority || 0) - (a.priority || 0);
             });
             cache.shenRefRules = matchedRefRules;
+            // 聚合所有命中规则/宏绑定的相生/相克关系（去重），供关系表 ✓ 标记
+            cache.shenRelBindings = Array.from(new Set(boundRelations));
             return;
         }
 
@@ -9370,6 +9392,9 @@
     function renderRelationTable(title, relList, actualMap, relMap, titleColor, showMark) {
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
+        // 命中规则/宏绑定的生克关系集合（关系名称后打 ✓ 提醒）
+        const boundSet = {};
+        (cache.shenRelBindings || []).forEach(function(r) { boundSet[r] = true; });
         let rows = '';
         relList.forEach(function(pair) {
             const relName = pair[0] + (isKe ? '克' : '生') + pair[1];
@@ -9386,8 +9411,10 @@
                     markHtml = chk.ok ? '<span class="bar-done font-bold ml-1">✓</span>' : '<span class="bar-miss font-bold ml-1">✗' + (chk.dir ? ' ' + chk.dir : '') + '</span>';
                 }
             }
+            // 绑定的断语/宏命中时，关系名称后打勾提醒（不改变行背景色，与参考比例琥珀色高亮并存）
+            const relNameHtml = relName + (boundSet[relName] ? ' <span class="text-green-600 font-bold">✓</span>' : '');
             rows += '<tr class="border-b last:border-0 border-gray-100' + (rr ? ' bg-amber-50' : '') + '">' +
-                '<td class="py-1 pl-1 font-medium ' + relNameColor + '">' + relName + '</td>' +
+                '<td class="py-1 pl-1 font-medium ' + relNameColor + '">' + relNameHtml + '</td>' +
                 '<td class="py-1 text-right text-gray-600">实际 <span class="font-bold">' + actualTxt + '</span></td>' +
                 '<td class="py-1 pr-1 text-right text-gray-500">参考 <span>' + refTxt + '</span>' + markHtml + '</td>' +
                 '</tr>';
@@ -9838,6 +9865,7 @@
             if (search) search.value = '';
             const clear = panel.querySelector('.ref-tpl-clear');
             if (clear) clear.classList.add('hidden');
+            buildRelBindingBox(panel);
         });
         refreshRefTplPickers();
     }
@@ -9950,6 +9978,49 @@
         if (clearBtn) clearBtn.classList.add('hidden');
         const tip = panel.querySelector('.ref-tpl-tip');
         if (tip) tip.classList.add('hidden');
+    }
+
+    // ============ 关联生克关系绑定（断语/宏命中时关系表打 ✓ 提醒） ============
+    // 构建 10 组（相克5+相生5）关系勾选区
+    function buildRelBindingBox(panel) {
+        if (!panel) return;
+        const box = panel.querySelector('.rel-binding-box');
+        if (!box) return;
+        const rels = [];
+        SHEN_KE_LIST.forEach(function(p) { rels.push(p[0] + '克' + p[1]); });
+        SHEN_SHENG_LIST.forEach(function(p) { rels.push(p[0] + '生' + p[1]); });
+        box.innerHTML = rels.map(function(rel) {
+            return '<label class="flex items-center gap-1 text-xs text-gray-600 cursor-pointer select-none hover:text-amber-700">' +
+                '<input type="checkbox" class="rel-binding-check rounded" value="' + rel + '" onchange="updateRelBindingCount(this.closest(\'.ref-output-panel\'))">' + rel + '</label>';
+        }).join('');
+        updateRelBindingCount(panel);
+    }
+    // 更新已选关系计数
+    function updateRelBindingCount(panel) {
+        if (!panel) return;
+        const count = panel.querySelector('.rel-binding-count');
+        if (count) count.textContent = panel.querySelectorAll('.rel-binding-check:checked').length;
+    }
+    // 收集勾选的关系（保存时调用）
+    function collectRelationBindings(panel) {
+        if (!panel) return [];
+        const res = [];
+        panel.querySelectorAll('.rel-binding-check:checked').forEach(function(c) { if (c.value) res.push(c.value); });
+        return res;
+    }
+    // 回显勾选的关系（编辑时调用）
+    function loadRelationBindings(panel, list) {
+        if (!panel || !Array.isArray(list)) return;
+        const set = {};
+        list.forEach(function(r) { set[r] = true; });
+        panel.querySelectorAll('.rel-binding-check').forEach(function(c) { c.checked = !!set[c.value]; });
+        updateRelBindingCount(panel);
+    }
+    // 清空勾选（新建时调用）
+    function resetRelationBindings(panel) {
+        if (!panel) return;
+        panel.querySelectorAll('.rel-binding-check').forEach(function(c) { c.checked = false; });
+        updateRelBindingCount(panel);
     }
 
     // 分类内断语按名称（断语文本）排序显示
@@ -11910,6 +11981,7 @@
             
             // 重置参考值输出面板
             resetRefOutput(document.getElementById('ref-output-panel-rule'));
+            resetRelationBindings(document.getElementById('ref-output-panel-rule'));
             
             // 重置根容器，只保留一个初始条件组
             const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
@@ -12082,6 +12154,9 @@
             // 参考值输出（十神柱状对比图）：随 conditions 一起同步
             const ruleRefOutput = collectRefOutput(document.getElementById('ref-output-panel-rule'));
             if (ruleRefOutput) conditionGroup.referenceOutput = ruleRefOutput;
+            // 关联生克关系（关系表打 ✓ 提醒）：随 conditions 一起同步
+            const ruleRelBindings = collectRelationBindings(document.getElementById('ref-output-panel-rule'));
+            if (ruleRelBindings.length) conditionGroup.relationBindings = ruleRelBindings;
 
             // 获取权限等级（管理员可见该选项，普通用户不可见时默认为0）
             const permissionLevelSel = document.getElementById('rule-permission-level');
@@ -12844,6 +12919,8 @@
                     if (ruleMapWxSel) ruleMapWxSel.value = defMapping['五行'] || '';
                     // 回填参考值输出（十神柱状对比图）
                     loadRefOutput(document.getElementById('ref-output-panel-rule'), (rule.conditions && rule.conditions.referenceOutput) || null);
+                    // 回填关联生克关系（关系表打 ✓ 提醒）
+                    loadRelationBindings(document.getElementById('ref-output-panel-rule'), (rule.conditions && rule.conditions.relationBindings) || []);
                     
                     // 清空现有条件组
                     const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
@@ -12978,6 +13055,8 @@
                     if (ruleMapWxSel) ruleMapWxSel.value = defMapping['五行'] || '';
                     // 回填参考值输出（十神柱状对比图）
                     loadRefOutput(document.getElementById('ref-output-panel-rule'), (rule.conditions && rule.conditions.referenceOutput) || null);
+                    // 回填关联生克关系（关系表打 ✓ 提醒）
+                    loadRelationBindings(document.getElementById('ref-output-panel-rule'), (rule.conditions && rule.conditions.relationBindings) || []);
                     
                     
                     // 清空现有条件组
@@ -23390,6 +23469,8 @@ function openMacroEditor(macroId) {
         if (macroMapWxSel) macroMapWxSel.value = macroDefMapping['五行'] || '';
         // 回填参考值输出（十神柱状对比图）
         loadRefOutput(document.getElementById('ref-output-panel-macro'), (macro.conditions && macro.conditions.referenceOutput) || null);
+        // 回填关联生克关系（关系表打 ✓ 提醒）
+        loadRelationBindings(document.getElementById('ref-output-panel-macro'), (macro.conditions && macro.conditions.relationBindings) || []);
         // 加载标签
         if (tagsContainer) {
             renderMacroEditorTags(macro.tags || []);
@@ -23414,6 +23495,7 @@ function openMacroEditor(macroId) {
         if (newMacroMapWxSel) newMacroMapWxSel.value = '';
         // 清空参考值输出面板（新建）
         resetRefOutput(document.getElementById('ref-output-panel-macro'));
+        resetRelationBindings(document.getElementById('ref-output-panel-macro'));
         if (tagsContainer) tagsContainer.innerHTML = '';
         if (tagsInput) tagsInput.value = '';
         if (pinnedCheckbox) pinnedCheckbox.checked = false;
@@ -23499,6 +23581,9 @@ async function saveMacroFromEditor() {
     // 参考值输出（十神柱状对比图）：随 conditions 一起同步
     const macroRefOutput = collectRefOutput(document.getElementById('ref-output-panel-macro'));
     if (macroRefOutput) macroData.conditions.referenceOutput = macroRefOutput;
+    // 关联生克关系（关系表打 ✓ 提醒）：随 conditions 一起同步
+    const macroRelBindings = collectRelationBindings(document.getElementById('ref-output-panel-macro'));
+    if (macroRelBindings.length) macroData.conditions.relationBindings = macroRelBindings;
     
     // 【修复】保存前归一化 macroRef：确保使用 cloudId，补全 macroName
     if (macroData.conditions && macroData.conditions.children && macroData.conditions.children.length > 0) {
@@ -30864,6 +30949,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button type="button" class="ref-tpl-clear hidden px-2 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600 shrink-0" onclick="clearRefTpl(this)">✕ 清除</button>
                 </div>
                 <div class="ref-tpl-tip text-[11px] text-amber-700/80 mt-1 hidden"></div>
+                <div class="mt-2 pt-2 border-t border-amber-200">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-medium text-gray-600">🔗 关联生克关系 <span class="text-gray-400">（命中本断语/宏时，勾选的关系在柱状图关系表中打 ✓ 提醒）</span></label>
+                        <span class="text-[10px] text-gray-400 shrink-0">已选 <span class="rel-binding-count">0</span>/10</span>
+                    </div>
+                    <div class="rel-binding-box grid grid-cols-2 gap-x-3 gap-y-1"></div>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="block text-sm font-medium text-gray-700 mb-2">条件定义</label>
