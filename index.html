@@ -9308,7 +9308,11 @@
         const showMark = window._shenBarShowMark;
 
         let html = '<div class="flex items-end justify-around gap-1 sm:gap-2 px-1" style="height:' + (chartH + 44) + 'px;">';
-        const colors = { 比劫:'#16a34a', 食伤:'#dc2626', 财星:'#d97706', 官杀:'#eab308', 印星:'#2563eb' };
+        // 十神对应的五行颜色（与十神关系图卡片一致：随日主五行动态变化，而非写死）
+        const shenWuXingMap = (stats && stats.shenWuXing) || {};
+        const WUXING_HEX = { '木':'#15803d', '火':'#dc2626', '土':'#78716c', '金':'#eab308', '水':'#2563eb' };
+        const colors = {};
+        groups.forEach(function(g) { colors[g] = WUXING_HEX[shenWuXingMap[g]] || '#6b7280'; });
         groups.forEach(function(g) {
             const act = actualMap[g];
             const actH = Math.max(4, act * unit);
@@ -9324,13 +9328,14 @@
                     '</div>';
             }
             const markHtml = actMark ? (actMark.ok ? '<span class="bar-done font-bold">✓</span>' : '<span class="bar-miss font-bold">✗</span>') : '';
+            // 顺序：参考值柱在前（左），实际八字十神柱在后（右）
             html += '<div class="flex-1 flex flex-col items-center min-w-0">' +
                 '<div class="relative flex items-end justify-center gap-1 w-full" style="height:' + chartH + 'px;">' +
+                (rv ? refHtml : '') +
                 '<div class="flex flex-col items-center justify-end" style="width:34%;">' +
                 '<span class="text-xs font-bold text-blue-700 leading-none mb-0.5">' + act + markHtml + '</span>' +
                 '<div class="rounded-t-sm w-full" style="height:' + Math.min(actH, chartH) + 'px;background:' + colors[g] + ';"></div>' +
                 '</div>' +
-                (rv ? refHtml : '') +
                 '</div>' +
                 '<div class="mt-1 font-bold text-xs text-gray-600 leading-none truncate">' + g + '</div>' +
                 '</div>';
@@ -9550,18 +9555,18 @@
         box.innerHTML = filtered.map(function(t) {
             const refCount = countRefTemplateUsers(t.cloudId || t.id);
             const tplId = String(t.cloudId || t.id);
-            return '<div class="flex items-start gap-2 bg-white border border-gray-200 rounded p-2">' +
+            return '<div class="flex items-start gap-2 bg-white border border-gray-200 rounded p-2.5">' +
                 '<div class="flex-1 min-w-0">' +
                 '<div class="flex items-center gap-2">' +
-                '<span class="font-bold text-sm text-amber-800 truncate">' + escapeHtml(t.name || '未命名模板') + '</span>' +
-                (t.displayName && t.displayName !== t.name ? '<span class="text-[10px] text-gray-400 bg-gray-100 rounded px-1 py-px">显示:' + escapeHtml(t.displayName) + '</span>' : '') +
+                '<span class="font-bold text-base text-amber-800 truncate">' + escapeHtml(t.name || '未命名模板') + '</span>' +
+                (t.displayName && t.displayName !== t.name ? '<span class="text-xs text-gray-400 bg-gray-100 rounded px-1 py-px">显示:' + escapeHtml(t.displayName) + '</span>' : '') +
                 '</div>' +
-                '<div class="text-[11px] text-gray-500 mt-0.5 truncate">' + escapeHtml(refTemplateSummary(t)) + '</div>' +
-                '<div class="text-[11px] text-gray-400 mt-0.5">被引用 <span class="' + (refCount ? 'text-indigo-600 font-medium' : 'text-gray-400') + '">' + refCount + '</span> 处（断语+宏）</div>' +
+                '<div class="text-xs text-gray-500 mt-1 truncate">' + escapeHtml(refTemplateSummary(t)) + '</div>' +
+                '<div class="text-xs text-gray-400 mt-0.5">被引用 <span class="' + (refCount ? 'text-indigo-600 font-medium' : 'text-gray-400') + '">' + refCount + '</span> 处（断语+宏）</div>' +
                 '</div>' +
                 '<div class="flex gap-1 shrink-0">' +
-                '<button class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs" onclick="editRefTemplate(\'' + tplId + '\')">✏️ 编辑</button>' +
-                '<button class="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs" onclick="deleteRefTemplate(\'' + tplId + '\')">🗑 删除</button>' +
+                '<button class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-sm" onclick="editRefTemplate(\'' + tplId + '\')">✏️ 编辑</button>' +
+                '<button class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-sm" onclick="deleteRefTemplate(\'' + tplId + '\')">🗑 删除</button>' +
                 '</div></div>';
         }).join('');
     }
@@ -9615,19 +9620,19 @@
         if (vBox) {
             let html = '';
             GROUPED_SHEN.forEach(function(g) {
-                html += '<div class="flex flex-wrap items-center gap-1 bg-white rounded px-1.5 py-0.5" data-shen="' + g + '">' +
-                    '<span class="w-10 text-xs font-bold text-amber-800">' + g + '</span>' +
-                    '<select class="ref-op text-xs p-1 border rounded" onchange="toggleRefValInput(this)">' +
+                html += '<div class="flex flex-wrap items-center gap-1.5 bg-white rounded px-2 py-1" data-shen="' + g + '">' +
+                    '<span class="w-14 text-sm font-bold text-amber-800">' + g + '</span>' +
+                    '<select class="ref-op text-sm p-1.5 border rounded" onchange="toggleRefValInput(this)">' +
                     '<option value="">--不设置--</option>' +
                     '<option value="eq">=（等于）</option>' +
                     '<option value="gte">≥（不低于）</option>' +
                     '<option value="lte">≤（不高于）</option>' +
                     '<option value="range">区间</option>' +
                     '</select>' +
-                    '<input type="number" class="ref-val text-xs p-1 border rounded w-14 hidden" placeholder="值" min="0">' +
-                    '<input type="number" class="ref-min text-xs p-1 border rounded w-14 hidden" placeholder="下限" min="0">' +
-                    '<span class="ref-range-sep text-xs text-gray-500 hidden">~</span>' +
-                    '<input type="number" class="ref-max text-xs p-1 border rounded w-14 hidden" placeholder="上限" min="0">' +
+                    '<input type="number" class="ref-val text-sm p-1.5 border rounded w-20 hidden" placeholder="值" min="0">' +
+                    '<input type="number" class="ref-min text-sm p-1.5 border rounded w-20 hidden" placeholder="下限" min="0">' +
+                    '<span class="ref-range-sep text-sm text-gray-500 hidden">~</span>' +
+                    '<input type="number" class="ref-max text-sm p-1.5 border rounded w-20 hidden" placeholder="上限" min="0">' +
                     '</div>';
             });
             vBox.innerHTML = html;
@@ -9653,13 +9658,13 @@
             SHEN_SHENG_LIST.forEach(function(p) { rels.push(p[0] + '生' + p[1]); });
             let html = '';
             rels.forEach(function(rel) {
-                html += '<div class="ref-rel-row bg-white rounded px-1.5 py-1" data-rel="' + rel + '">' +
+                html += '<div class="ref-rel-row bg-white rounded px-2 py-1" data-rel="' + rel + '">' +
                     '<div class="flex flex-wrap items-center gap-1">' +
-                    '<span class="text-xs font-medium text-gray-700 w-20">' + rel + '</span>' +
-                    '<button type="button" class="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded text-[10px] text-gray-600" onclick="addRefRelValue(this)">+ 精确值</button>' +
-                    '<button type="button" class="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded text-[10px] text-gray-600" onclick="addRefRelRange(this)">+ 区间</button>' +
+                    '<span class="text-sm font-medium text-gray-700 w-24">' + rel + '</span>' +
+                    '<button type="button" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600" onclick="addRefRelValue(this)">+ 精确值</button>' +
+                    '<button type="button" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600" onclick="addRefRelRange(this)">+ 区间</button>' +
                     '</div>' +
-                    '<div class="ref-rel-vals flex flex-wrap gap-1 mt-0.5"></div>' +
+                    '<div class="ref-rel-vals flex flex-wrap gap-1 mt-1"></div>' +
                     '</div>';
             });
             rBox.innerHTML = html;
@@ -9871,11 +9876,11 @@
 
     function createRefRelValueItem(n, d) {
         const div = document.createElement('div');
-        div.className = 'inline-flex items-center gap-0.5 bg-gray-50 border border-gray-200 rounded px-1 py-0.5';
-        div.innerHTML = '<input type="number" class="ref-n text-xs p-0.5 border rounded" placeholder="分子" min="0" style="width:38px" value="' + n + '">' +
-            '<span class="text-xs text-gray-500">:</span>' +
-            '<input type="number" class="ref-d text-xs p-0.5 border rounded" placeholder="分母" min="0" style="width:38px" value="' + d + '">' +
-            '<button type="button" class="text-red-400 hover:text-red-600 text-xs px-0.5" onclick="this.parentElement.remove()">×</button>';
+        div.className = 'inline-flex items-center gap-1 bg-gray-50 border border-gray-200 rounded px-1.5 py-1';
+        div.innerHTML = '<input type="number" class="ref-n text-sm p-1 border rounded" placeholder="分子" min="0" style="width:48px" value="' + n + '">' +
+            '<span class="text-sm text-gray-500">:</span>' +
+            '<input type="number" class="ref-d text-sm p-1 border rounded" placeholder="分母" min="0" style="width:48px" value="' + d + '">' +
+            '<button type="button" class="text-red-400 hover:text-red-600 text-sm px-1" onclick="this.parentElement.remove()">×</button>';
         return div;
     }
 
@@ -9887,16 +9892,16 @@
 
     function createRefRelRangeItem(minN, minD, maxN, maxD) {
         const div = document.createElement('div');
-        div.className = 'ref-range-item inline-flex items-center gap-0.5 bg-amber-50 border border-amber-200 rounded px-1 py-0.5';
-        div.innerHTML = '<span class="text-[10px] text-gray-500">区间</span>' +
-            '<input type="number" class="ref-min-n text-xs p-0.5 border rounded" placeholder="分子" style="width:38px" value="' + minN + '">' +
-            '<span class="text-xs text-gray-500">:</span>' +
-            '<input type="number" class="ref-min-d text-xs p-0.5 border rounded" placeholder="分母" style="width:38px" value="' + minD + '">' +
-            '<span class="text-xs text-gray-500">~</span>' +
-            '<input type="number" class="ref-max-n text-xs p-0.5 border rounded" placeholder="分子" style="width:38px" value="' + maxN + '">' +
-            '<span class="text-xs text-gray-500">:</span>' +
-            '<input type="number" class="ref-max-d text-xs p-0.5 border rounded" placeholder="分母" style="width:38px" value="' + maxD + '">' +
-            '<button type="button" class="text-red-400 hover:text-red-600 text-xs px-0.5" onclick="this.parentElement.remove()">×</button>';
+        div.className = 'ref-range-item inline-flex items-center gap-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-1';
+        div.innerHTML = '<span class="text-xs text-gray-500">区间</span>' +
+            '<input type="number" class="ref-min-n text-sm p-1 border rounded" placeholder="分子" style="width:48px" value="' + minN + '">' +
+            '<span class="text-sm text-gray-500">:</span>' +
+            '<input type="number" class="ref-min-d text-sm p-1 border rounded" placeholder="分母" style="width:48px" value="' + minD + '">' +
+            '<span class="text-sm text-gray-500">~</span>' +
+            '<input type="number" class="ref-max-n text-sm p-1 border rounded" placeholder="分子" style="width:48px" value="' + maxN + '">' +
+            '<span class="text-sm text-gray-500">:</span>' +
+            '<input type="number" class="ref-max-d text-sm p-1 border rounded" placeholder="分母" style="width:48px" value="' + maxD + '">' +
+            '<button type="button" class="text-red-400 hover:text-red-600 text-sm px-1" onclick="this.parentElement.remove()">×</button>';
         return div;
     }
 
@@ -31242,19 +31247,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- 参考值模板管理窗口（十神柱状对比图参考值基准模板） -->
 <div id="ref-template-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] hidden">
-    <div class="bg-white rounded-lg shadow-xl w-[760px] max-h-[85vh] flex flex-col mx-4">
+    <div class="bg-white rounded-lg shadow-xl w-[920px] max-w-[96vw] max-h-[92vh] flex flex-col mx-4">
         <div class="flex justify-between items-center p-4 border-b shrink-0">
-            <h3 class="text-lg font-bold text-amber-800">📊 参考值模板管理</h3>
+            <h3 class="text-xl font-bold text-amber-800">📊 参考值模板管理</h3>
             <button onclick="closeRefTemplateManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
         </div>
         <!-- 列表视图 -->
         <div id="ref-tpl-list-view" class="p-4 flex-1 overflow-y-auto">
             <div class="flex gap-2 mb-3 flex-wrap">
-                <input type="text" id="ref-tpl-list-search" class="flex-1 p-2 border rounded text-sm min-w-[150px]" placeholder="🔍 搜索模板名称..." oninput="renderRefTemplateList()">
-                <button onclick="newRefTemplate()" class="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm shrink-0">➕ 新建模板</button>
+                <input type="text" id="ref-tpl-list-search" class="flex-1 p-2.5 border rounded text-base min-w-[180px]" placeholder="🔍 搜索模板名称..." oninput="renderRefTemplateList()">
+                <button onclick="newRefTemplate()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base shrink-0">➕ 新建模板</button>
             </div>
-            <div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-gray-600">
-                <p class="font-medium text-amber-700 mb-0.5">模板说明：</p>
+            <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-gray-600">
+                <p class="font-medium text-amber-700 mb-1">模板说明：</p>
                 <p>• 一个模板包含<b>五种十神参考值</b>（= / ≥ / ≤ / 区间）与<b>十组相生/相克关系比例</b>（多个精确值或区间）。</p>
                 <p>• 断语/条件宏通过下拉框选择引用模板；<b>修改模板后，所有引用的断语/宏自动生效</b>。</p>
             </div>
@@ -31263,24 +31268,24 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
         <!-- 编辑视图 -->
-        <div id="ref-tpl-edit-view" class="p-4 flex-1 overflow-y-auto hidden">
+        <div id="ref-tpl-edit-view" class="p-5 flex-1 overflow-y-auto hidden">
             <div class="mb-3">
-                <label class="block text-xs text-gray-600 mb-0.5">模板名称 <span class="text-red-500">*</span></label>
-                <input type="text" id="ref-tpl-name" class="w-full p-1.5 border rounded text-sm" placeholder="如：食伤格·身强">
+                <label class="block text-sm text-gray-600 mb-1">模板名称 <span class="text-red-500">*</span></label>
+                <input type="text" id="ref-tpl-name" class="w-full p-2 border rounded text-base" placeholder="如：食伤格·身强">
             </div>
             <div class="mb-3">
-                <label class="block text-xs text-gray-600 mb-0.5">显示名称 <span class="text-gray-400">（留空默认使用模板名称；在柱状图参考值来源下拉中显示）</span></label>
-                <input type="text" id="ref-tpl-display-name" class="w-full p-1.5 border rounded text-sm" placeholder="如：食伤格·身强">
+                <label class="block text-sm text-gray-600 mb-1">显示名称 <span class="text-gray-400">（留空默认使用模板名称；在柱状图参考值来源下拉中显示）</span></label>
+                <input type="text" id="ref-tpl-display-name" class="w-full p-2 border rounded text-base" placeholder="如：食伤格·身强">
             </div>
-            <div class="mb-1 font-medium text-amber-700 text-sm">十神参考值（命中后作为柱状图的参考值基准）</div>
+            <div class="mb-1.5 font-medium text-amber-700 text-base">十神参考值（命中后作为柱状图的参考值基准）</div>
             <div id="ref-tpl-values-box" class="space-y-1 mb-3"></div>
             <details class="mb-3">
-                <summary class="text-xs text-amber-700 font-medium cursor-pointer select-none">🔗 关联关系参考比例（可选：用于相生/相克表标注与高亮，支持多个精确值或区间）</summary>
+                <summary class="text-sm text-amber-700 font-medium cursor-pointer select-none">🔗 关联关系参考比例（可选：用于相生/相克表标注与高亮，支持多个精确值或区间）</summary>
                 <div id="ref-tpl-relations-box" class="mt-1 space-y-1"></div>
             </details>
             <div class="flex gap-2">
-                <button onclick="saveRefTemplate()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm">💾 保存模板</button>
-                <button onclick="backToRefTplList()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-sm">← 返回列表</button>
+                <button onclick="saveRefTemplate()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base">💾 保存模板</button>
+                <button onclick="backToRefTplList()" class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-base">← 返回列表</button>
             </div>
         </div>
     </div>
