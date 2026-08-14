@@ -1661,7 +1661,7 @@
                     </div>
                 </div>
             </div>
-            <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel" id="ref-output-panel-rule">
+            <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel relative" id="ref-output-panel-rule">
                 <div class="flex items-center justify-between mb-1">
                     <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本断语时作为十神柱状对比图的参考值基准；从下方模板库中选择，模板修改后自动生效）</span></label>
                     <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出参考值设置</button>
@@ -1684,7 +1684,7 @@
                         <span class="text-gray-700">📌 点击下拉选择关系（已选 <span class="rel-binding-count font-bold text-amber-700">0</span> 项）</span>
                         <span class="rel-binding-arrow text-gray-400 font-bold">▾</span>
                     </button>
-                    <div class="rel-binding-drop hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto z-30"></div>
+                    <div class="rel-binding-drop hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto z-30 max-w-[calc(100vw-2rem)]"></div>
                     <div class="rel-binding-chips flex flex-wrap gap-1 mt-1"></div>
                 </div>
             </div>
@@ -9432,13 +9432,17 @@
             { label: '原局+大运', stats: (sc && sc.scope1) || null },
             { label: '原局+大运+流年', stats: (sc && sc.scope2) || null }
         ];
+        // 显示范围跟随选择状态：未选大运仅显示原局列；选大运显示原局+大运列；选流年后才显示原局+大运+流年列
+        const hasDayun = !!document.querySelector('.tiangan[data-type="dayun"]')?.value;
+        const hasLiunian = !!document.querySelector('.tiangan[data-type="liunian"]')?.value;
+        const visibleCount = hasLiunian ? 3 : (hasDayun ? 2 : 1);
         const showMark = window._shenBarShowMark;
         const defs = getRelationDefs();
         const keDefs = defs.filter(function(d) { return d.relType === 'ke'; });
         const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
 
-        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark);
-        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark);
+        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark, visibleCount);
+        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark, visibleCount);
         return '<div class="bg-white border border-gray-200 rounded-lg p-2">' + keHtml + '</div>' +
                '<div class="bg-white border border-gray-200 rounded-lg p-2">' + shengHtml + '</div>';
     }
@@ -9459,12 +9463,19 @@
         return set;
     }
 
-    // 单张关系对比表：关系列 + 三范围列 + 状态变化列
-    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark) {
+    // 单张关系对比表：关系列 + 范围列与「状态变化」列交错显示（跟随大运/流年选择）
+    // 状态显示（方案A·文字徽章式）：达标 ✓/✗ 徽章 · 命中 🔔 徽章 · 变化 ↗绑定 / ↘解绑 徽章
+    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount) {
+        visibleCount = (visibleCount === undefined || visibleCount === null) ? 3 : visibleCount;
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
         const boundSets = [];
         for (let i = 0; i < 3; i++) boundSets.push(buildScopeBoundSet(i));
+        const changeLabels = ['原局→大运', '大运→流年'];  // 交错插入的状态变化列标题
+        // 文字徽章（统一样式）
+        const badge = function(txt, cls) {
+            return '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold ' + cls + '">' + txt + '</span>';
+        };
         let rows = '';
         defList.forEach(function(def) {
             const defaultName = def.shenA + (isKe ? '克' : '生') + def.shenB;  // 参考比例键（模板按默认名存）
@@ -9483,75 +9494,50 @@
                 if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
                 return { stat: st, a: a, b: b, ok: ok, bound: !!boundSets[ci][String(def.id)] };
             });
-            // 变化检测：第2/3列与前一列比较（达标状态 + 绑定状态）
+            // 变化检测（仅绑定/解绑）：第2/3列与前一列比较
             const trans = [null, null];  // trans[0]=原局→+大运, trans[1]=+大运→+流年
-            for (let ci = 1; ci <= 2; ci++) {
+            for (let ci = 1; ci < visibleCount; ci++) {
                 const pre = cols[ci - 1], cur = cols[ci];
-                if (pre.stat && cur.stat && pre.ok !== null && cur.ok !== null && pre.ok !== cur.ok) {
-                    trans[ci - 1] = trans[ci - 1] || [];
-                    trans[ci - 1].push({ type: 'ratio', from: pre.ok, to: cur.ok });
-                }
                 if (pre.stat && cur.stat && pre.bound !== cur.bound) {
                     trans[ci - 1] = trans[ci - 1] || [];
-                    trans[ci - 1].push({ type: 'bound', from: pre.bound, to: cur.bound });
+                    trans[ci - 1].push({ from: pre.bound, to: cur.bound });
                 }
             }
-            // 变化单元格底色（第2/3列：达标变差红、变好绿）
-            const cellCls = ['', '', ''];
-            for (let ci = 1; ci <= 2; ci++) {
-                const pre = cols[ci - 1], cur = cols[ci];
-                if (pre.stat && cur.stat && pre.ok !== null && cur.ok !== null && pre.ok !== cur.ok) {
-                    cellCls[ci] = cur.ok ? ' bg-green-50' : ' bg-red-50';
-                }
-            }
-            const cellHtml = cols.map(function(c, ci) {
-                if (!c.stat) return '<td class="py-1.5 px-1 text-center text-gray-300 text-sm">—</td>';
-                let ratioHtml = '';
-                if (showMark && rr && c.ok !== null) {
-                    ratioHtml = c.ok ? '<span class="bar-done font-bold">✓</span>' : '<span class="bar-miss font-bold">✗</span>';
-                }
-                const boundHtml = c.bound ? '<span class="text-green-600 font-bold" title="该范围绑定的断语/宏命中">●</span>' : '';
-                return '<td class="py-1.5 px-1 text-center' + cellCls[ci] + '">' +
-                    '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + '</div>' +
-                    '<div class="text-[11px] leading-tight mt-0.5 whitespace-nowrap">' +
-                    (ratioHtml ? ratioHtml + ' 达标' : '') +
-                    (boundHtml ? ' ' + boundHtml : '') +
+            const changeTd = function(t) {
+                if (!t || !t.length) return '<td class="py-1.5 px-1 text-center text-gray-300 text-sm">—</td>';
+                const chips = t.map(function(ch) {
+                    return badge(ch.to ? '↗ 绑定' : '↘ 解绑', ch.to ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700');
+                });
+                return '<td class="py-1.5 px-1 text-center align-middle"><div class="flex flex-col gap-0.5 items-center">' + chips.join('') + '</div></td>';
+            };
+            // 范围列与变化列交错生成
+            let midHtml = '';
+            for (let ci = 0; ci < visibleCount; ci++) {
+                const c = cols[ci];
+                midHtml += '<td class="py-1.5 px-1 text-center">' +
+                    (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
+                    '<div class="flex flex-wrap items-center justify-center gap-0.5 mt-0.5">' +
+                    (c.stat && showMark && rr && c.ok !== null ? badge(c.ok ? '✓ 达标' : '✗ 未达标', c.ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') : '') +
+                    (c.bound ? badge('🔔 命中', 'bg-indigo-100 text-indigo-700') : '') +
                     '</div></td>';
-            }).join('');
-            // 状态变化列
-            let changeHtml = '<span class="text-gray-300">—</span>';
-            if (trans[0] || trans[1]) {
-                const chipList = [];
-                for (let t = 0; t < 2; t++) {
-                    if (!trans[t]) continue;
-                    trans[t].forEach(function(ch) {
-                        if (ch.type === 'ratio') {
-                            chipList.push('<span class="inline-block text-[10px] px-1.5 py-0.5 rounded font-bold ' + (ch.to ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') + '" title="' + scopes[t].label + '→' + scopes[t + 1].label + '">' + (ch.to ? '达标 ✗→✓' : '达标 ✓→✗') + '</span>');
-                        } else {
-                            chipList.push('<span class="inline-block text-[10px] px-1.5 py-0.5 rounded font-bold ' + (ch.to ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') + '" title="' + scopes[t].label + '→' + scopes[t + 1].label + '">' + (ch.to ? '绑定 ○→●' : '绑定 ●→○') + '</span>');
-                        }
-                    });
-                }
-                changeHtml = '<div class="flex flex-col gap-0.5 items-start">' + chipList.join('') + '</div>';
+                if (ci < visibleCount - 1) midHtml += changeTd(trans[ci]);
             }
             rows += '<tr class="border-b last:border-0 border-gray-100">' +
                 '<td class="py-1.5 pl-1 pr-1">' +
                 '<div class="font-bold text-sm sm:text-base leading-tight ' + relNameColor + '">' + escapeHtml(def.name) + '</div>' +
                 '<div class="text-[11px] text-gray-400 leading-tight mt-0.5">' + (rr ? '参考 ' + renderRefRatio(rr) : (def.builtin ? '' : '自定义·无参考')) + '</div>' +
-                '</td>' + cellHtml +
-                '<td class="py-1.5 pr-1 pl-1">' + changeHtml + '</td>' +
-                '</tr>';
+                '</td>' + midHtml + '</tr>';
         });
+        // 表头：关系 + 范围列/变化列交错
+        let headHtml = '<th class="py-1 pl-1 pr-1 text-left text-xs font-semibold">关系</th>';
+        for (let ci = 0; ci < visibleCount; ci++) {
+            headHtml += '<th class="py-1 px-1 text-center text-xs font-semibold">' + scopes[ci].label + '</th>';
+            if (ci < visibleCount - 1) headHtml += '<th class="py-1 px-1 text-center text-[10px] font-semibold text-gray-400">' + changeLabels[ci] + '</th>';
+        }
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
-            '<table class="w-full text-sm">' +
-            '<thead><tr class="border-b border-gray-200 text-gray-500">' +
-            '<th class="py-1 pl-1 pr-1 text-left text-xs font-semibold">关系</th>' +
-            '<th class="py-1 px-1 text-center text-xs font-semibold">原局</th>' +
-            '<th class="py-1 px-1 text-center text-xs font-semibold">原局+大运</th>' +
-            '<th class="py-1 px-1 text-center text-xs font-semibold">原局+大运+流年</th>' +
-            '<th class="py-1 pr-1 pl-1 text-left text-xs font-semibold">状态变化</th>' +
+            '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-gray-500">' + headHtml +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：✓ 达标 · ✗ 未达标 · ● 绑定断语/宏命中 · 绿色/红色底色与「状态变化」列标出范围切换时的状态改变</div>';
+            '<div class="text-[11px] text-gray-400 mt-1">图例：✓ 达标 · ✗ 未达标 · 🔔 命中（绑定断语/宏满足）· ↗ 绑定 / ↘ 解绑（范围切换时的状态变化）</div>';
     }
 
     // 渲染参考比例：精确值数组（多个时折叠展开）/ 区间
@@ -10478,12 +10464,18 @@
         document.querySelectorAll('.rel-binding-drop').forEach(function(d) { if (d !== drop) d.classList.add('hidden'); });
         document.querySelectorAll('.rel-binding-arrow').forEach(function(a) { a.textContent = '▾'; });
         if (willOpen) {
+            // 宽度跟随面板，但不超过窗口宽度（防止在窄编辑窗口/全宽面板中溢出）
+            const panelW = panel.clientWidth;
+            const maxW = window.innerWidth - 32;
+            drop.style.width = Math.min(panelW, Math.max(200, maxW)) + 'px';
+            drop.style.maxWidth = 'calc(100vw - 2rem)';
             renderRelBindingBox(panel);
             drop.classList.remove('hidden');
             const arrow = panel.querySelector('.rel-binding-arrow');
             if (arrow) arrow.textContent = '▴';
         } else {
             drop.classList.add('hidden');
+            drop.style.width = '';
         }
     }
     // 更新已选关系计数
@@ -31438,7 +31430,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             </div>
-            <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel" id="ref-output-panel-macro">
+            <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel relative" id="ref-output-panel-macro">
                 <div class="flex items-center justify-between mb-1">
                     <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本条件宏时作为十神柱状对比图的参考值基准；从下方模板库中选择，模板修改后自动生效）</span></label>
                     <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出参考值设置</button>
@@ -31461,7 +31453,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="text-gray-700">📌 点击下拉选择关系（已选 <span class="rel-binding-count font-bold text-amber-700">0</span> 项）</span>
                         <span class="rel-binding-arrow text-gray-400 font-bold">▾</span>
                     </button>
-                    <div class="rel-binding-drop hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto z-30"></div>
+                    <div class="rel-binding-drop hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto z-30 max-w-[calc(100vw-2rem)]"></div>
                     <div class="rel-binding-chips flex flex-wrap gap-1 mt-1"></div>
                 </div>
             </div>
