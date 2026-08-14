@@ -9511,15 +9511,19 @@
                 return '<td class="py-1.5 px-1 text-center align-middle"><div class="flex flex-col gap-0.5 items-center">' + chips.join('') + '</div></td>';
             };
             // 范围列与变化列交错生成
+            // 达标/未达标：仅用单元格底色区分（绿底=达标/红底=未达标，需参考比例且可判定）；命中/未命中：数字比例后跟 ✓（绿）/✗（红），大小与数字一致
             let midHtml = '';
             for (let ci = 0; ci < visibleCount; ci++) {
                 const c = cols[ci];
-                midHtml += '<td class="py-1.5 px-1 text-center">' +
-                    (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
-                    '<div class="flex flex-wrap items-center justify-center gap-0.5 mt-0.5">' +
-                    (c.stat && showMark && rr && c.ok !== null ? badge(c.ok ? '✓ 达标' : '✗ 未达标', c.ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') : '') +
-                    (c.bound ? badge('🔔 命中', 'bg-indigo-100 text-indigo-700') : '') +
-                    '</div></td>';
+                const cellBg = (c.stat && showMark && rr && c.ok !== null) ? (c.ok ? ' bg-green-100' : ' bg-red-100') : '';
+                const hitHtml = c.stat
+                    ? (c.bound
+                        ? '<span class="font-bold text-sm sm:text-base leading-tight text-green-600">✓</span>'
+                        : '<span class="font-bold text-sm sm:text-base leading-tight text-red-600">✗</span>')
+                    : '';
+                midHtml += '<td class="py-1.5 px-1 text-center' + cellBg + '">' +
+                    (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
+                    '</td>';
                 if (ci < visibleCount - 1) midHtml += changeTd(trans[ci]);
             }
             rows += '<tr class="border-b last:border-0 border-gray-100">' +
@@ -9537,7 +9541,7 @@
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
             '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-gray-500">' + headHtml +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：✓ 达标 · ✗ 未达标 · 🔔 命中（绑定断语/宏满足）· ↗ 绑定 / ↘ 解绑（范围切换时的状态变化）</div>';
+            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格绿底=达标 / 红底=未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>';
     }
 
     // 渲染参考比例：精确值数组（多个时折叠展开）/ 区间
