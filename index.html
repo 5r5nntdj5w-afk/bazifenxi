@@ -9185,6 +9185,48 @@
                 // 聚合所有命中规则/宏绑定的相生/相克关系（去重），供关系表 ✓ 标记
                 cache.shenRelBindings = Array.from(new Set(boundRelations));
             }
+            // ===== 参考值模板命局直接匹配（基础匹配条件 + 生克关系喜忌） =====
+            // 模板基础匹配条件被当前命局（范围）满足即命中；命中后按其喜忌规则（触发条件满足时）动态标注喜用/忌讳关系
+            const matchedTplPrefs = [];
+            try {
+                const tplList = (typeof getRefTemplates === 'function') ? (getRefTemplates() || []) : [];
+                tplList.forEach(function(tpl) {
+                    const mc = tpl.matchConditions;
+                    const mcChildren = (mc && mc.children && Array.isArray(mc.children)) ? mc.children : [];
+                    if (!mcChildren.length) return;  // 无基础匹配条件 → 不参与命局直接匹配
+                    const mcGroup = { logic: 'and', children: mcChildren };
+                    let hit = false;
+                    if (shenDims.length === 0) {
+                        hit = evaluateConditionGroup(mcGroup, 0, new Set(), {});
+                    } else {
+                        for (let di = 0; di < shenDims.length; di++) {
+                            const ctx = { shenQzOverride: shenDims[di] };
+                            if (evaluateConditionGroup(mcGroup, 0, new Set(), ctx)) { hit = true; break; }
+                        }
+                    }
+                    if (!hit) return;
+                    // 基础条件命中：评估喜忌规则（触发条件为空 → 恒生效）
+                    const prefs = [];
+                    ((tpl.relationPrefs) || []).forEach(function(p) {
+                        if (!p || !p.relId) return;
+                        let ok = true;
+                        const pcChildren = (p.conds && p.conds.children && Array.isArray(p.conds.children)) ? p.conds.children : [];
+                        if (pcChildren.length) {
+                            ok = evaluateConditionGroup({ logic: 'and', children: pcChildren }, 0, new Set(), {});
+                        }
+                        if (ok) prefs.push({ relId: String(p.relId), pref: p.pref === 'ji' ? 'ji' : 'xi' });
+                    });
+                    if (prefs.length) {
+                        matchedTplPrefs.push({ tplId: String(tpl.cloudId || tpl.id || ''), tplName: tpl.displayName || tpl.name || '', prefs: prefs });
+                    }
+                });
+            } catch (e) { console.warn('模板喜忌匹配失败:', e); }
+            if (opts.scopeIdx !== undefined) {
+                if (!cache.shenTplPrefsByScope) cache.shenTplPrefsByScope = [];
+                cache.shenTplPrefsByScope[opts.scopeIdx] = matchedTplPrefs;
+            } else {
+                cache.shenTplPrefs = matchedTplPrefs;
+            }
             return;
         }
 
@@ -9441,9 +9483,22 @@
         const defs = getRelationDefs();
         const keDefs = defs.filter(function(d) { return d.relType === 'ke'; });
         const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
+        // 模板喜忌（按范围）：scopeIdx -> { 关系DefId: 'xi'|'ji' }（scope0 缺失时回退主缓存）
+        const prefSets = [null, null, null];
+        for (let i = 0; i < 3; i++) {
+            const scList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[i]);
+            const list = (i === 0 && !scList) ? (cache.shenTplPrefs || []) : (scList || []);
+            if (list && list.length) {
+                const map = {};
+                list.forEach(function(tp) {
+                    (tp.prefs || []).forEach(function(p) { if (p && p.relId) map[String(p.relId)] = p.pref === 'ji' ? 'ji' : 'xi'; });
+                });
+                prefSets[i] = map;
+            }
+        }
 
-        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark, visibleCount);
-        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark, visibleCount);
+        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark, visibleCount, prefSets);
+        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark, visibleCount, prefSets);
         return '<div class="bg-white border border-gray-200 rounded-lg p-2">' + keHtml + '</div>' +
                '<div class="bg-white border border-gray-200 rounded-lg p-2">' + shengHtml + '</div>';
     }
@@ -9466,10 +9521,11 @@
 
     // 单张关系对比表：关系列 + 范围列与「状态变化」列交错显示（跟随大运/流年选择）
     // 状态显示（方案A·文字徽章式）：达标 ✓/✗ 徽章 · 命中 🔔 徽章 · 变化 ↗绑定 / ↘解绑 徽章
-    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount) {
+    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount, prefSets) {
         visibleCount = (visibleCount === undefined || visibleCount === null) ? 3 : visibleCount;
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
+        prefSets = prefSets || [null, null, null];
         const boundSets = [];
         for (let i = 0; i < 3; i++) boundSets.push(buildScopeBoundSet(i));
         const changeLabels = ['原局→大运', '大运→流年'];  // 交错插入的状态变化列标题
@@ -9481,6 +9537,22 @@
         defList.forEach(function(def) {
             const defaultName = def.shenA + (isKe ? '克' : '生') + def.shenB;  // 参考比例键（模板按默认名存）
             const rr = relMap[defaultName] || null;
+            // 模板喜忌（列级）：该范围是否命中喜/忌（按关系定义ID匹配）
+            const prefByCol = [];
+            for (let ci = 0; ci < 3; ci++) {
+                const ps = prefSets[ci];
+                prefByCol.push(ps ? (ps[String(def.id)] || '') : '');
+            }
+            // 行级喜忌徽章（任一可见范围命中 → 行徽章 + 行背景）
+            let rowHasXi = false, rowHasJi = false;
+            for (let ci = 0; ci < visibleCount; ci++) {
+                if (prefByCol[ci] === 'xi') rowHasXi = true;
+                else if (prefByCol[ci] === 'ji') rowHasJi = true;
+            }
+            let rowBadges = '';
+            if (rowHasXi) rowBadges += badge('喜', 'bg-emerald-100 text-emerald-700');
+            if (rowHasJi) rowBadges += badge('忌', 'bg-rose-100 text-rose-700');
+            const rowBg = (rowHasXi && !rowHasJi) ? ' bg-emerald-50' : (rowHasJi && !rowHasXi) ? ' bg-rose-50' : '';
             // 各列状态：{ ok: 达标bool|null, bound: 绑定bool }
             const cols = scopes.map(function(sc, ci) {
                 const st = sc.stats;
@@ -9512,7 +9584,7 @@
                 return '<td class="py-1.5 px-1 text-center align-middle"><div class="flex flex-col gap-0.5 items-center">' + chips.join('') + '</div></td>';
             };
             // 范围列与变化列交错生成
-            // 达标/未达标：仅用单元格底色区分（绿底=达标/红底=未达标，需参考比例且可判定）；命中/未命中：数字比例后跟 ✓（绿）/✗（红），大小与数字一致
+            // 达标/未达标：仅用单元格底色区分（绿底=达标/红底=未达标，需参考比例且可判定）；命中/未命中：数字比例后跟 ✓（绿）/✗（红）
             let midHtml = '';
             for (let ci = 0; ci < visibleCount; ci++) {
                 const c = cols[ci];
@@ -9522,14 +9594,17 @@
                         ? '<span class="font-bold text-sm sm:text-base leading-tight text-green-600">✓</span>'
                         : '<span class="font-bold text-sm sm:text-base leading-tight text-red-600">✗</span>')
                     : '';
+                // 列级喜忌小徽章（该范围命中模板喜/忌时显示）
+                const prefMark = prefByCol[ci] ? badge(prefByCol[ci] === 'xi' ? '喜' : '忌', prefByCol[ci] === 'xi' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700') : '';
                 midHtml += '<td class="py-1.5 px-1 text-center' + cellBg + '">' +
                     (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
+                    (prefMark ? '<div class="mt-0.5">' + prefMark + '</div>' : '') +
                     '</td>';
                 if (ci < visibleCount - 1) midHtml += changeTd(trans[ci]);
             }
-            rows += '<tr class="border-b last:border-0 border-gray-100">' +
+            rows += '<tr class="border-b last:border-0 border-gray-100' + rowBg + '">' +
                 '<td class="py-1.5 pl-1 pr-1">' +
-                '<div class="font-bold text-sm sm:text-base leading-tight ' + relNameColor + '">' + escapeHtml(def.name) + '</div>' +
+                '<div class="font-bold text-sm sm:text-base leading-tight ' + relNameColor + '">' + escapeHtml(def.name) + (rowBadges ? ' ' + rowBadges : '') + '</div>' +
                 '<div class="text-[11px] text-gray-400 leading-tight mt-0.5">' + (rr ? '参考 ' + renderRefRatio(rr) : (def.builtin ? '' : '自定义·无参考')) + '</div>' +
                 '</td>' + midHtml + '</tr>';
         });
@@ -9542,7 +9617,7 @@
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
             '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-gray-500">' + headHtml +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格绿底=达标 / 红底=未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>';
+            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格绿底=达标 / 红底=未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · 喜/忌=参考值模板喜忌关系标注（绿=喜用，红=忌讳，随范围动态变化）· ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>';
     }
 
     // 渲染参考比例：精确值数组（多个时折叠展开）/ 区间
@@ -9630,6 +9705,7 @@
             const scopeData = buildScopeData(data);
             cache.shenRefRulesByScope = [];
             cache.shenRelBindingsByScope = [];
+            cache.shenTplPrefsByScope = [];
             for (let i = 0; i < scopeData.length; i++) {
                 // 继承出生信息/有效年龄，保证年龄类条件在范围评估中与主评估一致
                 if (data.hasBirthData !== undefined) scopeData[i].hasBirthData = data.hasBirthData;
@@ -9676,7 +9752,7 @@
                 .order('update_time', { ascending: false });
             if (error) throw error;
             const list = (data || []).map(function(r) {
-                return { id: r.id, cloudId: r.id, name: r.name || '', displayName: r.display_name || '', values: r.values || {}, relationRefs: r.relation_refs || [] };
+                return { id: r.id, cloudId: r.id, name: r.name || '', displayName: r.display_name || '', values: r.values || {}, relationRefs: r.relation_refs || [], matchConditions: r.match_conditions || {}, relationPrefs: r.relation_prefs || [] };
             });
             cache.refTemplates = list;
             saveLocalRefTemplates(list);
@@ -9873,6 +9949,107 @@
                 }
             });
         }
+        // 基础匹配条件回填
+        const mBox = document.getElementById('ref-tpl-match-box');
+        if (mBox) {
+            mBox.innerHTML = '';
+            const mc = (tpl && tpl.matchConditions) || {};
+            const mcChildren = (mc && mc.children && Array.isArray(mc.children)) ? mc.children : [];
+            mcChildren.forEach(function(cond) { mBox.appendChild(createRefTplCondRow(cond)); });
+        }
+        // 生克关系喜忌回填
+        const pBox = document.getElementById('ref-tpl-prefs-box');
+        if (pBox) {
+            pBox.innerHTML = '';
+            const prefs = (tpl && tpl.relationPrefs) || [];
+            prefs.forEach(function(p) { pBox.appendChild(createRefTplPrefRow(p)); });
+        }
+    }
+    // ---- 基础匹配条件 / 喜忌规则 编辑辅助 ----
+    // 字段下拉选项（复用 field_config 字段：分组显示；未加载时回退十神数量字段）
+    function refTplFieldOptionsHtml(selected) {
+        let fields = [];
+        try { if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) fields = _fieldConfigCache; } catch (e) { fields = []; }
+        if (!fields.length) {
+            return GROUPED_SHEN.map(function(g) {
+                const v = '十神数量-' + g;
+                return '<option value="' + v + '"' + (String(v) === String(selected) ? ' selected' : '') + '>' + g + '数量</option>';
+            }).join('');
+        }
+        const groups = {};
+        fields.forEach(function(f) { const g = f.group_label || '其他'; (groups[g] = groups[g] || []).push(f); });
+        let html = '';
+        Object.keys(groups).forEach(function(g) {
+            html += '<optgroup label="' + escapeHtml(g) + '">' + groups[g].map(function(f) {
+                return '<option value="' + escapeHtml(f.field_value) + '"' + (String(f.field_value) === String(selected) ? ' selected' : '') + '>' + escapeHtml(f.field_name) + '</option>';
+            }).join('') + '</optgroup>';
+        });
+        return html;
+    }
+    // 关系下拉选项（喜忌规则关联关系：相克/相生分组）
+    function refTplRelOptionsHtml(selected) {
+        let defs = [];
+        try { if (typeof getRelationDefs === 'function') defs = getRelationDefs() || []; } catch (e) { defs = []; }
+        const opt = function(list) {
+            return list.map(function(d) {
+                return '<option value="' + d.id + '"' + (String(d.id) === String(selected) ? ' selected' : '') + '>' + escapeHtml(d.name) + '</option>';
+            }).join('');
+        };
+        return '<optgroup label="相克">' + opt(defs.filter(function(d) { return d.relType === 'ke'; })) + '</optgroup>' +
+            '<optgroup label="相生">' + opt(defs.filter(function(d) { return d.relType === 'sheng'; })) + '</optgroup>';
+    }
+    // 条件行（字段 + 运算符 + 值），用于基础匹配条件与喜忌触发条件
+    function createRefTplCondRow(cond) {
+        const row = document.createElement('div');
+        row.className = 'ref-tpl-cond-row flex flex-wrap items-center gap-1.5 bg-white rounded px-2 py-1';
+        row.innerHTML =
+            '<select class="rtf-field text-sm p-1.5 border rounded flex-1 min-w-[160px]">' + refTplFieldOptionsHtml(cond && cond.field) + '</select>' +
+            '<select class="rtf-op text-sm p-1.5 border rounded">' +
+            '<option value="eq"' + ((cond && cond.op) === 'eq' ? ' selected' : '') + '>=（等于）</option>' +
+            '<option value="ne"' + ((cond && cond.op) === 'ne' ? ' selected' : '') + '>≠（不等于）</option>' +
+            '<option value="ge"' + ((cond && cond.op) === 'ge' ? ' selected' : '') + '>≥（不低于）</option>' +
+            '<option value="gt"' + ((cond && cond.op) === 'gt' ? ' selected' : '') + '>＞（大于）</option>' +
+            '<option value="le"' + ((cond && cond.op) === 'le' ? ' selected' : '') + '>≤（不高于）</option>' +
+            '<option value="lt"' + ((cond && cond.op) === 'lt' ? ' selected' : '') + '>＜（小于）</option>' +
+            '</select>' +
+            '<input class="rtf-val flex-1 min-w-[90px] text-sm p-1.5 border rounded" placeholder="值（如 食伤 / 2）" value="' + escapeHtml((cond && cond.val !== undefined) ? cond.val : '') + '">' +
+            '<button type="button" class="text-red-500 text-sm px-1 shrink-0" title="删除该条件" onclick="this.closest(\'.ref-tpl-cond-row\').remove()">✕</button>';
+        return row;
+    }
+    function addRefTplMatchCond() {
+        const box = document.getElementById('ref-tpl-match-box');
+        if (box) box.appendChild(createRefTplCondRow(null));
+    }
+    // 喜忌规则行（喜/忌 + 关联关系 + 触发条件列表）
+    function createRefTplPrefRow(p) {
+        const row = document.createElement('div');
+        row.className = 'ref-tpl-pref-row bg-white border border-rose-100 rounded p-2';
+        row.innerHTML =
+            '<div class="flex flex-wrap items-center gap-2 mb-1">' +
+            '<span class="text-xs font-bold text-gray-600">喜忌：</span>' +
+            '<select class="rtp-pref text-sm p-1 border rounded">' +
+            '<option value="xi"' + ((!p || p.pref === 'xi') ? ' selected' : '') + '>喜（喜欢此关系）</option>' +
+            '<option value="ji"' + (p && p.pref === 'ji' ? ' selected' : '') + '>忌（忌讳此关系）</option>' +
+            '</select>' +
+            '<span class="text-xs font-bold text-gray-600">关联关系：</span>' +
+            '<select class="rtp-rel flex-1 min-w-[160px] text-sm p-1 border rounded">' + refTplRelOptionsHtml(p && p.relId) + '</select>' +
+            '<button type="button" class="text-red-500 text-sm px-1 shrink-0" onclick="this.closest(\'.ref-tpl-pref-row\').remove()">✕ 删除</button>' +
+            '</div>' +
+            '<div class="text-xs text-gray-500 mb-1">触发条件（可多条，全部满足时生效；不添加则恒生效）：</div>' +
+            '<div class="rtp-conds space-y-1"></div>' +
+            '<button type="button" onclick="addRefTplPrefCond(this)" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs mt-1">➕ 添加触发条件</button>';
+        const condsBox = row.querySelector('.rtp-conds');
+        const pConds = (p && p.conds && p.conds.children && Array.isArray(p.conds.children)) ? p.conds.children : [];
+        pConds.forEach(function(cond) { condsBox.appendChild(createRefTplCondRow(cond)); });
+        return row;
+    }
+    function addRefTplPrefRule() {
+        const box = document.getElementById('ref-tpl-prefs-box');
+        if (box) box.appendChild(createRefTplPrefRow(null));
+    }
+    function addRefTplPrefCond(btn) {
+        const box = btn.closest('.ref-tpl-pref-row');
+        if (box) box.querySelector('.rtp-conds').appendChild(createRefTplCondRow(null));
     }
     // 收集模板编辑视图的输入（保存时调用）
     function collectRefTemplateEditor() {
@@ -9920,6 +10097,30 @@
             if (exactVals.length) relationRefs.push({ relation: relation, type: 'eq', values: exactVals });
         });
         if (relationRefs.length) ro.relationRefs = relationRefs;
+        // 基础匹配条件收集（AND 组合）
+        const matchChildren = [];
+        document.querySelectorAll('#ref-tpl-match-box .ref-tpl-cond-row').forEach(function(row) {
+            const field = row.querySelector('.rtf-field').value.trim();
+            const op = row.querySelector('.rtf-op').value;
+            const val = row.querySelector('.rtf-val').value.trim();
+            if (field && val !== '') matchChildren.push({ field: field, op: op, val: val });
+        });
+        if (matchChildren.length) ro.matchConditions = { logic: 'and', children: matchChildren };
+        // 生克关系喜忌收集（每条 = 喜/忌 + 关联关系 + 触发条件）
+        const prefs = [];
+        document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').forEach(function(row) {
+            const relId = row.querySelector('.rtp-rel').value;
+            if (!relId) return;
+            const conds = [];
+            row.querySelectorAll('.rtp-conds .ref-tpl-cond-row').forEach(function(crow) {
+                const field = crow.querySelector('.rtf-field').value.trim();
+                const op = crow.querySelector('.rtf-op').value;
+                const val = crow.querySelector('.rtf-val').value.trim();
+                if (field && val !== '') conds.push({ field: field, op: op, val: val });
+            });
+            prefs.push({ pref: row.querySelector('.rtp-pref').value === 'ji' ? 'ji' : 'xi', relId: relId, conds: conds.length ? { logic: 'and', children: conds } : { logic: 'and', children: [] } });
+        });
+        if (prefs.length) ro.relationPrefs = prefs;
         return Object.keys(ro).length ? ro : null;
     }
     // 保存模板（新建/更新到云端）
@@ -9932,7 +10133,9 @@
             name: name,
             display_name: document.getElementById('ref-tpl-display-name').value.trim(),
             values: content.values || {},
-            relation_refs: content.relationRefs || []
+            relation_refs: content.relationRefs || [],
+            match_conditions: content.matchConditions || {},
+            relation_prefs: content.relationPrefs || []
         };
         try {
             if (_editingRefTplId) {
@@ -32211,6 +32414,16 @@ document.addEventListener('DOMContentLoaded', function() {
             <details class="mb-3">
                 <summary class="text-sm text-amber-700 font-medium cursor-pointer select-none">🔗 关联关系参考比例（可选：用于相生/相克表标注与高亮，支持多个精确值或区间）</summary>
                 <div id="ref-tpl-relations-box" class="mt-1 space-y-1"></div>
+            </details>
+            <details class="mb-3">
+                <summary class="text-sm text-sky-700 font-medium cursor-pointer select-none">🧩 基础匹配条件（可选：命局直接匹配本模板的判定条件，如 月支十神 = 食伤；不配置则本模板不参与命局直接匹配）</summary>
+                <div id="ref-tpl-match-box" class="mt-1 space-y-1"></div>
+                <button type="button" onclick="addRefTplMatchCond()" class="mt-1 px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded text-sm">➕ 添加条件</button>
+            </details>
+            <details class="mb-3">
+                <summary class="text-sm text-rose-700 font-medium cursor-pointer select-none">⚖️ 生克关系喜忌（可选：模板命中后，命局满足某条件时在相克/相生表中标注对应关系，如 财星弱 → 喜「食伤生财」）</summary>
+                <div id="ref-tpl-prefs-box" class="mt-1 space-y-2"></div>
+                <button type="button" onclick="addRefTplPrefRule()" class="mt-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-sm">➕ 添加喜忌规则</button>
             </details>
             <div class="flex gap-2">
                 <button onclick="saveRefTemplate()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base">💾 保存模板</button>
