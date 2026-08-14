@@ -4465,6 +4465,8 @@
         // 初始化参考值模板选择器（断语/条件宏编辑器）并加载云端模板（非阻塞）
         if (typeof initRefTplPickers === 'function') initRefTplPickers();
         if (typeof loadRefTemplatesFromCloud === 'function') loadRefTemplatesFromCloud();
+        // 加载云端关联关系参考比例预设库（非阻塞）
+        if (typeof loadRelRatioPresetsFromCloud === 'function') loadRelRatioPresetsFromCloud();
         // 加载云端生克关系定义（自定义关系/重命名，非阻塞）
         if (typeof loadRelationDefsFromCloud === 'function') loadRelationDefsFromCloud();
         initGroupKeyCombo();
@@ -9465,7 +9467,11 @@
         const relMap = {};  // 默认关系名（A克B / A生B） -> 参考比例配置（参考值模板按默认名存键，重命名不受影响）
         if (selRef && selRef._resolved && Array.isArray(selRef._resolved.relationRefs)) {
             selRef._resolved.relationRefs.forEach(function(rr) {
-                if (rr && rr.relation) relMap[rr.relation] = rr;
+                // 支持预设引用：实时解析预设值（修改预设后自动套用到所有复用关系）；预设缺失时忽略该条
+                if (rr && rr.relation) {
+                    const resolved = (typeof resolveRelRatio === 'function') ? resolveRelRatio(rr) : rr;
+                    if (resolved) relMap[rr.relation] = resolved;
+                }
             });
         }
         // 三范围（原局 → 原局+大运 → 原局+大运+流年）：优先使用三范围统计缓存，缺失时第1列回退当前统计
@@ -9764,6 +9770,78 @@
             cache.refTemplates = loadLocalRefTemplates();
         }
     }
+    // ============ 关联关系参考比例预设库（可复用比例集合，不绑定具体生克关系） ============
+    // 预设存纯数值（精确值集合或区间），参考值模板的关联关系参考比例可引用预设；
+    // 保存时只存 presetId，渲染时实时解析 → 修改预设后所有复用该预设的关系自动生效。
+    function loadLocalRelRatioPresets() {
+        try { return JSON.parse(localStorage.getItem('bazi_rel_ratio_presets') || '[]'); } catch (e) { return []; }
+    }
+    function saveLocalRelRatioPresets(list) {
+        try { localStorage.setItem('bazi_rel_ratio_presets', JSON.stringify(list)); } catch (e) {}
+    }
+    function getRelRatioPresets() {
+        if (!cache.relRatioPresets) cache.relRatioPresets = loadLocalRelRatioPresets();
+        return cache.relRatioPresets;
+    }
+    function getRelRatioPresetById(id) {
+        if (!id) return null;
+        return (getRelRatioPresets() || []).find(function(p) {
+            return String(p.cloudId) === String(id) || String(p.id) === String(id);
+        }) || null;
+    }
+    async function loadRelRatioPresetsFromCloud() {
+        if (!supabaseClient) { cache.relRatioPresets = loadLocalRelRatioPresets(); return; }
+        try {
+            const { data: ud } = await supabaseClient.auth.getUser();
+            if (!ud || !ud.user) { cache.relRatioPresets = loadLocalRelRatioPresets(); return; }
+            const { data, error } = await supabaseClient
+                .from('relation_ratio_presets')
+                .select('*')
+                .order('update_time', { ascending: false });
+            if (error) throw error;
+            const list = (data || []).map(function(r) {
+                return {
+                    id: r.id, cloudId: r.id,
+                    name: r.name || '',
+                    presetType: r.preset_type || 'eq',
+                    values: r.values || [],
+                    min: r.min || null,
+                    max: r.max || null
+                };
+            });
+            cache.relRatioPresets = list;
+            saveLocalRelRatioPresets(list);
+        } catch (e) {
+            console.warn('比例预设加载失败:', e);
+            cache.relRatioPresets = loadLocalRelRatioPresets();
+        }
+    }
+    // 解析关系参考比例配置（含预设引用）：返回可直接用于达标判断/展示的 {type, values, min, max}
+    // 无 presetId 时原样返回；有 presetId 但预设缺失时返回 null（视为参考比例缺失）
+    function resolveRelRatio(rr) {
+        if (!rr) return null;
+        if (rr.presetId) {
+            const p = getRelRatioPresetById(rr.presetId);
+            if (!p) return null;
+            if (p.presetType === 'range') {
+                return { type: 'range', min: p.min || null, max: p.max || null, presetId: rr.presetId };
+            }
+            return { type: 'eq', values: (p.values || []).slice(), presetId: rr.presetId };
+        }
+        return { type: rr.type, values: rr.values || [], value: rr.value, min: rr.min, max: rr.max };
+    }
+    // 预设摘要（管理列表与选择器中展示）
+    function relRatioPresetSummary(p) {
+        if (!p) return '';
+        if (p.presetType === 'range' && p.min && p.max) {
+            return fmtRatio(p.min) + ' ~ ' + fmtRatio(p.max);
+        }
+        const vals = (p.values || []).filter(function(v) { return v && !(v.n === 0 && v.d === 0); });
+        if (!vals.length) return '空';
+        if (vals.length === 1) return fmtRatio(vals[0]);
+        return vals.map(fmtRatio).join('、') + '（共' + vals.length + '个）';
+    }
+
     // 解析断语/宏的 referenceOutput：模板引用实时解析；兼容旧版内嵌 values/relationRefs 格式
     function resolveRefOutput(ro) {
         if (!ro) return null;
@@ -9786,7 +9864,8 @@
             return g + ':' + v.value;
         }).filter(Boolean);
         const relCnt = ((tpl && tpl.relationRefs) || []).length;
-        const relTxt = relCnt ? '，关系' + relCnt + '组' : '';
+        const presetCnt = ((tpl && tpl.relationRefs) || []).filter(function(r) { return r && r.presetId; }).length;
+        const relTxt = relCnt ? '，关系' + relCnt + '组' + (presetCnt ? '（预设' + presetCnt + '组）' : '') : '';
         return (parts.length ? parts.join('、') : '未配置十神参考值') + relTxt;
     }
 
@@ -9927,11 +10006,14 @@
             SHEN_SHENG_LIST.forEach(function(p) { rels.push(p[0] + '生' + p[1]); });
             let html = '';
             rels.forEach(function(rel) {
-                html += '<div class="ref-rel-row bg-white rounded px-2 py-1" data-rel="' + rel + '">' +
+                html += '<div class="ref-rel-row bg-white rounded px-2 py-1" data-rel="' + rel + '" data-preset-id="">' +
                     '<div class="flex flex-wrap items-center gap-1">' +
                     '<span class="text-sm font-medium text-gray-700 w-24">' + rel + '</span>' +
-                    '<button type="button" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600" onclick="addRefRelValue(this)">+ 精确值</button>' +
-                    '<button type="button" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600" onclick="addRefRelRange(this)">+ 区间</button>' +
+                    '<button type="button" class="ref-rel-add-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600" onclick="addRefRelValue(this)">+ 精确值</button>' +
+                    '<button type="button" class="ref-rel-add-btn px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600" onclick="addRefRelRange(this)">+ 区间</button>' +
+                    '<button type="button" class="px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded text-xs text-amber-700" onclick="openRelRatioPresetPicker(this)">📋 选预设</button>' +
+                    '<button type="button" class="px-2 py-1 bg-sky-50 hover:bg-sky-100 rounded text-xs text-sky-600" onclick="saveRowAsRelRatioPreset(this)">💾 存为预设</button>' +
+                    '<span class="ref-rel-preset-badge hidden items-center gap-1"></span>' +
                     '</div>' +
                     '<div class="ref-rel-vals flex flex-wrap gap-1 mt-1"></div>' +
                     '</div>';
@@ -9941,6 +10023,13 @@
                 if (!rr || !rr.relation) return;
                 const row = rBox.querySelector('.ref-rel-row[data-rel="' + rr.relation + '"]');
                 if (!row) return;
+                if (rr.presetId) {
+                    const preset = getRelRatioPresetById(rr.presetId);
+                    if (preset) { applyRelRatioPresetToRow(row, preset); return; }
+                    // 预设缺失：显示缺失提示
+                    row.querySelector('.ref-rel-vals').innerHTML = '<span class="text-xs text-red-500">⚠ 引用的比例预设已缺失，请重新选择</span>';
+                    return;
+                }
                 const valsBox = row.querySelector('.ref-rel-vals');
                 if (rr.type === 'range' && rr.min && rr.max) {
                     valsBox.appendChild(createRefRelRangeItem(rr.min.n, rr.min.d, rr.max.n, rr.max.d));
@@ -9955,7 +10044,7 @@
             mBox.innerHTML = '';
             const mc = (tpl && tpl.matchConditions) || {};
             const mcChildren = (mc && mc.children && Array.isArray(mc.children)) ? mc.children : [];
-            mcChildren.forEach(function(cond) { mBox.appendChild(createRefTplCondRow(cond)); });
+            mcChildren.forEach(function(cond) { appendRefTplCond(mBox, cond); });
         }
         // 生克关系喜忌回填
         const pBox = document.getElementById('ref-tpl-prefs-box');
@@ -10003,6 +10092,23 @@
         return '<optgroup label="相克">' + opt(defs.filter(function(d) { return d.relType === 'ke'; })) + '</optgroup>' +
             '<optgroup label="相生">' + opt(defs.filter(function(d) { return d.relType === 'sheng'; })) + '</optgroup>';
     }
+    // 宏引用节点（基础匹配条件 / 喜忌触发条件中引用条件宏）
+    function createRefTplMacroRefItem(refId, refName) {
+        const item = document.createElement('div');
+        item.className = 'condition-item macro-ref-item flex items-center gap-2 mb-2 p-2 bg-indigo-100 border border-indigo-300 rounded';
+        item.innerHTML =
+            '<span class="text-xs font-bold text-indigo-700">🧩 宏：' + escapeHtml(refName || refId || '') + '</span>' +
+            '<input type="hidden" class="macro-ref-id" value="' + escapeHtml(refId || '') + '">' +
+            '<input type="hidden" class="macro-ref-name" value="' + escapeHtml(refName || '') + '">' +
+            '<button type="button" class="ml-auto text-red-500 hover:text-red-700 text-sm font-bold" onclick="this.closest(\'.condition-item\').remove()">&times;</button>';
+        return item;
+    }
+    // 按节点类型渲染条件（字段条件行 / 宏引用节点）并追加到容器
+    function appendRefTplCond(container, cond) {
+        if (!container) return;
+        if (cond && cond.macroRef) container.appendChild(createRefTplMacroRefItem(cond.macroRef, cond.macroName));
+        else container.appendChild(createRefTplCondRow(cond));
+    }
     // 条件行（字段[分组+搜索选择器] + 运算符 + 值），用于基础匹配条件与喜忌触发条件
     function createRefTplCondRow(cond) {
         const row = document.createElement('div');
@@ -10039,6 +10145,19 @@
         const box = document.getElementById('ref-tpl-match-box');
         if (box) box.appendChild(createRefTplCondRow(null));
     }
+    // 模板编辑器插入条件宏：kind='match' → 基础匹配条件容器；kind='pref' → 当前喜忌规则的触发条件容器
+    function openRefTplMacroSelector(btn, kind) {
+        let target = null;
+        if (kind === 'match') {
+            target = document.getElementById('ref-tpl-match-box');
+        } else if (kind === 'pref') {
+            const row = btn.closest('.ref-tpl-pref-row');
+            if (row) target = row.querySelector('.rtp-conds');
+        }
+        if (!target) return;
+        window._lastGroupChildren = null;  // 防止残留的断语/宏编辑器插入位置导致错位
+        openMacroSelector(target, null);
+    }
     // 喜忌规则行（喜/忌 + 关联关系 + 触发条件列表）
     function createRefTplPrefRow(p) {
         const row = document.createElement('div');
@@ -10056,10 +10175,13 @@
             '</div>' +
             '<div class="text-xs text-gray-500 mb-1">触发条件（可多条，全部满足时生效；不添加则恒生效）：</div>' +
             '<div class="rtp-conds space-y-1"></div>' +
-            '<button type="button" onclick="addRefTplPrefCond(this)" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs mt-1">➕ 添加触发条件</button>';
+            '<div class="flex gap-1.5 flex-wrap">' +
+            '<button type="button" onclick="addRefTplPrefCond(this)" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs mt-1">➕ 添加触发条件</button>' +
+            '<button type="button" onclick="openRefTplMacroSelector(this, \'pref\')" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs mt-1">🧩 插入条件宏</button>' +
+            '</div>';
         const condsBox = row.querySelector('.rtp-conds');
         const pConds = (p && p.conds && p.conds.children && Array.isArray(p.conds.children)) ? p.conds.children : [];
-        pConds.forEach(function(cond) { condsBox.appendChild(createRefTplCondRow(cond)); });
+        pConds.forEach(function(cond) { appendRefTplCond(condsBox, cond); });
         return row;
     }
     function addRefTplPrefRule() {
@@ -10069,6 +10191,26 @@
     function addRefTplPrefCond(btn) {
         const box = btn.closest('.ref-tpl-pref-row');
         if (box) box.querySelector('.rtp-conds').appendChild(createRefTplCondRow(null));
+    }
+    // 收集模板编辑器中的条件列表（字段条件行 + 宏引用节点，按 DOM 顺序）
+    function collectRefTplConds(container) {
+        const children = [];
+        if (!container) return children;
+        container.querySelectorAll(':scope > .ref-tpl-cond-row, :scope > .macro-ref-item').forEach(function(node) {
+            if (node.classList.contains('macro-ref-item')) {
+                const refId = node.querySelector('.macro-ref-id') ? node.querySelector('.macro-ref-id').value : '';
+                if (refId) {
+                    const refName = node.querySelector('.macro-ref-name') ? node.querySelector('.macro-ref-name').value : '';
+                    children.push({ macroRef: refId, macroName: refName || '' });
+                }
+                return;
+            }
+            const field = node.querySelector('.rtf-field') ? node.querySelector('.rtf-field').value.trim() : '';
+            const op = node.querySelector('.rtf-op') ? node.querySelector('.rtf-op').value : '';
+            const val = node.querySelector('.rtf-val') ? node.querySelector('.rtf-val').value.trim() : '';
+            if (field && val !== '') children.push({ field: field, op: op, val: val });
+        });
+        return children;
     }
     // 收集模板编辑视图的输入（保存时调用）
     function collectRefTemplateEditor() {
@@ -10096,6 +10238,13 @@
         const relationRefs = [];
         document.querySelectorAll('#ref-tpl-relations-box .ref-rel-row').forEach(function(row) {
             const relation = row.dataset.rel;
+            // 预设引用：存 presetId（渲染时实时解析预设值，修改预设自动套用）
+            const presetId = row.dataset.presetId;
+            if (presetId) {
+                const preset = getRelRatioPresetById(presetId);
+                if (preset) relationRefs.push({ relation: relation, type: preset.presetType, presetId: String(preset.cloudId || preset.id) });
+                return;
+            }
             const rangeItem = row.querySelector('.ref-rel-vals > .ref-range-item');
             if (rangeItem) {
                 const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
@@ -10117,26 +10266,14 @@
         });
         if (relationRefs.length) ro.relationRefs = relationRefs;
         // 基础匹配条件收集（AND 组合；无有效条件行时写空结构，覆盖旧值 → 不参与命局直接匹配）
-        const matchChildren = [];
-        document.querySelectorAll('#ref-tpl-match-box .ref-tpl-cond-row').forEach(function(row) {
-            const field = row.querySelector('.rtf-field').value.trim();
-            const op = row.querySelector('.rtf-op').value;
-            const val = row.querySelector('.rtf-val').value.trim();
-            if (field && val !== '') matchChildren.push({ field: field, op: op, val: val });
-        });
+        const matchChildren = collectRefTplConds(document.getElementById('ref-tpl-match-box'));
         ro.matchConditions = { logic: 'and', children: matchChildren };
         // 生克关系喜忌收集（每条 = 喜/忌 + 关联关系 + 触发条件；无有效规则时写空数组，覆盖旧值）
         const prefs = [];
         document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').forEach(function(row) {
             const relId = row.querySelector('.rtp-rel').value;
             if (!relId) return;
-            const conds = [];
-            row.querySelectorAll('.rtp-conds .ref-tpl-cond-row').forEach(function(crow) {
-                const field = crow.querySelector('.rtf-field').value.trim();
-                const op = crow.querySelector('.rtf-op').value;
-                const val = crow.querySelector('.rtf-val').value.trim();
-                if (field && val !== '') conds.push({ field: field, op: op, val: val });
-            });
+            const conds = collectRefTplConds(row.querySelector('.rtp-conds'));
             prefs.push({ pref: row.querySelector('.rtp-pref').value === 'ji' ? 'ji' : 'xi', relId: relId, conds: conds.length ? { logic: 'and', children: conds } : { logic: 'and', children: [] } });
         });
         ro.relationPrefs = prefs;
@@ -10570,6 +10707,269 @@
             '<input type="number" class="ref-max-d text-sm p-1 border rounded" placeholder="分母" style="width:48px" value="' + maxD + '">' +
             '<button type="button" class="text-red-400 hover:text-red-600 text-sm px-1" onclick="this.parentElement.remove()">×</button>';
         return div;
+    }
+
+    // ============ 关联关系参考比例预设：套用/解除/选择/存为预设 ============
+    // 将预设套用到某关系行：显示预设徽章 + 只读预览解析值，禁用手动添加按钮
+    function applyRelRatioPresetToRow(row, preset) {
+        if (!row || !preset) return;
+        row.dataset.presetId = String(preset.cloudId || preset.id);
+        const badge = row.querySelector('.ref-rel-preset-badge');
+        if (badge) {
+            badge.classList.remove('hidden');
+            badge.classList.add('inline-flex');
+            badge.innerHTML = '<span class="text-xs font-bold text-amber-700">📦 预设：' + escapeHtml(preset.name) + '</span>' +
+                '<button type="button" class="px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-xs" onclick="clearRelRatioPresetFromRow(this)">解除</button>';
+        }
+        row.querySelectorAll('.ref-rel-add-btn').forEach(function(b) { b.disabled = true; b.classList.add('opacity-50', 'cursor-not-allowed'); });
+        const valsBox = row.querySelector('.ref-rel-vals');
+        if (valsBox) {
+            valsBox.innerHTML = '';
+            const preview = document.createElement('div');
+            preview.className = 'text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-1';
+            preview.textContent = preset.presetType === 'range'
+                ? '区间：' + fmtRatio(preset.min) + ' ~ ' + fmtRatio(preset.max)
+                : '精确值：' + (preset.values || []).map(fmtRatio).join('、');
+            valsBox.appendChild(preview);
+        }
+    }
+    function clearRelRatioPresetFromRow(btn) {
+        const row = btn.closest('.ref-rel-row');
+        if (!row) return;
+        delete row.dataset.presetId;
+        const badge = row.querySelector('.ref-rel-preset-badge');
+        if (badge) { badge.classList.add('hidden'); badge.classList.remove('inline-flex'); badge.innerHTML = ''; }
+        row.querySelectorAll('.ref-rel-add-btn').forEach(function(b) { b.disabled = false; b.classList.remove('opacity-50', 'cursor-not-allowed'); });
+        const valsBox = row.querySelector('.ref-rel-vals');
+        if (valsBox) valsBox.innerHTML = '';
+    }
+    // 预设选择器
+    var _refRelPresetPickerTarget = null;
+    function openRelRatioPresetPicker(btn) {
+        const row = btn.closest('.ref-rel-row');
+        if (!row) return;
+        _refRelPresetPickerTarget = row;
+        const container = document.getElementById('rel-ratio-preset-picker-list');
+        if (!container) return;
+        const list = getRelRatioPresets();
+        if (!list.length) {
+            container.innerHTML = '<p class="text-gray-400 text-center py-4">暂无比例预设，请先到模板列表页点「📦 比例预设库」创建</p>';
+        } else {
+            container.innerHTML = list.map(function(p) {
+                const badge = p.presetType === 'range'
+                    ? '<span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1 py-0.5">区间</span>'
+                    : '<span class="text-[10px] bg-sky-100 text-sky-700 rounded px-1 py-0.5">精确值</span>';
+                return '<div class="border border-amber-200 rounded-lg p-3 mb-2 cursor-pointer hover:bg-amber-50" onclick="pickRelRatioPresetToRow(\'' + (p.cloudId || p.id) + '\')">' +
+                    '<div class="font-medium text-amber-800">📦 ' + escapeHtml(p.name) + ' ' + badge + '</div>' +
+                    '<div class="text-xs text-gray-500 mt-1">' + escapeHtml(relRatioPresetSummary(p)) + '</div>' +
+                    '</div>';
+            }).join('');
+        }
+        document.getElementById('rel-ratio-preset-picker-modal').classList.remove('hidden');
+    }
+    function pickRelRatioPresetToRow(presetId) {
+        const preset = getRelRatioPresetById(presetId);
+        const row = _refRelPresetPickerTarget;
+        const modal = document.getElementById('rel-ratio-preset-picker-modal');
+        if (modal) modal.classList.add('hidden');
+        _refRelPresetPickerTarget = null;
+        if (preset && row) applyRelRatioPresetToRow(row, preset);
+    }
+    function closeRelRatioPresetPicker() {
+        const modal = document.getElementById('rel-ratio-preset-picker-modal');
+        if (modal) modal.classList.add('hidden');
+        _refRelPresetPickerTarget = null;
+    }
+    // 将当前关系行的值保存为新预设并自动套用
+    async function saveRowAsRelRatioPreset(btn) {
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再保存比例预设！'); return; }
+        const row = btn.closest('.ref-rel-row');
+        if (!row) return;
+        const rangeItem = row.querySelector('.ref-rel-vals > .ref-range-item');
+        let presetType = 'eq', values = [], min = null, max = null;
+        if (rangeItem) {
+            const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
+            const minD = parseInt(rangeItem.querySelector('.ref-min-d').value);
+            const maxN = parseInt(rangeItem.querySelector('.ref-max-n').value);
+            const maxD = parseInt(rangeItem.querySelector('.ref-max-d').value);
+            if (isNaN(minN) || isNaN(minD) || isNaN(maxN) || isNaN(maxD) || (minN === 0 && minD === 0)) { alert('请先填写有效的区间比例！'); return; }
+            presetType = 'range';
+            min = { n: minN, d: minD }; max = { n: maxN, d: maxD };
+        } else {
+            row.querySelectorAll('.ref-rel-vals > div:not(.ref-range-item)').forEach(function(item) {
+                const n = parseInt(item.querySelector('.ref-n').value);
+                const d = parseInt(item.querySelector('.ref-d').value);
+                if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) values.push({ n: n, d: d });
+            });
+            if (!values.length) { alert('请先添加至少一个精确值比例！'); return; }
+        }
+        const name = prompt('请输入预设名称（如：十神相克精确值集合A）：');
+        if (!name || !name.trim()) return;
+        const record = { name: name.trim(), preset_type: presetType, values: values, min: min, max: max };
+        try {
+            const { data: ud } = await supabaseClient.auth.getUser();
+            if (ud && ud.user) record.user_id = ud.user.id;
+            const { data, error } = await supabaseClient.from('relation_ratio_presets').insert([record]).select().single();
+            if (error) throw error;
+            if (!data) { alert('保存失败：未返回数据'); return; }
+            await loadRelRatioPresetsFromCloud();
+            const preset = getRelRatioPresetById(data.id);
+            if (preset) applyRelRatioPresetToRow(row, preset);
+            alert('已保存为预设并套用到当前关系！');
+        } catch (e) {
+            console.error('保存比例预设失败:', e);
+            alert('保存失败：' + (e.message || e));
+        }
+    }
+
+    // ============ 比例预设库管理窗口 ============
+    var _editingRelRatioPresetId = null;
+    function openRelRatioPresetsModal() {
+        document.getElementById('rel-ratio-presets-modal').classList.remove('hidden');
+        backToRelRatioPresetList();
+    }
+    function closeRelRatioPresetsModal() {
+        document.getElementById('rel-ratio-presets-modal').classList.add('hidden');
+    }
+    function backToRelRatioPresetList() {
+        _editingRelRatioPresetId = null;
+        document.getElementById('rel-ratio-preset-edit-view').classList.add('hidden');
+        document.getElementById('rel-ratio-preset-list-view').classList.remove('hidden');
+        renderRelRatioPresetList();
+    }
+    function renderRelRatioPresetList() {
+        const box = document.getElementById('rel-ratio-preset-list');
+        if (!box) return;
+        const kw = String(document.getElementById('rel-ratio-preset-search').value || '').trim();
+        const all = getRelRatioPresets();
+        const list = all.filter(function(p) { return !kw || (p.name || '').indexOf(kw) >= 0; });
+        if (!list.length) {
+            box.innerHTML = '<p class="text-gray-400 text-center py-4">' + (all.length ? '没有匹配的预设' : '暂无比例预设，点击「➕ 新建预设」创建') + '</p>';
+            return;
+        }
+        box.innerHTML = list.map(function(p) {
+            const id = String(p.cloudId || p.id);
+            const typeBadge = p.presetType === 'range'
+                ? '<span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1 py-0.5">区间</span>'
+                : '<span class="text-[10px] bg-sky-100 text-sky-700 rounded px-1 py-0.5">精确值</span>';
+            return '<div class="flex items-start gap-2 bg-white border border-amber-200 rounded p-2.5">' +
+                '<div class="flex-1 min-w-0">' +
+                '<div class="flex items-center gap-2">' +
+                '<span class="font-bold text-base text-amber-800 truncate">📦 ' + escapeHtml(p.name) + '</span>' + typeBadge +
+                '</div>' +
+                '<div class="text-xs text-gray-500 mt-1 truncate">' + escapeHtml(relRatioPresetSummary(p)) + '</div>' +
+                '</div>' +
+                '<div class="flex gap-1 shrink-0">' +
+                '<button class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-sm" onclick="editRelRatioPreset(\'' + id + '\')">✏️ 编辑</button>' +
+                '<button class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-sm" onclick="deleteRelRatioPreset(\'' + id + '\')">🗑 删除</button>' +
+                '</div></div>';
+        }).join('');
+    }
+    function newRelRatioPreset() {
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再创建比例预设！'); return; }
+        _editingRelRatioPresetId = null;
+        document.getElementById('rel-ratio-preset-name').value = '';
+        document.getElementById('rel-ratio-preset-type').value = 'eq';
+        document.getElementById('rel-ratio-preset-eq-vals').innerHTML = '';
+        addRelRatioPresetValue();
+        toggleRelRatioPresetType();
+        document.getElementById('rel-ratio-preset-list-view').classList.add('hidden');
+        document.getElementById('rel-ratio-preset-edit-view').classList.remove('hidden');
+    }
+    function editRelRatioPreset(id) {
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再编辑比例预设！'); return; }
+        const p = getRelRatioPresetById(id);
+        if (!p) { alert('预设不存在或已被删除！'); renderRelRatioPresetList(); return; }
+        _editingRelRatioPresetId = p.cloudId || p.id;
+        document.getElementById('rel-ratio-preset-name').value = p.name || '';
+        document.getElementById('rel-ratio-preset-type').value = p.presetType || 'eq';
+        const eqBox = document.getElementById('rel-ratio-preset-eq-vals');
+        eqBox.innerHTML = '';
+        if (p.presetType === 'range') {
+            document.getElementById('rel-ratio-preset-min-n').value = p.min ? p.min.n : '';
+            document.getElementById('rel-ratio-preset-min-d').value = p.min ? p.min.d : '';
+            document.getElementById('rel-ratio-preset-max-n').value = p.max ? p.max.n : '';
+            document.getElementById('rel-ratio-preset-max-d').value = p.max ? p.max.d : '';
+        } else {
+            (p.values || []).forEach(function(v) { eqBox.appendChild(createRelRatioPresetValueItem(v.n, v.d)); });
+            if (!(p.values || []).length) addRelRatioPresetValue();
+        }
+        toggleRelRatioPresetType();
+        document.getElementById('rel-ratio-preset-list-view').classList.add('hidden');
+        document.getElementById('rel-ratio-preset-edit-view').classList.remove('hidden');
+    }
+    function toggleRelRatioPresetType() {
+        const t = document.getElementById('rel-ratio-preset-type').value;
+        document.getElementById('rel-ratio-preset-eq-box').classList.toggle('hidden', t !== 'eq');
+        document.getElementById('rel-ratio-preset-range-box').classList.toggle('hidden', t !== 'range');
+    }
+    function createRelRatioPresetValueItem(n, d) {
+        const div = document.createElement('div');
+        div.className = 'inline-flex items-center gap-1 bg-gray-50 border border-gray-200 rounded px-1.5 py-1';
+        div.innerHTML = '<input type="number" class="rrp-n text-sm p-1 border rounded" placeholder="分子" min="0" style="width:48px" value="' + (n !== undefined && n !== null ? n : '') + '">' +
+            '<span class="text-sm text-gray-500">:</span>' +
+            '<input type="number" class="rrp-d text-sm p-1 border rounded" placeholder="分母" min="0" style="width:48px" value="' + (d !== undefined && d !== null ? d : '') + '">' +
+            '<button type="button" class="text-red-400 hover:text-red-600 text-sm px-1" onclick="this.parentElement.remove()">×</button>';
+        return div;
+    }
+    function addRelRatioPresetValue() {
+        const box = document.getElementById('rel-ratio-preset-eq-vals');
+        if (box) box.appendChild(createRelRatioPresetValueItem('', ''));
+    }
+    async function saveRelRatioPreset() {
+        const name = document.getElementById('rel-ratio-preset-name').value.trim();
+        if (!name) { alert('请填写预设名称！'); return; }
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再保存比例预设！'); return; }
+        const presetType = document.getElementById('rel-ratio-preset-type').value;
+        let values = [], min = null, max = null;
+        if (presetType === 'range') {
+            const minN = parseInt(document.getElementById('rel-ratio-preset-min-n').value);
+            const minD = parseInt(document.getElementById('rel-ratio-preset-min-d').value);
+            const maxN = parseInt(document.getElementById('rel-ratio-preset-max-n').value);
+            const maxD = parseInt(document.getElementById('rel-ratio-preset-max-d').value);
+            if (isNaN(minN) || isNaN(minD) || isNaN(maxN) || isNaN(maxD) || (minN === 0 && minD === 0)) { alert('请填写有效的区间比例！'); return; }
+            min = { n: minN, d: minD }; max = { n: maxN, d: maxD };
+        } else {
+            document.querySelectorAll('#rel-ratio-preset-eq-vals > div').forEach(function(item) {
+                const n = parseInt(item.querySelector('.rrp-n').value);
+                const d = parseInt(item.querySelector('.rrp-d').value);
+                if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) values.push({ n: n, d: d });
+            });
+            if (!values.length) { alert('请添加至少一个有效精确值比例！'); return; }
+        }
+        const record = { name: name, preset_type: presetType, values: values, min: min, max: max };
+        try {
+            if (_editingRelRatioPresetId) {
+                const { error } = await supabaseClient.from('relation_ratio_presets').update(record).eq('id', _editingRelRatioPresetId);
+                if (error) throw error;
+            } else {
+                const { data: ud } = await supabaseClient.auth.getUser();
+                if (ud && ud.user) record.user_id = ud.user.id;
+                const { data, error } = await supabaseClient.from('relation_ratio_presets').insert([record]).select().single();
+                if (error) throw error;
+                if (data) _editingRelRatioPresetId = data.id;
+            }
+            await loadRelRatioPresetsFromCloud();
+            backToRelRatioPresetList();
+            alert('预设保存成功！所有套用了该预设的生克关系将自动生效。');
+        } catch (e) {
+            console.error('保存比例预设失败:', e);
+            alert('保存失败：' + (e.message || e));
+        }
+    }
+    async function deleteRelRatioPreset(id) {
+        if (!confirm('确认删除该比例预设？套用了该预设的模板关系将显示"预设缺失"提示。')) return;
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再删除比例预设！'); return; }
+        try {
+            const { error } = await supabaseClient.from('relation_ratio_presets').delete().eq('id', id);
+            if (error) throw error;
+            cache.relRatioPresets = (cache.relRatioPresets || []).filter(function(p) { return String(p.cloudId) !== String(id); });
+            saveLocalRelRatioPresets(cache.relRatioPresets);
+            renderRelRatioPresetList();
+        } catch (e) {
+            console.error('删除比例预设失败:', e);
+            alert('删除失败：' + (e.message || e));
+        }
     }
 
     // 收集参考值输出数据（保存时调用）：模板引用模式，仅存 refTemplateId
@@ -32065,7 +32465,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- 选择条件宏弹窗（插入宏到断语条件时使用） -->
-<div id="macro-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+<div id="macro-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] hidden">
     <div class="bg-white rounded-lg shadow-xl w-[550px] max-h-[70vh] flex flex-col mx-4">
         <div class="flex justify-between items-center p-4 border-b shrink-0">
             <h3 class="text-lg font-bold text-indigo-800">🧩 选择条件宏</h3>
@@ -32408,6 +32808,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="flex gap-2 mb-3 flex-wrap">
                 <input type="text" id="ref-tpl-list-search" class="flex-1 p-2.5 border rounded text-base min-w-[180px]" placeholder="🔍 搜索模板名称..." oninput="renderRefTemplateList()">
                 <button onclick="newRefTemplate()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base shrink-0">➕ 新建模板</button>
+                <button onclick="openRelRatioPresetsModal()" class="px-4 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-base shrink-0">📦 比例预设库</button>
             </div>
             <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-gray-600">
                 <p class="font-medium text-amber-700 mb-1">模板说明：</p>
@@ -32437,7 +32838,10 @@ document.addEventListener('DOMContentLoaded', function() {
             <details class="mb-3">
                 <summary class="text-sm text-sky-700 font-medium cursor-pointer select-none">🧩 基础匹配条件（可选：命局直接匹配本模板的判定条件，如 月支十神 = 食伤；不配置则本模板不参与命局直接匹配）</summary>
                 <div id="ref-tpl-match-box" class="mt-1 space-y-1"></div>
-                <button type="button" onclick="addRefTplMatchCond()" class="mt-1 px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded text-sm">➕ 添加条件</button>
+                <div class="flex gap-1.5 flex-wrap">
+                    <button type="button" onclick="addRefTplMatchCond()" class="mt-1 px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded text-sm">➕ 添加条件</button>
+                    <button type="button" onclick="openRefTplMacroSelector(this, 'match')" class="mt-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-sm">🧩 插入条件宏</button>
+                </div>
             </details>
             <details class="mb-3">
                 <summary class="text-sm text-rose-700 font-medium cursor-pointer select-none">⚖️ 生克关系喜忌（可选：模板命中后，命局满足某条件时在相克/相生表中标注对应关系，如 财星弱 → 喜「食伤生财」）</summary>
@@ -32448,6 +32852,80 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button onclick="saveRefTemplate()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base">💾 保存模板</button>
                 <button onclick="backToRefTplList()" class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-base">← 返回列表</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="rel-ratio-presets-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[760px] max-w-[96vw] max-h-[92vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-xl font-bold text-amber-800">📦 关联关系参考比例预设库</h3>
+            <button onclick="closeRelRatioPresetsModal()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <!-- 列表视图 -->
+        <div id="rel-ratio-preset-list-view" class="p-4 flex-1 overflow-y-auto">
+            <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-gray-600">
+                <p class="font-medium text-amber-700 mb-1">预设库说明：</p>
+                <p>• 预设只存<b>纯数值</b>（精确值集合或区间），不绑定具体生克关系。</p>
+                <p>• 模板「关联关系参考比例」可用「📋 选预设」套用，同一预设可用于比劫克财、食伤克官杀等任意关系。</p>
+                <p>• <b>修改预设后</b>，所有套用了该预设的关系自动生效（模板仅存引用，展示时实时解析）。</p>
+            </div>
+            <div class="flex gap-2 mb-3 flex-wrap">
+                <input type="text" id="rel-ratio-preset-search" class="flex-1 p-2 border rounded text-base min-w-[180px]" placeholder="🔍 搜索预设名称..." oninput="renderRelRatioPresetList()">
+                <button onclick="newRelRatioPreset()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-base shrink-0">➕ 新建预设</button>
+            </div>
+            <div id="rel-ratio-preset-list" class="space-y-2">
+                <p class="text-gray-400 text-center py-4">预设加载中...</p>
+            </div>
+        </div>
+        <!-- 编辑视图 -->
+        <div id="rel-ratio-preset-edit-view" class="p-5 flex-1 overflow-y-auto hidden">
+            <div class="mb-3">
+                <label class="block text-sm text-gray-600 mb-1">预设名称 <span class="text-red-500">*</span></label>
+                <input type="text" id="rel-ratio-preset-name" class="w-full p-2 border rounded text-base" placeholder="如：十神相克精确值集合A / 标准克杀区间">
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm text-gray-600 mb-1">预设类型</label>
+                <select id="rel-ratio-preset-type" class="w-full p-2 border rounded text-base" onchange="toggleRelRatioPresetType()">
+                    <option value="eq">精确值集合（多个比例）</option>
+                    <option value="range">区间（下限~上限）</option>
+                </select>
+            </div>
+            <div id="rel-ratio-preset-eq-box" class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-sm text-gray-600">精确值比例（n:d）</label>
+                    <button type="button" onclick="addRelRatioPresetValue()" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600">+ 添加比例</button>
+                </div>
+                <div id="rel-ratio-preset-eq-vals" class="space-y-1"></div>
+            </div>
+            <div id="rel-ratio-preset-range-box" class="mb-3 hidden">
+                <label class="block text-sm text-gray-600 mb-1">区间比例（下限 ~ 上限）</label>
+                <div class="flex flex-wrap items-center gap-1">
+                    <input type="number" id="rel-ratio-preset-min-n" class="p-1.5 border rounded w-20 text-sm" placeholder="分子" min="0">
+                    <span class="text-sm text-gray-500">:</span>
+                    <input type="number" id="rel-ratio-preset-min-d" class="p-1.5 border rounded w-20 text-sm" placeholder="分母" min="0">
+                    <span class="text-sm text-gray-500">~</span>
+                    <input type="number" id="rel-ratio-preset-max-n" class="p-1.5 border rounded w-20 text-sm" placeholder="分子" min="0">
+                    <span class="text-sm text-gray-500">:</span>
+                    <input type="number" id="rel-ratio-preset-max-d" class="p-1.5 border rounded w-20 text-sm" placeholder="分母" min="0">
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="saveRelRatioPreset()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base">💾 保存预设</button>
+                <button onclick="backToRelRatioPresetList()" class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-base">← 返回列表</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="rel-ratio-preset-picker-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[620px] max-w-[96vw] max-h-[88vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-xl font-bold text-amber-800">📋 选择比例预设（套用到当前生克关系）</h3>
+            <button onclick="closeRelRatioPresetPicker()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto" id="rel-ratio-preset-picker-list">
+            <p class="text-gray-400 text-center py-4">加载中...</p>
         </div>
     </div>
 </div>
