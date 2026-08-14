@@ -1448,7 +1448,7 @@
                     <div id="shen-bar-container" class="hidden w-full max-w-3xl mx-auto px-1">
                         <div id="shen-bar-ref-bar" class="mb-2"></div>
                         <div id="shen-bar-chart" class="mb-3"></div>
-                        <div id="shen-bar-tables" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                        <div id="shen-bar-tables" class="grid grid-cols-1 gap-3"></div>
                     </div>
                     
                     <script>
@@ -1677,10 +1677,15 @@
                 <div class="ref-tpl-tip text-[11px] text-amber-700/80 mt-1 hidden"></div>
                 <div class="mt-2 pt-2 border-t border-amber-200">
                     <div class="flex items-center justify-between mb-1">
-                        <label class="block text-xs font-medium text-gray-600">🔗 关联生克关系 <span class="text-gray-400">（命中本断语/宏时，勾选的关系在柱状图关系表中打 ✓ 提醒）</span></label>
-                        <span class="text-[10px] text-gray-400 shrink-0">已选 <span class="rel-binding-count">0</span>/10</span>
+                        <label class="block text-sm font-medium text-gray-700">🔗 关联生克关系 <span class="text-xs text-gray-400">（命中本断语/宏时，所选关系在柱状对比图关系表中打 ✓ 提醒；可重命名/新增关系）</span></label>
+                        <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRelationDefManager()">⚙️ 关系设置</button>
                     </div>
-                    <div class="rel-binding-box grid grid-cols-2 gap-x-3 gap-y-1"></div>
+                    <button type="button" class="rel-binding-toggle w-full p-2 border rounded bg-white text-sm text-left flex items-center justify-between hover:border-amber-300" onclick="toggleRelBindingPanel(this.closest('.ref-output-panel'))">
+                        <span class="text-gray-700">📌 点击下拉选择关系（已选 <span class="rel-binding-count font-bold text-amber-700">0</span> 项）</span>
+                        <span class="rel-binding-arrow text-gray-400 font-bold">▾</span>
+                    </button>
+                    <div class="rel-binding-drop hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto z-30"></div>
+                    <div class="rel-binding-chips flex flex-wrap gap-1 mt-1"></div>
                 </div>
             </div>
             <div id="rule-conditions" class="mb-4">
@@ -4459,6 +4464,8 @@
         // 初始化参考值模板选择器（断语/条件宏编辑器）并加载云端模板（非阻塞）
         if (typeof initRefTplPickers === 'function') initRefTplPickers();
         if (typeof loadRefTemplatesFromCloud === 'function') loadRefTemplatesFromCloud();
+        // 加载云端生克关系定义（自定义关系/重命名，非阻塞）
+        if (typeof loadRelationDefsFromCloud === 'function') loadRelationDefsFromCloud();
         initGroupKeyCombo();
         refreshGroupFilter();
         refreshGroupKeyDropdown();
@@ -4818,6 +4825,8 @@
         document.querySelectorAll('.shen-label').forEach(function(el) {
             el.style.display = (mode === 'all') ? '' : 'none';
         });
+        // 取值维度联动：切换「全部/天干/地支」按钮后，重新按新模式评估命中的断语/宏（含三范围对比）
+        if (window._lastCalcData) collectShenChartData(window._lastCalcData, mode);
         // 柱状对比图跟随维度切换实时刷新
         refreshShenBarIfVisible();
     };
@@ -7789,6 +7798,10 @@
         // 参考值规则收集（十神柱状对比图使用）
         const matchedRefRules = [];
         const boundRelations = [];  // 命中规则/宏绑定的相生/相克关系集合（用于关系表 ✓ 标记）
+        // 取值维度联动（仅收集模式）：绑定柱状对比图的「全部/天干/地支」按钮
+        //   'all' = 天干或地支任一为 true 即命中；'tian'/'di' = 固定维度；非收集模式不启用（保持原匹配行为）
+        const shenQzMode = opts.collectRefOnly ? (opts.shenQz || 'all') : '';
+        const shenDims = shenQzMode === 'all' ? ['天干', '地支'] : (shenQzMode === 'tian' ? ['天干'] : (shenQzMode === 'di' ? ['地支'] : []));
 
         // 预计算统计数据，避免在循环中重复计算
         const stats = getStats(data);
@@ -7866,6 +7879,8 @@
                 const macroDefQz = ctxMapping.macroDefaultQuZhi || '';
                 if(ruleDefQz) pbQuZhi = ruleDefQz;
                 if(!pbQuZhi && macroDefQz) pbQuZhi = macroDefQz;
+                // 取值维度联动（最低优先级）：未设置任何取值维度时，跟随柱状对比图按钮（全部=天干或地支任一命中，由外层按维度分别评估）
+                if(!pbQuZhi && ctxMapping.shenQzOverride) pbQuZhi = ctxMapping.shenQzOverride;
                 // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
                 if(pbMappingBaseId || pbMappingId){
                     let mappingRulesList = (typeof getMappingRules === 'function') ? getMappingRules() : null;
@@ -8114,6 +8129,8 @@
                 if(biRuleDefQz) biQuZhi = biRuleDefQz;
                 if(!biQuZhi && biGz !== '通用') biQuZhi = biGz;
                 if(!biQuZhi && biMacroDefQz) biQuZhi = biMacroDefQz;
+                // 取值维度联动（最低优先级）：未设置任何取值维度时，跟随柱状对比图按钮
+                if(!biQuZhi && ctxMapping.shenQzOverride) biQuZhi = ctxMapping.shenQzOverride;
                 // 实际收集取值维度：通用（未指定）时后备为天干
                 const biActualGzFinal = biQuZhi || (biGz !== '通用' ? biGz : '天干');
 
@@ -9000,7 +9017,8 @@
                         ruleDefaultQuZhi: ctxMapping.ruleDefaultQuZhi || '',
                         macroDefaultQuZhi: (macro.conditions && macro.conditions.defaultQuZhi) || '',
                         ruleDefaultMapping: ctxMapping.ruleDefaultMapping || null,
-                        macroDefaultMapping: (macro.conditions && macro.conditions.defaultMapping) || null
+                        macroDefaultMapping: (macro.conditions && macro.conditions.defaultMapping) || null,
+                        shenQzOverride: ctxMapping.shenQzOverride || ''
                     };
                     return evaluateConditionGroup(macro.conditions, depth + 1, newVisited, newCtx);
                 }
@@ -9020,7 +9038,8 @@
                         ruleDefaultQuZhi: (refRule.conditions.defaultQuZhi) || ctxMapping.ruleDefaultQuZhi || '',
                         macroDefaultQuZhi: ctxMapping.macroDefaultQuZhi || '',
                         ruleDefaultMapping: (refRule.conditions.defaultMapping) || ctxMapping.ruleDefaultMapping || null,
-                        macroDefaultMapping: ctxMapping.macroDefaultMapping || null
+                        macroDefaultMapping: ctxMapping.macroDefaultMapping || null,
+                        shenQzOverride: ctxMapping.shenQzOverride || ''
                     };
                     return evaluateConditionGroup(refCond, depth + 1, newVisited, newCtx);
                 }
@@ -9036,6 +9055,44 @@
             return false;
         }
         
+        // 评估单个断语的全部条件（兼容新格式嵌套组/旧格式线性数组）
+        function evaluateRuleConditions(rule, ctx) {
+            if (rule.conditions && rule.conditions.children && rule.conditions.children.length > 0) {
+                // 使用新格式：嵌套条件组（conditions 是一个带有 children 的对象）
+                return evaluateConditionGroup(rule.conditions, 0, new Set(), ctx);
+            }
+            if (rule.conditionGroups && rule.conditionGroups.length > 0) {
+                // 使用旧格式：嵌套条件组（conditionGroups 是数组）
+                return evaluateConditionGroup({
+                    logic: 'and',
+                    children: rule.conditionGroups
+                }, 0, new Set(), ctx);
+            }
+            if (rule.conditions && rule.conditions.length > 0) {
+                // 使用旧格式：线性条件（向后兼容）
+                let isMatch = true;
+                let logic = 'and';
+                for (let i=0; i<rule.conditions.length; i++) {
+                    const c = rule.conditions[i];
+                    if(i>0) logic = c.logic || 'and';
+                    const { res } = evaluateSingleCondition(c, ctx);
+                    if (logic === 'and') { isMatch = isMatch && res; if (!isMatch) break; }
+                    else { isMatch = isMatch || res; }
+                }
+                return isMatch;
+            }
+            return false;
+        }
+        // 取值维度联动评估：shenDims 为空（生产匹配）时单次评估；收集模式下按维度逐一评估，任一命中即通过
+        function evalRuleWithDim(rule, ctxBase) {
+            if (shenDims.length === 0) return evaluateRuleConditions(rule, ctxBase);
+            for (let di = 0; di < shenDims.length; di++) {
+                const ctx = Object.assign({}, ctxBase, { shenQzOverride: shenDims[di] });
+                if (evaluateRuleConditions(rule, ctx)) return true;
+            }
+            return false;
+        }
+
         cache.rules.forEach((rule) => {
             let isMatch = false;
 
@@ -9044,33 +9101,7 @@
             if (rule.conditions && rule.conditions.defaultQuZhi) ruleCtx.ruleDefaultQuZhi = rule.conditions.defaultQuZhi;
             if (rule.conditions && rule.conditions.defaultMapping) ruleCtx.ruleDefaultMapping = rule.conditions.defaultMapping;
 
-            if (rule.conditions && rule.conditions.children && rule.conditions.children.length > 0) {
-                // 使用新格式：嵌套条件组（conditions 是一个带有 children 的对象）
-                isMatch = evaluateConditionGroup(rule.conditions, 0, new Set(), ruleCtx);
-            } else if (rule.conditionGroups && rule.conditionGroups.length > 0) {
-                // 使用旧格式：嵌套条件组（conditionGroups 是数组）
-                isMatch = evaluateConditionGroup({
-                    logic: 'and',
-                    children: rule.conditionGroups
-                }, 0, new Set(), ruleCtx);
-            } else if (rule.conditions && rule.conditions.length > 0) {
-                // 使用旧格式：线性条件（向后兼容）
-                isMatch = true;
-                let logic = 'and';
-
-                for (let i=0; i<rule.conditions.length; i++) {
-                    const c = rule.conditions[i];
-                    if(i>0) logic = c.logic || 'and';
-                    const { res } = evaluateSingleCondition(c, ruleCtx);
-
-                    if (logic === 'and') {
-                        isMatch = isMatch && res;
-                        if (!isMatch) break;
-                    } else {
-                        isMatch = isMatch || res;
-                    }
-                }
-            }
+            isMatch = evalRuleWithDim(rule, ruleCtx);
             
             // 年龄检查（有出生时间+有效年龄时按类别顶层配置过滤）
             if (isMatch && data.hasBirthData && data.effectiveAge != null) {
@@ -9112,7 +9143,17 @@
                 const macroCtx = {};
                 if (mac.conditions.defaultQuZhi) macroCtx.ruleDefaultQuZhi = mac.conditions.defaultQuZhi;
                 if (mac.conditions.defaultMapping) macroCtx.ruleDefaultMapping = mac.conditions.defaultMapping;
-                if (evaluateConditionGroup(mac.conditions, 0, new Set(), macroCtx)) {
+                // 取值维度联动：shenDims 为空（生产匹配）时单次评估；收集模式下按维度逐一评估，任一命中即通过
+                let macroOk = false;
+                if (shenDims.length === 0) {
+                    macroOk = evaluateConditionGroup(mac.conditions, 0, new Set(), macroCtx);
+                } else {
+                    for (let di = 0; di < shenDims.length; di++) {
+                        const ctx = Object.assign({}, macroCtx, { shenQzOverride: shenDims[di] });
+                        if (evaluateConditionGroup(mac.conditions, 0, new Set(), ctx)) { macroOk = true; break; }
+                    }
+                }
+                if (macroOk) {
                     if (hasRef) {
                         matchedRefRules.push({ source: 'macro', name: mac.name || '', refOutput: mac.conditions.referenceOutput, rule: mac, priority: (mac.priority !== undefined ? mac.priority : 0) });
                     }
@@ -9132,9 +9173,17 @@
                 if (sa !== sb) return sa - sb;
                 return (b.priority || 0) - (a.priority || 0);
             });
-            cache.shenRefRules = matchedRefRules;
-            // 聚合所有命中规则/宏绑定的相生/相克关系（去重），供关系表 ✓ 标记
-            cache.shenRelBindings = Array.from(new Set(boundRelations));
+            // 三范围对比模式（scopeIdx 指定时写入对应范围缓存）；否则写入主缓存（当前柱状图使用）
+            if (opts.scopeIdx !== undefined) {
+                if (!cache.shenRefRulesByScope) cache.shenRefRulesByScope = [];
+                if (!cache.shenRelBindingsByScope) cache.shenRelBindingsByScope = [];
+                cache.shenRefRulesByScope[opts.scopeIdx] = matchedRefRules;
+                cache.shenRelBindingsByScope[opts.scopeIdx] = Array.from(new Set(boundRelations));
+            } else {
+                cache.shenRefRules = matchedRefRules;
+                // 聚合所有命中规则/宏绑定的相生/相克关系（去重），供关系表 ✓ 标记
+                cache.shenRelBindings = Array.from(new Set(boundRelations));
+            }
             return;
         }
 
@@ -9366,61 +9415,143 @@
         return html;
     }
 
-    // 渲染相生/相克关系表（两栏）
+    // 渲染相生/相克关系对比表（按关系定义列表：内置+自定义；三范围对比：原局 / 原局+大运 / 原局+大运+流年）
+    // 实际值、达标标记、绑定命中均按范围实时计算；范围间状态变化以单元格底色+「状态变化」列高亮标记
     function renderShenBarTables(stats, rules, selIdx, mode) {
         const selRef = rules[selIdx] || null;
-        const relMap = {};  // relation -> ref entry
+        const relMap = {};  // 默认关系名（A克B / A生B） -> 参考比例配置（参考值模板按默认名存键，重命名不受影响）
         if (selRef && selRef._resolved && Array.isArray(selRef._resolved.relationRefs)) {
             selRef._resolved.relationRefs.forEach(function(rr) {
                 if (rr && rr.relation) relMap[rr.relation] = rr;
             });
         }
-        const actualMap = {};
-        GROUPED_SHEN.forEach(function(g) {
-            if (mode === 'tian') actualMap[g] = stats.groupTian[g];
-            else if (mode === 'di') actualMap[g] = stats.groupDi[g];
-            else actualMap[g] = stats.groupCount[g];
-        });
+        // 三范围（原局 → 原局+大运 → 原局+大运+流年）：优先使用三范围统计缓存，缺失时第1列回退当前统计
+        const sc = cache.statsByScope || null;
+        const scopes = [
+            { label: '原局', stats: (sc && sc.scope0) || stats },
+            { label: '原局+大运', stats: (sc && sc.scope1) || null },
+            { label: '原局+大运+流年', stats: (sc && sc.scope2) || null }
+        ];
         const showMark = window._shenBarShowMark;
+        const defs = getRelationDefs();
+        const keDefs = defs.filter(function(d) { return d.relType === 'ke'; });
+        const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
 
-        const keHtml = renderRelationTable('🔥 相克关系', SHEN_KE_LIST, actualMap, relMap, 'text-red-600', showMark);
-        const shengHtml = renderRelationTable('🌱 相生关系', SHEN_SHENG_LIST, actualMap, relMap, 'text-green-600', showMark);
+        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark);
+        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark);
         return '<div class="bg-white border border-gray-200 rounded-lg p-2">' + keHtml + '</div>' +
                '<div class="bg-white border border-gray-200 rounded-lg p-2">' + shengHtml + '</div>';
     }
 
-    function renderRelationTable(title, relList, actualMap, relMap, titleColor, showMark) {
+    // 构建某范围的绑定命中集合（绑定存关系ID，兼容旧版名称/默认名）
+    function buildScopeBoundSet(scopeIdx) {
+        const set = {};
+        const list = (cache.shenRelBindingsByScope && cache.shenRelBindingsByScope[scopeIdx]) || [];
+        const defs = getRelationDefs();
+        list.forEach(function(item) {
+            const s = String(item);
+            if (!s) return;
+            const def = defs.find(function(d) { return String(d.id) === s; }) ||
+                defs.find(function(d) { return d.name === s; }) ||
+                defs.find(function(d) { return (d.shenA + (d.relType === 'ke' ? '克' : '生') + d.shenB) === s; });
+            if (def) set[String(def.id)] = true;
+        });
+        return set;
+    }
+
+    // 单张关系对比表：关系列 + 三范围列 + 状态变化列
+    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark) {
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
-        // 命中规则/宏绑定的生克关系集合（关系名称后打 ✓ 提醒）
-        const boundSet = {};
-        (cache.shenRelBindings || []).forEach(function(r) { boundSet[r] = true; });
+        const boundSets = [];
+        for (let i = 0; i < 3; i++) boundSets.push(buildScopeBoundSet(i));
         let rows = '';
-        relList.forEach(function(pair) {
-            const relName = pair[0] + (isKe ? '克' : '生') + pair[1];
-            const a = actualMap[pair[0]] || 0;
-            const b = actualMap[pair[1]] || 0;
-            const actualTxt = a + ':' + b;
-            const rr = relMap[relName] || null;
-            let refTxt = '<span class="text-gray-400">—</span>';
-            let markHtml = '';
-            if (rr) {
-                refTxt = renderRefRatio(rr);
-                if (showMark) {
-                    const chk = checkRatioMatch(a, b, rr);
-                    markHtml = chk.ok ? '<span class="bar-done font-bold ml-1">✓</span>' : '<span class="bar-miss font-bold ml-1">✗' + (chk.dir ? ' ' + chk.dir : '') + '</span>';
+        defList.forEach(function(def) {
+            const defaultName = def.shenA + (isKe ? '克' : '生') + def.shenB;  // 参考比例键（模板按默认名存）
+            const rr = relMap[defaultName] || null;
+            // 各列状态：{ ok: 达标bool|null, bound: 绑定bool }
+            const cols = scopes.map(function(sc, ci) {
+                const st = sc.stats;
+                const gv = function(g) {
+                    if (!st) return null;
+                    if (mode === 'tian') return st.groupTian[g] || 0;
+                    if (mode === 'di') return st.groupDi[g] || 0;
+                    return st.groupCount[g] || 0;
+                };
+                const a = gv(def.shenA), b = gv(def.shenB);
+                let ok = null;
+                if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
+                return { stat: st, a: a, b: b, ok: ok, bound: !!boundSets[ci][String(def.id)] };
+            });
+            // 变化检测：第2/3列与前一列比较（达标状态 + 绑定状态）
+            const trans = [null, null];  // trans[0]=原局→+大运, trans[1]=+大运→+流年
+            for (let ci = 1; ci <= 2; ci++) {
+                const pre = cols[ci - 1], cur = cols[ci];
+                if (pre.stat && cur.stat && pre.ok !== null && cur.ok !== null && pre.ok !== cur.ok) {
+                    trans[ci - 1] = trans[ci - 1] || [];
+                    trans[ci - 1].push({ type: 'ratio', from: pre.ok, to: cur.ok });
+                }
+                if (pre.stat && cur.stat && pre.bound !== cur.bound) {
+                    trans[ci - 1] = trans[ci - 1] || [];
+                    trans[ci - 1].push({ type: 'bound', from: pre.bound, to: cur.bound });
                 }
             }
-            // 绑定的断语/宏命中时，关系名称后打勾提醒（不改变行背景色，与参考比例琥珀色高亮并存）
-            const relNameHtml = relName + (boundSet[relName] ? ' <span class="text-green-600 font-bold">✓</span>' : '');
-            rows += '<tr class="border-b last:border-0 border-gray-100' + (rr ? ' bg-amber-50' : '') + '">' +
-                '<td class="py-1 pl-1 font-medium ' + relNameColor + '">' + relNameHtml + '</td>' +
-                '<td class="py-1 text-right text-gray-600">实际 <span class="font-bold">' + actualTxt + '</span></td>' +
-                '<td class="py-1 pr-1 text-right text-gray-500">参考 <span>' + refTxt + '</span>' + markHtml + '</td>' +
+            // 变化单元格底色（第2/3列：达标变差红、变好绿）
+            const cellCls = ['', '', ''];
+            for (let ci = 1; ci <= 2; ci++) {
+                const pre = cols[ci - 1], cur = cols[ci];
+                if (pre.stat && cur.stat && pre.ok !== null && cur.ok !== null && pre.ok !== cur.ok) {
+                    cellCls[ci] = cur.ok ? ' bg-green-50' : ' bg-red-50';
+                }
+            }
+            const cellHtml = cols.map(function(c, ci) {
+                if (!c.stat) return '<td class="py-1.5 px-1 text-center text-gray-300 text-sm">—</td>';
+                let ratioHtml = '';
+                if (showMark && rr && c.ok !== null) {
+                    ratioHtml = c.ok ? '<span class="bar-done font-bold">✓</span>' : '<span class="bar-miss font-bold">✗</span>';
+                }
+                const boundHtml = c.bound ? '<span class="text-green-600 font-bold" title="该范围绑定的断语/宏命中">●</span>' : '';
+                return '<td class="py-1.5 px-1 text-center' + cellCls[ci] + '">' +
+                    '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + '</div>' +
+                    '<div class="text-[11px] leading-tight mt-0.5 whitespace-nowrap">' +
+                    (ratioHtml ? ratioHtml + ' 达标' : '') +
+                    (boundHtml ? ' ' + boundHtml : '') +
+                    '</div></td>';
+            }).join('');
+            // 状态变化列
+            let changeHtml = '<span class="text-gray-300">—</span>';
+            if (trans[0] || trans[1]) {
+                const chipList = [];
+                for (let t = 0; t < 2; t++) {
+                    if (!trans[t]) continue;
+                    trans[t].forEach(function(ch) {
+                        if (ch.type === 'ratio') {
+                            chipList.push('<span class="inline-block text-[10px] px-1.5 py-0.5 rounded font-bold ' + (ch.to ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') + '" title="' + scopes[t].label + '→' + scopes[t + 1].label + '">' + (ch.to ? '达标 ✗→✓' : '达标 ✓→✗') + '</span>');
+                        } else {
+                            chipList.push('<span class="inline-block text-[10px] px-1.5 py-0.5 rounded font-bold ' + (ch.to ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') + '" title="' + scopes[t].label + '→' + scopes[t + 1].label + '">' + (ch.to ? '绑定 ○→●' : '绑定 ●→○') + '</span>');
+                        }
+                    });
+                }
+                changeHtml = '<div class="flex flex-col gap-0.5 items-start">' + chipList.join('') + '</div>';
+            }
+            rows += '<tr class="border-b last:border-0 border-gray-100">' +
+                '<td class="py-1.5 pl-1 pr-1">' +
+                '<div class="font-bold text-sm sm:text-base leading-tight ' + relNameColor + '">' + escapeHtml(def.name) + '</div>' +
+                '<div class="text-[11px] text-gray-400 leading-tight mt-0.5">' + (rr ? '参考 ' + renderRefRatio(rr) : (def.builtin ? '' : '自定义·无参考')) + '</div>' +
+                '</td>' + cellHtml +
+                '<td class="py-1.5 pr-1 pl-1">' + changeHtml + '</td>' +
                 '</tr>';
         });
-        return '<div class="font-bold ' + titleColor + ' text-sm mb-1">' + title + '</div>' +
-            '<table class="w-full text-xs"><tbody>' + rows + '</tbody></table>';
+        return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
+            '<table class="w-full text-sm">' +
+            '<thead><tr class="border-b border-gray-200 text-gray-500">' +
+            '<th class="py-1 pl-1 pr-1 text-left text-xs font-semibold">关系</th>' +
+            '<th class="py-1 px-1 text-center text-xs font-semibold">原局</th>' +
+            '<th class="py-1 px-1 text-center text-xs font-semibold">原局+大运</th>' +
+            '<th class="py-1 px-1 text-center text-xs font-semibold">原局+大运+流年</th>' +
+            '<th class="py-1 pr-1 pl-1 text-left text-xs font-semibold">状态变化</th>' +
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div class="text-[11px] text-gray-400 mt-1">图例：✓ 达标 · ✗ 未达标 · ● 绑定断语/宏命中 · 绿色/红色底色与「状态变化」列标出范围切换时的状态改变</div>';
     }
 
     // 渲染参考比例：精确值数组（多个时折叠展开）/ 区间
@@ -9473,6 +9604,50 @@
     // 刷新柱状图（模式/数据变化时调用）
     function refreshShenBarIfVisible() {
         if (window.currentShenChart === 'bar') renderShenBar();
+    }
+
+    // ============ 三范围统计与收集（生克关系对比显示） ============
+    // 范围：原局（年/月/日/时）→ +大运 → +大运+流年（实时计算，不存储历史；换八字整体替换）
+    function buildScopeData(data) {
+        const mk = function(keys) {
+            const d = {};
+            keys.forEach(function(k) { if (data[k]) d[k] = data[k]; });
+            return d;
+        };
+        return [
+            mk(['nian', 'yue', 'ri', 'shi']),
+            mk(['nian', 'yue', 'ri', 'shi', 'dayun']),
+            mk(['nian', 'yue', 'ri', 'shi', 'dayun', 'liunian'])
+        ];
+    }
+    function getStatsByScope(data) {
+        const scopeData = buildScopeData(data);
+        return {
+            scope0: getStats(scopeData[0]),
+            scope1: getStats(scopeData[1]),
+            scope2: getStats(scopeData[2])
+        };
+    }
+    // 收集柱状对比图数据：主范围（含流月，保持当前柱状图行为）+ 三范围对比评估
+    // mode: 'all' | 'tian' | 'di'（柱状图「全部/天干/地支」按钮 → 取值维度联动）
+    function collectShenChartData(data, mode) {
+        mode = mode || 'all';
+        const savedStats = cache.statsCache;
+        try {
+            cache.statsByScope = getStatsByScope(data);
+            matchRules(data, { collectRefOnly: true, shenQz: mode });
+            const scopeData = buildScopeData(data);
+            cache.shenRefRulesByScope = [];
+            cache.shenRelBindingsByScope = [];
+            for (let i = 0; i < scopeData.length; i++) {
+                // 继承出生信息/有效年龄，保证年龄类条件在范围评估中与主评估一致
+                if (data.hasBirthData !== undefined) scopeData[i].hasBirthData = data.hasBirthData;
+                if (data.effectiveAge !== undefined) scopeData[i].effectiveAge = data.effectiveAge;
+                matchRules(scopeData[i], { collectRefOnly: true, shenQz: mode, scopeIdx: i });
+            }
+        } finally {
+            cache.statsCache = savedStats;
+        }
     }
 
     // ============ 参考值模板（十神柱状对比图参考值基准模板库） ============
@@ -9858,6 +10033,255 @@
         btn.classList.add('hidden');
         if (tip) tip.classList.add('hidden');
     }
+    // ============ 十神生克关系定义（内置关系重命名 + 自定义关系） ============
+    // 云端表 relation_defs（见 create_relation_defs.sql）+ 本地缓存 cache.relationDefs（离线可用）
+    // 内置 10 组关系固定 ID：builtin-ke-0..4 / builtin-sheng-0..4（绑定关系时使用该 ID，重命名不影响绑定）
+    // 用户自定义/重命名记录按 (rel_type, shen_a, shen_b) 三元组匹配：命中内置 → 覆盖名称；否则 → 新增关系
+    function loadLocalRelationDefs() {
+        try {
+            const raw = localStorage.getItem('bazi_relation_defs');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) { return []; }
+    }
+    function saveLocalRelationDefs(list) {
+        try { localStorage.setItem('bazi_relation_defs', JSON.stringify(list)); } catch (e) {}
+    }
+    function getRelationDefs() {
+        const defs = [];
+        SHEN_KE_LIST.forEach(function(p, i) { defs.push({ id: 'builtin-ke-' + i, relType: 'ke', shenA: p[0], shenB: p[1], name: p[0] + '克' + p[1], builtin: true }); });
+        SHEN_SHENG_LIST.forEach(function(p, i) { defs.push({ id: 'builtin-sheng-' + i, relType: 'sheng', shenA: p[0], shenB: p[1], name: p[0] + '生' + p[1], builtin: true }); });
+        const userDefs = (cache.relationDefs !== undefined) ? cache.relationDefs : loadLocalRelationDefs();
+        const custom = [];
+        (userDefs || []).forEach(function(d) {
+            const dRel = d.relType || 'ke';
+            const dA = d.shenA || '';
+            const dB = d.shenB || '';
+            const target = defs.find(function(x) { return x.relType === dRel && x.shenA === dA && x.shenB === dB; });
+            if (target) target.name = d.name || target.name;
+            else custom.push({ id: d.id, relType: dRel, shenA: dA, shenB: dB, name: d.name || (dA + (dRel === 'ke' ? '克' : '生') + dB), builtin: false });
+        });
+        custom.forEach(function(c) { defs.push(c); });
+        return defs;
+    }
+    function getRelationDefById(id) {
+        if (!id) return null;
+        const s = String(id);
+        return (getRelationDefs() || []).find(function(d) { return String(d.id) === s; }) || null;
+    }
+    // 把绑定值解析为当前显示名称（兼容旧版直接存关系名称字符串的格式；重命名后自动跟随新名称）
+    function resolveRelationDisplayName(idOrName) {
+        const s = String(idOrName || '');
+        if (!s) return '';
+        const defs = getRelationDefs();
+        const byId = defs.find(function(d) { return String(d.id) === s; });
+        if (byId) return byId.name;
+        const byName = defs.find(function(d) { return d.name === s; });
+        if (byName) return byName.name;
+        // 旧版名称：按默认名称（A克B / A生B）匹配，重命名后仍能跟随
+        const byDefault = defs.find(function(d) { return (d.shenA + (d.relType === 'ke' ? '克' : '生') + d.shenB) === s; });
+        if (byDefault) return byDefault.name;
+        return s;
+    }
+    // 从云端拉取当前用户的关系定义（登录后自动调用；失败时回退本地缓存）
+    async function loadRelationDefsFromCloud() {
+        if (!supabaseClient) { cache.relationDefs = loadLocalRelationDefs(); return; }
+        try {
+            const { data: ud } = await supabaseClient.auth.getUser();
+            if (!ud || !ud.user) { cache.relationDefs = loadLocalRelationDefs(); return; }
+            const { data, error } = await supabaseClient
+                .from('relation_defs')
+                .select('*')
+                .order('update_time', { ascending: false });
+            if (error) throw error;
+            const list = (data || []).map(function(r) {
+                return { id: r.id, cloudId: r.id, relType: r.rel_type || 'ke', shenA: r.shen_a || '', shenB: r.shen_b || '', name: r.name || '' };
+            });
+            cache.relationDefs = list;
+            saveLocalRelationDefs(list);
+            refreshRelBindingPanels();
+            const modal = document.getElementById('relation-defs-modal');
+            if (modal && !modal.classList.contains('hidden')) renderRelationDefList();
+        } catch (e) {
+            console.warn('关系定义加载失败:', e);
+            cache.relationDefs = loadLocalRelationDefs();
+        }
+    }
+
+    // ============ 生克关系定义管理窗口 ============
+    var _editingRelDefId = null; // 当前编辑的关系ID（内置ID / 云端ID / null=新建）
+    function openRelationDefManager() {
+        document.getElementById('relation-defs-modal').classList.remove('hidden');
+        backToRelDefList();
+    }
+    function closeRelationDefManager() {
+        document.getElementById('relation-defs-modal').classList.add('hidden');
+    }
+    function backToRelDefList() {
+        _editingRelDefId = null;
+        document.getElementById('rel-def-edit-view').classList.add('hidden');
+        document.getElementById('rel-def-list-view').classList.remove('hidden');
+        renderRelationDefList();
+    }
+    function renderRelationDefList() {
+        const box = document.getElementById('rel-def-list');
+        if (!box) return;
+        const kw = String(document.getElementById('rel-def-list-search').value || '').trim();
+        const defs = getRelationDefs();
+        const filtered = defs.filter(function(d) {
+            if (!kw) return true;
+            return (d.name || '').indexOf(kw) >= 0 || (d.shenA || '').indexOf(kw) >= 0 || (d.shenB || '').indexOf(kw) >= 0;
+        });
+        if (!filtered.length) {
+            box.innerHTML = '<p class="text-gray-400 text-center py-4">' + (defs.length ? '没有匹配的关系' : '暂无自定义关系，可点击「➕ 新增关系」创建') + '</p>';
+            return;
+        }
+        box.innerHTML = filtered.map(function(d) {
+            const isBuiltin = String(d.id).indexOf('builtin-') === 0;
+            const typeTxt = d.relType === 'ke' ? '<span class="text-red-500 text-xs bg-red-50 rounded px-1 py-px">相克</span>' : '<span class="text-green-600 text-xs bg-green-50 rounded px-1 py-px">相生</span>';
+            const pairTxt = '<span class="text-xs text-gray-500">' + d.shenA + ' : ' + d.shenB + '</span>';
+            const bindCount = countRelationDefUsers(d.id);
+            return '<div class="flex items-start gap-2 bg-white border border-gray-200 rounded p-2.5">' +
+                '<div class="flex-1 min-w-0">' +
+                '<div class="flex items-center gap-2 flex-wrap">' +
+                '<span class="font-bold text-base text-amber-800 truncate">' + escapeHtml(d.name) + '</span>' +
+                typeTxt + pairTxt +
+                (isBuiltin ? '<span class="text-[10px] text-gray-400 bg-gray-100 rounded px-1 py-px">内置' + (getRelationDefs().some(function(x){ return x.id === d.id && x.name !== (x.shenA + (x.relType === 'ke' ? '克' : '生') + x.shenB); }) ? '·已重命名' : '') + '</span>' : '<span class="text-[10px] text-indigo-400 bg-indigo-50 rounded px-1 py-px">自定义</span>') +
+                '</div>' +
+                '<div class="text-xs text-gray-400 mt-0.5">被绑定 <span class="' + (bindCount ? 'text-indigo-600 font-medium' : 'text-gray-400') + '">' + bindCount + '</span> 处（断语+宏）</div>' +
+                '</div>' +
+                '<div class="flex gap-1 shrink-0">' +
+                '<button class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-sm" onclick="editRelationDef(\'' + d.id + '\')">' + (isBuiltin ? '✏️ 重命名' : '✏️ 编辑') + '</button>' +
+                '<button class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-sm" onclick="deleteRelationDef(\'' + d.id + '\')">' + (isBuiltin ? '↺ 恢复默认' : '🗑 删除') + '</button>' +
+                '</div></div>';
+        }).join('');
+    }
+    // 统计某关系被断语/宏绑定次数（兼容旧版存名称）
+    function countRelationDefUsers(relId) {
+        const def = getRelationDefById(relId);
+        const names = {};
+        if (def) {
+            names[def.name] = true;
+            names[def.shenA + (def.relType === 'ke' ? '克' : '生') + def.shenB] = true;
+        }
+        let n = 0;
+        (cache.rules || []).forEach(function(r) {
+            const list = (r.conditions && r.conditions.relationBindings) || [];
+            list.forEach(function(b) {
+                if (String(b) === String(relId) || (def && names[String(b)])) n++;
+            });
+        });
+        (cache.conditionMacros || []).forEach(function(m) {
+            const list = (m.conditions && m.conditions.relationBindings) || [];
+            list.forEach(function(b) {
+                if (String(b) === String(relId) || (def && names[String(b)])) n++;
+            });
+        });
+        return n;
+    }
+    function newRelationDef() {
+        _editingRelDefId = null;
+        document.getElementById('rel-def-list-view').classList.add('hidden');
+        document.getElementById('rel-def-edit-view').classList.remove('hidden');
+        document.getElementById('rel-def-edit-title').textContent = '➕ 新增生克关系';
+        document.getElementById('rel-def-name').value = '';
+        document.getElementById('rel-def-type').value = 'ke';
+        document.getElementById('rel-def-shen-a').value = '比劫';
+        document.getElementById('rel-def-shen-b').value = '财星';
+    }
+    function editRelationDef(id) {
+        const def = getRelationDefById(id);
+        if (!def) return;
+        _editingRelDefId = def.id;
+        document.getElementById('rel-def-list-view').classList.add('hidden');
+        document.getElementById('rel-def-edit-view').classList.remove('hidden');
+        document.getElementById('rel-def-edit-title').textContent = (def.builtin ? '✏️ 重命名内置关系' : '✏️ 编辑自定义关系') + '：' + def.shenA + (def.relType === 'ke' ? '克' : '生') + def.shenB;
+        document.getElementById('rel-def-name').value = def.name || '';
+        document.getElementById('rel-def-type').value = def.relType || 'ke';
+        document.getElementById('rel-def-shen-a').value = def.shenA || '比劫';
+        document.getElementById('rel-def-shen-b').value = def.shenB || '财星';
+    }
+    async function deleteRelationDef(id) {
+        const def = getRelationDefById(id);
+        if (!def) return;
+        const cnt = countRelationDefUsers(def.id);
+        if (cnt > 0 && !confirm('该关系正被 ' + cnt + ' 条断语/宏绑定，删除/恢复默认后绑定将指向默认名称。确定继续？')) return;
+        const isBuiltin = String(def.id).indexOf('builtin-') === 0;
+        try {
+            if (supabaseClient && (typeof currentUser !== 'undefined' && currentUser)) {
+                // 清理同三元组的云端记录（重命名或自定义记录）
+                const { data: rows } = await supabaseClient.from('relation_defs').select('id').eq('rel_type', def.relType).eq('shen_a', def.shenA).eq('shen_b', def.shenB);
+                for (const r of (rows || [])) { await supabaseClient.from('relation_defs').delete().eq('id', r.id); }
+                if (!isBuiltin && !rows) {
+                    await supabaseClient.from('relation_defs').delete().eq('id', def.id);
+                }
+            }
+            let list = loadLocalRelationDefs();
+            list = list.filter(function(x) {
+                if (!isBuiltin && (String(x.id) === String(def.id) || String(x.cloudId || '') === String(def.id))) return false;
+                if (String(x.relType || '') === def.relType && String(x.shenA || '') === def.shenA && String(x.shenB || '') === def.shenB) return false;
+                return true;
+            });
+            cache.relationDefs = list;
+            saveLocalRelationDefs(list);
+        } catch (e) {
+            console.warn('删除关系定义失败:', e);
+        }
+        refreshRelBindingPanels();
+        renderRelationDefList();
+        refreshShenBarIfVisible();
+    }
+    async function saveRelationDef() {
+        const name = String(document.getElementById('rel-def-name').value || '').trim();
+        const relType = document.getElementById('rel-def-type').value || 'ke';
+        const shenA = document.getElementById('rel-def-shen-a').value || '';
+        const shenB = document.getElementById('rel-def-shen-b').value || '';
+        if (!name) { alert('请填写关系名称！'); return; }
+        if (!shenA || !shenB) { alert('请选择两个十神！'); return; }
+        if (shenA === shenB) { alert('两个十神不能相同！'); return; }
+        const isBuiltin = String(_editingRelDefId || '').indexOf('builtin-') === 0;
+        let cloudId = isBuiltin ? '' : (_editingRelDefId || '');
+        if (supabaseClient && (typeof currentUser !== 'undefined' && currentUser)) {
+            try {
+                if (!isBuiltin && cloudId) {
+                    const { error } = await supabaseClient.from('relation_defs').update({ name: name, rel_type: relType, shen_a: shenA, shen_b: shenB }).eq('id', cloudId);
+                    if (error) throw error;
+                } else {
+                    // 清理同三元组旧记录（防止重复），再插入
+                    const { data: oldRows } = await supabaseClient.from('relation_defs').select('id').eq('rel_type', relType).eq('shen_a', shenA).eq('shen_b', shenB);
+                    for (const r of (oldRows || [])) { await supabaseClient.from('relation_defs').delete().eq('id', r.id); }
+                    const { data: ud } = await supabaseClient.auth.getUser();
+                    const record = { name: name, rel_type: relType, shen_a: shenA, shen_b: shenB };
+                    if (ud && ud.user) record.user_id = ud.user.id;
+                    const { data, error } = await supabaseClient.from('relation_defs').insert([record]).select().single();
+                    if (error) throw error;
+                    cloudId = data ? data.id : '';
+                }
+            } catch (e) {
+                console.warn('关系定义保存失败:', e);
+                alert('云端保存失败：' + (e.message || e) + '\n已仅保存到本地缓存。');
+            }
+        }
+        // 更新本地缓存：按三元组去重（防止重复记录）
+        let list = loadLocalRelationDefs();
+        list = list.filter(function(x) {
+            if (String(x.relType || '') === relType && String(x.shenA || '') === shenA && String(x.shenB || '') === shenB) return false;
+            if (!isBuiltin && (String(x.id) === String(cloudId) || String(x.cloudId || '') === String(cloudId))) return false;
+            return true;
+        });
+        if (!isBuiltin) {
+            list.push({ id: cloudId || (_editingRelDefId || 'local-' + Date.now()), relType: relType, shenA: shenA, shenB: shenB, name: name });
+        } else {
+            // 内置关系重命名：仅需存储三元组+新名称（getRelationDefs 按三元组匹配覆盖默认名称）
+            list.push({ id: cloudId || 'local-' + Date.now(), relType: relType, shenA: shenA, shenB: shenB, name: name });
+        }
+        cache.relationDefs = list;
+        saveLocalRelationDefs(list);
+        refreshRelBindingPanels();
+        backToRelDefList();
+        refreshShenBarIfVisible();
+        if (!isBuiltin) alert('关系保存成功！可在断语/条件宏的「关联生克关系」下拉中绑定使用。');
+    }
+
     // 初始化所有面板选择器（initAll 时调用）
     function initRefTplPickers() {
         document.querySelectorAll('.ref-output-panel').forEach(function(panel) {
@@ -9865,15 +10289,17 @@
             if (search) search.value = '';
             const clear = panel.querySelector('.ref-tpl-clear');
             if (clear) clear.classList.add('hidden');
-            buildRelBindingBox(panel);
+            renderRelBindingBox(panel);
         });
         refreshRefTplPickers();
     }
 
-    // 点击面板外部时关闭模板下拉列表
+    // 点击面板外部时关闭模板下拉列表与生克关系下拉
     document.addEventListener('click', function(e) {
         if (!e.target || !e.target.closest('.ref-output-panel')) {
             document.querySelectorAll('.ref-tpl-list').forEach(function(b) { b.classList.add('hidden'); });
+            document.querySelectorAll('.rel-binding-drop').forEach(function(b) { b.classList.add('hidden'); });
+            document.querySelectorAll('.rel-binding-arrow').forEach(function(a) { a.textContent = '▾'; });
         }
     });
 
@@ -9980,47 +10406,123 @@
         if (tip) tip.classList.add('hidden');
     }
 
-    // ============ 关联生克关系绑定（断语/宏命中时关系表打 ✓ 提醒） ============
-    // 构建 10 组（相克5+相生5）关系勾选区
-    function buildRelBindingBox(panel) {
+    // ============ 关联生克关系绑定（断语/宏命中时关系表打 ✓ 提醒；下拉多选 + 已选 chips） ============
+    // 绑定值存关系 ID（内置固定 ID builtin-ke-0..4 / builtin-sheng-0..4，自定义=云端/本地 ID）；
+    // 兼容旧版直接存关系名称字符串的格式（回显时自动解析为 ID）。
+    // 选中集合存于 panel._relBindings（Set），重渲染/加载/重置均基于该集合，不丢状态。
+    function getRelBindingsSet(panel) {
+        if (!panel._relBindings) panel._relBindings = new Set();
+        return panel._relBindings;
+    }
+    // 渲染下拉选项 + 已选 chips（关系定义变化/下拉打开/选中变化时调用）
+    function renderRelBindingBox(panel) {
         if (!panel) return;
-        const box = panel.querySelector('.rel-binding-box');
-        if (!box) return;
-        const rels = [];
-        SHEN_KE_LIST.forEach(function(p) { rels.push(p[0] + '克' + p[1]); });
-        SHEN_SHENG_LIST.forEach(function(p) { rels.push(p[0] + '生' + p[1]); });
-        box.innerHTML = rels.map(function(rel) {
-            return '<label class="flex items-center gap-1 text-xs text-gray-600 cursor-pointer select-none hover:text-amber-700">' +
-                '<input type="checkbox" class="rel-binding-check rounded" value="' + rel + '" onchange="updateRelBindingCount(this.closest(\'.ref-output-panel\'))">' + rel + '</label>';
-        }).join('');
+        const drop = panel.querySelector('.rel-binding-drop');
+        const chipsBox = panel.querySelector('.rel-binding-chips');
+        const sel = getRelBindingsSet(panel);
+        const defs = getRelationDefs();
+        if (drop) {
+            const keDefs = defs.filter(function(d) { return d.relType === 'ke'; });
+            const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
+            const groupHtml = function(title, list, color) {
+                if (!list.length) return '';
+                return '<div class="px-2.5 pt-2 pb-1 text-xs font-bold ' + color + ' sticky top-0 bg-white border-b border-gray-50">' + title + '</div>' +
+                    list.map(function(d) {
+                        return '<label class="flex items-center gap-2 px-2.5 py-1.5 text-sm text-gray-700 cursor-pointer hover:bg-amber-50 select-none border-b border-gray-50 last:border-0">' +
+                            '<input type="checkbox" class="rel-binding-check w-4 h-4 rounded" value="' + d.id + '" ' + (sel.has(String(d.id)) ? 'checked' : '') + ' onchange="onRelBindingChange(this)">' +
+                            '<span class="flex-1 truncate">' + escapeHtml(d.name) + '</span>' +
+                            '<span class="text-[10px] text-gray-400">' + d.shenA + ':' + d.shenB + '</span>' +
+                            '</label>';
+                    }).join('');
+            };
+            drop.innerHTML = groupHtml('🔥 相克关系', keDefs, 'text-red-600') + groupHtml('🌱 相生关系', shengDefs, 'text-green-600') +
+                (!defs.length ? '<div class="text-gray-400 text-center py-3 text-sm">暂无关系定义</div>' : '');
+        }
+        if (chipsBox) {
+            chipsBox.innerHTML = Array.from(sel).map(function(id) {
+                const d = getRelationDefById(id);
+                if (!d) return '';
+                return '<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-xs font-medium rounded px-2 py-0.5">' +
+                    escapeHtml(d.name) +
+                    '<button type="button" class="text-amber-600 hover:text-amber-800 font-bold leading-none" onclick="removeRelBindingChip(this)" title="移除">×</button></span>';
+            }).join('');
+        }
         updateRelBindingCount(panel);
+    }
+    // 勾选变化（基于 panel._relBindings 集合，重渲染保持状态）
+    function onRelBindingChange(cb) {
+        const panel = cb.closest('.ref-output-panel');
+        if (!panel) return;
+        const sel = getRelBindingsSet(panel);
+        const id = cb.value;
+        if (cb.checked) sel.add(String(id)); else sel.delete(String(id));
+        renderRelBindingBox(panel);
+    }
+    // 移除已选 chip
+    function removeRelBindingChip(btn) {
+        const panel = btn.closest('.ref-output-panel');
+        if (!panel) return;
+        const chip = btn.closest('span');
+        const txt = (chip ? chip.textContent : '').replace('×', '').trim();
+        const sel = getRelBindingsSet(panel);
+        const def = getRelationDefs().find(function(d) { return d.name === txt; });
+        if (def) sel.delete(String(def.id));
+        renderRelBindingBox(panel);
+    }
+    // 打开/关闭下拉
+    function toggleRelBindingPanel(panel) {
+        if (!panel) return;
+        const drop = panel.querySelector('.rel-binding-drop');
+        if (!drop) return;
+        const willOpen = drop.classList.contains('hidden');
+        document.querySelectorAll('.rel-binding-drop').forEach(function(d) { if (d !== drop) d.classList.add('hidden'); });
+        document.querySelectorAll('.rel-binding-arrow').forEach(function(a) { a.textContent = '▾'; });
+        if (willOpen) {
+            renderRelBindingBox(panel);
+            drop.classList.remove('hidden');
+            const arrow = panel.querySelector('.rel-binding-arrow');
+            if (arrow) arrow.textContent = '▴';
+        } else {
+            drop.classList.add('hidden');
+        }
     }
     // 更新已选关系计数
     function updateRelBindingCount(panel) {
         if (!panel) return;
         const count = panel.querySelector('.rel-binding-count');
-        if (count) count.textContent = panel.querySelectorAll('.rel-binding-check:checked').length;
+        if (count) count.textContent = getRelBindingsSet(panel).size;
     }
-    // 收集勾选的关系（保存时调用）
+    // 收集选中的关系ID（保存时调用）
     function collectRelationBindings(panel) {
         if (!panel) return [];
-        const res = [];
-        panel.querySelectorAll('.rel-binding-check:checked').forEach(function(c) { if (c.value) res.push(c.value); });
-        return res;
+        return Array.from(getRelBindingsSet(panel));
     }
-    // 回显勾选的关系（编辑时调用）
+    // 回显选中的关系（编辑时调用；兼容旧版存名称字符串）
     function loadRelationBindings(panel, list) {
         if (!panel || !Array.isArray(list)) return;
-        const set = {};
-        list.forEach(function(r) { set[r] = true; });
-        panel.querySelectorAll('.rel-binding-check').forEach(function(c) { c.checked = !!set[c.value]; });
-        updateRelBindingCount(panel);
+        const sel = getRelBindingsSet(panel);
+        sel.clear();
+        const defs = getRelationDefs();
+        list.forEach(function(item) {
+            const s = String(item);
+            if (!s) return;
+            const def = getRelationDefById(s) ||
+                defs.find(function(d) { return d.name === s; }) ||
+                defs.find(function(d) { return (d.shenA + (d.relType === 'ke' ? '克' : '生') + d.shenB) === s; });
+            if (def) sel.add(String(def.id));
+            else sel.add(s);
+        });
+        renderRelBindingBox(panel);
     }
-    // 清空勾选（新建时调用）
+    // 清空选中（新建时调用）
     function resetRelationBindings(panel) {
         if (!panel) return;
-        panel.querySelectorAll('.rel-binding-check').forEach(function(c) { c.checked = false; });
-        updateRelBindingCount(panel);
+        getRelBindingsSet(panel).clear();
+        renderRelBindingBox(panel);
+    }
+    // 刷新所有面板（关系定义变化后调用，保持已选状态）
+    function refreshRelBindingPanels() {
+        document.querySelectorAll('.ref-output-panel').forEach(function(panel) { renderRelBindingBox(panel); });
     }
 
     // 分类内断语按名称（断语文本）排序显示
@@ -10225,8 +10727,9 @@
         const {wuCount, shenCount, groupCount, groupTian, groupDi, shenWuXing}=getStats(data);
         cache.shenWuXing = shenWuXing;
 
-        // 收集命中的参考值规则（断语/条件宏），供十神柱状对比图使用（仅收集不触发断语显示，避免与后端匹配冲突）
-        matchRules(data, { collectRefOnly: true });
+        // 收集命中的参考值规则（断语/条件宏）+ 三范围生克关系对比评估（仅收集不触发断语显示，避免与后端匹配冲突）
+        window._lastCalcData = data;
+        collectShenChartData(data, window.currentShenDisplayMode || 'all');
         // 柱状对比图实时刷新（跟随原局/大运/流年选择与数量调节）
         refreshShenBarIfVisible();
         
@@ -30951,10 +31454,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="ref-tpl-tip text-[11px] text-amber-700/80 mt-1 hidden"></div>
                 <div class="mt-2 pt-2 border-t border-amber-200">
                     <div class="flex items-center justify-between mb-1">
-                        <label class="block text-xs font-medium text-gray-600">🔗 关联生克关系 <span class="text-gray-400">（命中本断语/宏时，勾选的关系在柱状图关系表中打 ✓ 提醒）</span></label>
-                        <span class="text-[10px] text-gray-400 shrink-0">已选 <span class="rel-binding-count">0</span>/10</span>
+                        <label class="block text-sm font-medium text-gray-700">🔗 关联生克关系 <span class="text-xs text-gray-400">（命中本断语/宏时，所选关系在柱状对比图关系表中打 ✓ 提醒；可重命名/新增关系）</span></label>
+                        <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRelationDefManager()">⚙️ 关系设置</button>
                     </div>
-                    <div class="rel-binding-box grid grid-cols-2 gap-x-3 gap-y-1"></div>
+                    <button type="button" class="rel-binding-toggle w-full p-2 border rounded bg-white text-sm text-left flex items-center justify-between hover:border-amber-300" onclick="toggleRelBindingPanel(this.closest('.ref-output-panel'))">
+                        <span class="text-gray-700">📌 点击下拉选择关系（已选 <span class="rel-binding-count font-bold text-amber-700">0</span> 项）</span>
+                        <span class="rel-binding-arrow text-gray-400 font-bold">▾</span>
+                    </button>
+                    <div class="rel-binding-drop hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto z-30"></div>
+                    <div class="rel-binding-chips flex flex-wrap gap-1 mt-1"></div>
                 </div>
             </div>
             <div class="mb-3">
@@ -31378,6 +31886,72 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="flex gap-2">
                 <button onclick="saveRefTemplate()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base">💾 保存模板</button>
                 <button onclick="backToRefTplList()" class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-base">← 返回列表</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="relation-defs-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[720px] max-w-[96vw] max-h-[92vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-xl font-bold text-amber-800">🔗 生克关系定义管理</h3>
+            <button onclick="closeRelationDefManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <!-- 列表视图 -->
+        <div id="rel-def-list-view" class="p-4 flex-1 overflow-y-auto">
+            <div class="flex gap-2 mb-3 flex-wrap">
+                <input type="text" id="rel-def-list-search" class="flex-1 p-2.5 border rounded text-base min-w-[180px]" placeholder="🔍 搜索关系名称..." oninput="renderRelationDefList()">
+                <button onclick="newRelationDef()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base shrink-0">➕ 新增关系</button>
+            </div>
+            <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-gray-600">
+                <p class="font-medium text-amber-700 mb-1">关系定义说明：</p>
+                <p>• 内置十组相生/相克关系，可<b>重命名</b>（如 食伤克官杀 → 食伤制官杀），未重命名按默认名称显示。</p>
+                <p>• 可<b>新增自定义关系</b>（任选两个十神 + 自定义名称，如 比劫制财护印 = 比劫:财星），并在断语/条件宏的「关联生克关系」下拉中绑定。</p>
+                <p>• 关系在柱状对比图的关系表中按实际数量比例（A:B）统计展示。</p>
+            </div>
+            <div id="rel-def-list" class="space-y-2">
+                <p class="text-gray-400 text-center py-4">关系加载中...</p>
+            </div>
+        </div>
+        <!-- 编辑视图 -->
+        <div id="rel-def-edit-view" class="p-5 flex-1 overflow-y-auto hidden">
+            <h4 id="rel-def-edit-title" class="text-lg font-bold text-amber-800 mb-3"></h4>
+            <div class="mb-3">
+                <label class="block text-sm text-gray-600 mb-1">关系显示名称 <span class="text-red-500">*</span> <span class="text-gray-400">（如 食伤制官杀 / 比劫制财护印）</span></label>
+                <input type="text" id="rel-def-name" class="w-full p-2 border rounded text-base" placeholder="如：食伤制官杀">
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm text-gray-600 mb-1">关系类型 <span class="text-red-500">*</span></label>
+                <select id="rel-def-type" class="w-full p-2 border rounded text-base">
+                    <option value="ke">相克</option>
+                    <option value="sheng">相生</option>
+                </select>
+            </div>
+            <div class="mb-3 grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">十神 A（主） <span class="text-red-500">*</span></label>
+                    <select id="rel-def-shen-a" class="w-full p-2 border rounded text-base">
+                        <option value="比劫">比劫</option>
+                        <option value="食伤">食伤</option>
+                        <option value="财星">财星</option>
+                        <option value="官杀">官杀</option>
+                        <option value="印星">印星</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">十神 B（受） <span class="text-red-500">*</span></label>
+                    <select id="rel-def-shen-b" class="w-full p-2 border rounded text-base">
+                        <option value="比劫">比劫</option>
+                        <option value="食伤">食伤</option>
+                        <option value="财星">财星</option>
+                        <option value="官杀">官杀</option>
+                        <option value="印星">印星</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="saveRelationDef()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base">💾 保存关系</button>
+                <button onclick="backToRelDefList()" class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-base">← 返回列表</button>
             </div>
         </div>
     </div>
