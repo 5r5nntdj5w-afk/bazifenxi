@@ -2328,6 +2328,7 @@
                     导入断语<input type="file" id="import-rule" class="hidden" accept=".json">
                 </label>
                 <button id="batch-copy" class="px-3 py-1 bg-yellow-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量复制</button>
+                <button id="batch-cond-set" class="px-3 py-1 bg-indigo-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>⚙️ 批量条件设置</button>
                 <button id="batch-enable" class="px-3 py-1 bg-green-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量开启</button>
                 <button id="batch-disable" class="px-3 py-1 bg-gray-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>批量关闭</button>
                 <button id="prefix-merge-btn" class="px-3 py-1 bg-cyan-700 text-white rounded text-sm" style="display:none">🔗 合并前缀设置</button>
@@ -14528,6 +14529,9 @@
         if (batchEnable) batchEnable.disabled = count === 0;
         if (batchDisable) batchDisable.disabled = count === 0;
         
+        const batchCondSet = document.getElementById('batch-cond-set');
+        if (batchCondSet) batchCondSet.disabled = count === 0;
+        
         // 更新全选当前页状态
         if (selectAll) {
             const checkboxes = document.querySelectorAll('.rule-checkbox');
@@ -24142,6 +24146,249 @@ async function deleteMacroConfirm(macroId) {
     updateMacroTagFilters();
 }
 
+// ============ 批量条件设置（断语/条件宏通用） ============
+// 对选中的断语/条件宏批量设置：参考值输出、关联生克关系、默认取值维度、默认映射规则
+// 每项支持「不修改 / 设置 / 清除」；关联生克关系额外支持「追加」
+let _batchCondModalType = '';
+let _batchCondTargets = [];
+
+function openBatchConditionsModal(type, targets) {
+    _batchCondModalType = type || '';
+    _batchCondTargets = targets || [];
+    renderBatchCondRefTpl();
+    renderBatchCondRelations();
+    renderBatchCondMappings();
+    // 重置模式并隐藏设置体
+    ['ref', 'rel', 'qz', 'map'].forEach(function(k) {
+        const modeSel = document.getElementById('bc-' + k + '-mode');
+        if (modeSel) modeSel.value = '';
+        const body = document.getElementById('bc-' + k + '-body');
+        if (body) body.classList.add('hidden');
+    });
+    const countEl = document.getElementById('batch-cond-count');
+    if (countEl) countEl.textContent = String(targets.length);
+    const modal = document.getElementById('batch-conditions-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeBatchConditionsModal() {
+    const modal = document.getElementById('batch-conditions-modal');
+    if (modal) modal.classList.add('hidden');
+    _batchCondModalType = '';
+    _batchCondTargets = [];
+}
+
+// 模式切换：显示/隐藏对应设置体
+function onBatchCondModeChange(kind) {
+    const modeSel = document.getElementById('bc-' + kind + '-mode');
+    const body = document.getElementById('bc-' + kind + '-body');
+    if (!modeSel || !body) return;
+    body.classList.toggle('hidden', modeSel.value !== 'set');
+}
+
+// 参考值模板下拉（模板来自 getRefTemplates，未登录时回退本地缓存）
+function renderBatchCondRefTpl() {
+    const sel = document.getElementById('bc-ref-template');
+    if (!sel) return;
+    let templates = [];
+    try {
+        if (typeof getRefTemplates === 'function') templates = getRefTemplates() || [];
+    } catch (e) { templates = []; }
+    sel.innerHTML = '<option value="">--请选择参考值模板--</option>' +
+        templates.map(function(t) {
+            const label = t.displayName || t.name || '未命名模板';
+            const id = t.cloudId || t.id || '';
+            return '<option value="' + id + '">' + escapeHtml(label) + '</option>';
+        }).join('');
+}
+
+// 关联生克关系多选（内置+自定义，分相克/相生两组）
+function renderBatchCondRelations() {
+    const keBox = document.getElementById('bc-rel-ke');
+    const shengBox = document.getElementById('bc-rel-sheng');
+    if (!keBox || !shengBox) return;
+    let defs = [];
+    try {
+        if (typeof getRelationDefs === 'function') defs = getRelationDefs() || [];
+    } catch (e) { defs = []; }
+    const defsHtml = function(list, colorCls) {
+        if (!list || !list.length) return '<span class="text-xs text-gray-400">暂无</span>';
+        return list.map(function(d) {
+            return '<label class="inline-flex items-center gap-1 mr-2 mb-1 text-sm cursor-pointer">' +
+                '<input type="checkbox" class="bc-rel-chk" value="' + d.id + '">' +
+                '<span class="' + colorCls + '">' + escapeHtml(d.name) + '</span>' +
+                '</label>';
+        }).join('');
+    };
+    keBox.innerHTML = '<div class="text-xs font-bold text-red-600 mb-1">🔥 相克关系</div>' +
+        defsHtml(defs.filter(function(d) { return d.relType === 'ke'; }), 'text-red-700');
+    shengBox.innerHTML = '<div class="text-xs font-bold text-green-600 mb-1">🌱 相生关系</div>' +
+        defsHtml(defs.filter(function(d) { return d.relType === 'sheng'; }), 'text-green-700');
+}
+
+// 映射规则下拉（按字段类型：十神组/五行）
+function renderBatchCondMappings() {
+    const szSel = document.getElementById('bc-map-sz');
+    const wxSel = document.getElementById('bc-map-wx');
+    if (!szSel || !wxSel) return;
+    let rules = [];
+    try {
+        if (typeof getMappingRules === 'function') rules = getMappingRules() || [];
+    } catch (e) { rules = []; }
+    const optsHtml = function(type) {
+        return rules.filter(function(r) { return r.type === type; }).map(function(r) {
+            return '<option value="' + r.id + '">' + escapeHtml(r.name) + '</option>';
+        }).join('');
+    };
+    szSel.innerHTML = '<option value="">--不设置（使用字段设置）--</option>' + optsHtml('十神组');
+    wxSel.innerHTML = '<option value="">--不设置（使用字段设置）--</option>' + optsHtml('五行');
+}
+
+// 收集弹窗中的批量设置
+function collectBatchCondSettings() {
+    const gv = function(id) { const el = document.getElementById(id); return el ? el.value : ''; };
+    const relIds = [];
+    document.querySelectorAll('.bc-rel-chk:checked').forEach(function(cb) { relIds.push(cb.value); });
+    return {
+        ref: { mode: gv('bc-ref-mode'), tplId: gv('bc-ref-template') },
+        rel: { mode: gv('bc-rel-mode'), ids: relIds },
+        qz: { mode: gv('bc-qz-mode'), val: gv('bc-qz-val') },
+        map: { mode: gv('bc-map-mode'), sz: gv('bc-map-sz'), wx: gv('bc-map-wx') }
+    };
+}
+
+// 将批量设置应用到单个 conditions（深拷贝后修改，返回新 conditions；未修改的项保持原状）
+function applyBatchCondSettings(conditions, s) {
+    const c = (conditions && typeof conditions === 'object') ? JSON.parse(JSON.stringify(conditions)) : { logic: 'and', children: [] };
+    if (s.ref.mode === 'set') {
+        if (s.ref.tplId) c.referenceOutput = { refTemplateId: s.ref.tplId };
+        else delete c.referenceOutput;
+    } else if (s.ref.mode === 'clear') {
+        delete c.referenceOutput;
+    }
+    if (s.rel.mode === 'set') {
+        c.relationBindings = s.rel.ids.slice();
+    } else if (s.rel.mode === 'append') {
+        const merged = (Array.isArray(c.relationBindings) ? c.relationBindings : []).concat(s.rel.ids);
+        c.relationBindings = merged.filter(function(v, i) { return merged.indexOf(v) === i; });
+    } else if (s.rel.mode === 'clear') {
+        delete c.relationBindings;
+    }
+    if (s.qz.mode === 'set') {
+        c.defaultQuZhi = s.qz.val;
+    } else if (s.qz.mode === 'clear') {
+        delete c.defaultQuZhi;
+    }
+    if (s.map.mode === 'set') {
+        const dm = {};
+        if (s.map.sz) dm['十神组'] = s.map.sz;
+        if (s.map.wx) dm['五行'] = s.map.wx;
+        c.defaultMapping = dm;
+    } else if (s.map.mode === 'clear') {
+        delete c.defaultMapping;
+    }
+    return c;
+}
+
+// 条件宏批量条件设置（宏批量栏入口）
+async function openMacroBatchConditionsModal() {
+    if (!_selectedMacroIds || _selectedMacroIds.size === 0) {
+        alert('请先选择要设置的条件宏');
+        return;
+    }
+    const targets = [..._selectedMacroIds].map(function(id) {
+        const m = getMacroById(id);
+        return { key: id, name: m ? (m.name || id) : id };
+    });
+    openBatchConditionsModal('macro', targets);
+    document.getElementById('bc-confirm').onclick = async function() {
+        const s = collectBatchCondSettings();
+        const isAdminUser = currentUser && isAdmin(currentUser.email);
+        let n = 0, skipped = 0;
+        for (const t of targets) {
+            const m = getMacroById(t.key);
+            if (!m) continue;
+            // 【权限】普通用户只能设置自己创建的条件宏（管理员可设置所有）
+            const isOwn = !m.createdBy || m.createdBy === getCurrentUserId();
+            if (!isOwn && !isAdminUser) { skipped++; continue; }
+            m.conditions = applyBatchCondSettings(m.conditions, s);
+            try {
+                const saved = await saveMacro(m);
+                if (saved !== false) n++;
+            } catch (e) {
+                console.error('批量条件设置保存宏失败:', e);
+            }
+        }
+        closeBatchConditionsModal();
+        renderMacroList();
+        updateMacroTagFilters();
+        clearMacroSelection();
+        alert('已批量设置 ' + n + ' 个条件宏' + (skipped > 0 ? '（跳过 ' + skipped + ' 个非您创建的宏）' : ''));
+    };
+}
+
+// 断语批量条件设置（断语批量工具栏入口）
+async function openRuleBatchConditionsModal() {
+    if (!selectedRulesSet || selectedRulesSet.size === 0) {
+        alert('请先选择要设置的断语');
+        return;
+    }
+    const targets = [...selectedRulesSet].map(function(ruleKey) {
+        const rule = cache.rules.find(function(r) { return ruleKeyMatches(r, ruleKey); });
+        return rule ? { key: ruleKey, name: rule.duanyu || ruleKey } : null;
+    }).filter(Boolean);
+    if (!targets.length) {
+        alert('未找到选中的断语');
+        return;
+    }
+    openBatchConditionsModal('rule', targets);
+    document.getElementById('bc-confirm').onclick = async function() {
+        const s = collectBatchCondSettings();
+        const isAdminUser = currentUser && isAdmin(currentUser.email);
+        let n = 0, skipped = 0;
+        for (const t of targets) {
+            const rule = cache.rules.find(function(r) { return ruleKeyMatches(r, t.key); });
+            if (!rule) continue;
+            // 【权限】普通用户只能设置自己创建的断语（管理员可设置所有）
+            const isOwn = (!rule.ownerId && !rule.userId) || rule.ownerId === getCurrentUserId() || rule.userId === getCurrentUserId();
+            if (!isAdminUser && !isOwn) { skipped++; continue; }
+            rule.conditions = applyBatchCondSettings(rule.conditions, s);
+            rule.updateTime = new Date().toISOString();
+            try {
+                if (rule.id && currentUser && supabaseClient) {
+                    await updateSupabaseDuanyu(rule.id, {
+                        category: rule.category,
+                        conditions: rule.conditions,
+                        duanyu: rule.duanyu,
+                        permissionLevel: rule.permissionLevel || 0,
+                        description: rule.description || '',
+                        groupKey: rule.groupKey || '',
+                        priority: rule.priority || 0,
+                        ownerId: rule.ownerId || '',
+                        userId: rule.userId || ''
+                    });
+                }
+                n++;
+            } catch (e) {
+                console.error('批量条件设置同步云端失败:', e);
+            }
+        }
+        localStorage.setItem(RULE_KEY, JSON.stringify(cache.rules));
+        closeBatchConditionsModal();
+        updateSelectionUI();
+        reloadAll();
+        clearScfRuleCache();
+        clearClientApiCache();
+        alert('已批量设置 ' + n + ' 条断语' + (skipped > 0 ? '（跳过 ' + skipped + ' 条非您创建的断语）' : ''));
+    };
+}
+
+// 断语批量工具栏按钮绑定（页面加载完成后执行）
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('batch-cond-set');
+    if (btn) btn.onclick = openRuleBatchConditionsModal;
+});
+
 // ============ 批量操作功能 ============
 let _selectedMacroIds = new Set();
 
@@ -31331,6 +31578,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="text-sm text-indigo-700">已选择 <span id="macro-selected-count" class="font-bold">0</span> 个条件宏</span>
                 <button onclick="batchCopyMacros()" class="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs">📋 批量复制</button>
                 <button onclick="batchEditTags()" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs">🏷️ 批量调整标签</button>
+                <button onclick="openMacroBatchConditionsModal()" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs">⚙️ 批量条件设置</button>
                 <button onclick="batchDeleteMacros()" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs">🗑️ 批量删除</button>
                 <button onclick="clearMacroSelection()" class="px-3 py-1.5 bg-gray-400 text-white rounded text-xs">✖️ 取消选择</button>
             </div>
@@ -31505,6 +31753,91 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button id="save-macro-btn" class="px-4 py-2 bg-indigo-600 text-white rounded">💾 保存宏</button>
                 <button onclick="closeMacroEditor()" class="px-4 py-2 bg-gray-300 rounded">取消</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- 批量条件设置弹窗（断语/条件宏通用：参考值输出、关联生克关系、默认取值维度、默认映射规则） -->
+<div id="batch-conditions-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] hidden">
+    <div class="bg-white rounded-lg shadow-xl w-[720px] max-h-[85vh] flex flex-col mx-4">
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h3 class="text-lg font-bold">⚙️ 批量条件设置</h3>
+            <button onclick="closeBatchConditionsModal()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1 space-y-4">
+            <p class="text-sm text-gray-500">已选择 <strong id="batch-cond-count" class="text-blue-600">0</strong> 项，设置将应用到全部选中项。各项均可选择「不修改 / 设置 / 清除」，未修改的项保持原状。</p>
+            <!-- 参考值输出 -->
+            <div class="border border-amber-200 rounded-lg p-3">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="font-bold text-sm text-amber-700">📊 参考值输出</span>
+                    <select id="bc-ref-mode" class="px-2 py-1 border rounded text-sm" onchange="onBatchCondModeChange('ref')">
+                        <option value="">不修改</option>
+                        <option value="set">设置（选择模板）</option>
+                        <option value="clear">清除</option>
+                    </select>
+                </div>
+                <div id="bc-ref-body" class="hidden">
+                    <select id="bc-ref-template" class="w-full p-2 border rounded text-sm"></select>
+                </div>
+            </div>
+            <!-- 关联生克关系 -->
+            <div class="border border-purple-200 rounded-lg p-3">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="font-bold text-sm text-purple-700">🔗 关联生克关系</span>
+                    <select id="bc-rel-mode" class="px-2 py-1 border rounded text-sm" onchange="onBatchCondModeChange('rel')">
+                        <option value="">不修改</option>
+                        <option value="set">覆盖（替换为所选）</option>
+                        <option value="append">追加（增加所选）</option>
+                        <option value="clear">清除</option>
+                    </select>
+                </div>
+                <div id="bc-rel-body" class="hidden">
+                    <div id="bc-rel-ke" class="mb-1"></div>
+                    <div id="bc-rel-sheng"></div>
+                </div>
+            </div>
+            <!-- 默认取值维度 -->
+            <div class="border border-sky-200 rounded-lg p-3">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="font-bold text-sm text-sky-700">🎯 默认取值维度</span>
+                    <select id="bc-qz-mode" class="px-2 py-1 border rounded text-sm" onchange="onBatchCondModeChange('qz')">
+                        <option value="">不修改</option>
+                        <option value="set">设置</option>
+                        <option value="clear">清除</option>
+                    </select>
+                </div>
+                <div id="bc-qz-body" class="hidden">
+                    <select id="bc-qz-val" class="w-full p-2 border rounded text-sm">
+                        <option value="天干">天干</option>
+                        <option value="地支">地支</option>
+                    </select>
+                </div>
+            </div>
+            <!-- 默认映射规则 -->
+            <div class="border border-teal-200 rounded-lg p-3">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="font-bold text-sm text-teal-700">🧭 默认映射规则</span>
+                    <select id="bc-map-mode" class="px-2 py-1 border rounded text-sm" onchange="onBatchCondModeChange('map')">
+                        <option value="">不修改</option>
+                        <option value="set">设置</option>
+                        <option value="clear">清除</option>
+                    </select>
+                </div>
+                <div id="bc-map-body" class="hidden grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">十神组映射</label>
+                        <select id="bc-map-sz" class="w-full p-2 border rounded text-sm"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">五行映射</label>
+                        <select id="bc-map-wx" class="w-full p-2 border rounded text-sm"></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 p-4 border-t shrink-0">
+            <button onclick="closeBatchConditionsModal()" class="px-4 py-2 border border-gray-300 rounded text-sm">取消</button>
+            <button id="bc-confirm" class="px-4 py-2 bg-blue-600 text-white rounded text-sm">确认应用</button>
         </div>
     </div>
 </div>
