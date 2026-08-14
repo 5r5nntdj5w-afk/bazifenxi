@@ -9852,7 +9852,7 @@
         _editingRefTplId = null;
         document.getElementById('ref-tpl-name').value = '';
         document.getElementById('ref-tpl-display-name').value = '';
-        buildRefTemplateEditor({ values: {}, relationRefs: [] });
+        buildRefTemplateEditor({ values: {}, relationRefs: [], matchConditions: {}, relationPrefs: [] });
         document.getElementById('ref-tpl-list-view').classList.add('hidden');
         document.getElementById('ref-tpl-edit-view').classList.remove('hidden');
     }
@@ -9863,7 +9863,7 @@
         _editingRefTplId = tpl.cloudId || tpl.id;
         document.getElementById('ref-tpl-name').value = tpl.name || '';
         document.getElementById('ref-tpl-display-name').value = tpl.displayName || '';
-        buildRefTemplateEditor({ values: tpl.values || {}, relationRefs: tpl.relationRefs || [] });
+        buildRefTemplateEditor({ values: tpl.values || {}, relationRefs: tpl.relationRefs || [], matchConditions: tpl.matchConditions || {}, relationPrefs: tpl.relationPrefs || [] });
         document.getElementById('ref-tpl-list-view').classList.add('hidden');
         document.getElementById('ref-tpl-edit-view').classList.remove('hidden');
     }
@@ -9966,24 +9966,29 @@
         }
     }
     // ---- 基础匹配条件 / 喜忌规则 编辑辅助 ----
-    // 字段下拉选项（复用 field_config 字段：分组显示；未加载时回退十神数量字段）
-    function refTplFieldOptionsHtml(selected) {
-        let fields = [];
-        try { if (_fieldConfigCache && Array.isArray(_fieldConfigCache)) fields = _fieldConfigCache; } catch (e) { fields = []; }
-        if (!fields.length) {
-            return GROUPED_SHEN.map(function(g) {
-                const v = '十神数量-' + g;
-                return '<option value="' + v + '"' + (String(v) === String(selected) ? ' selected' : '') + '>' + g + '数量</option>';
-            }).join('');
+    // 字段下拉选项：克隆断语条件编辑器的完整字段列表（含全部分组与自定义字段），缓存复用
+    let _refTplFieldOptionsCache = null;
+    function getRefTplFieldOptionsHtml(selected) {
+        let html = _refTplFieldOptionsCache;
+        if (html === null) {
+            try {
+                const tpl = document.getElementById('condition-item-template');
+                const sel = tpl && tpl.content && tpl.content.querySelector('.condition-field');
+                html = sel ? sel.innerHTML : '';
+            } catch (e) { html = ''; }
+            if (!html || html.indexOf('<optgroup') === -1) {
+                // 回退：内置十神数量基础字段
+                html = '<optgroup label="十神数量">' + GROUPED_SHEN.map(function(g) {
+                    return '<option value="十神数量-' + g + '">' + g + '数量</option>';
+                }).join('') + '</optgroup>';
+            }
+            _refTplFieldOptionsCache = html;
         }
-        const groups = {};
-        fields.forEach(function(f) { const g = f.group_label || '其他'; (groups[g] = groups[g] || []).push(f); });
-        let html = '';
-        Object.keys(groups).forEach(function(g) {
-            html += '<optgroup label="' + escapeHtml(g) + '">' + groups[g].map(function(f) {
-                return '<option value="' + escapeHtml(f.field_value) + '"' + (String(f.field_value) === String(selected) ? ' selected' : '') + '>' + escapeHtml(f.field_name) + '</option>';
-            }).join('') + '</optgroup>';
-        });
+        if (selected) {
+            html = html.replace(/(<option value=")([^"]*)(")/g, function(m, p1, p2, p3) {
+                return p1 + p2 + p3 + (p2 === String(selected) ? ' selected' : '');
+            });
+        }
         return html;
     }
     // 关系下拉选项（喜忌规则关联关系：相克/相生分组）
@@ -9998,22 +10003,36 @@
         return '<optgroup label="相克">' + opt(defs.filter(function(d) { return d.relType === 'ke'; })) + '</optgroup>' +
             '<optgroup label="相生">' + opt(defs.filter(function(d) { return d.relType === 'sheng'; })) + '</optgroup>';
     }
-    // 条件行（字段 + 运算符 + 值），用于基础匹配条件与喜忌触发条件
+    // 条件行（字段[分组+搜索选择器] + 运算符 + 值），用于基础匹配条件与喜忌触发条件
     function createRefTplCondRow(cond) {
         const row = document.createElement('div');
         row.className = 'ref-tpl-cond-row flex flex-wrap items-center gap-1.5 bg-white rounded px-2 py-1';
+        const fval = (cond && cond.field) ? cond.field : '';
+        const opSelected = cond && cond.op;
         row.innerHTML =
-            '<select class="rtf-field text-sm p-1.5 border rounded flex-1 min-w-[160px]">' + refTplFieldOptionsHtml(cond && cond.field) + '</select>' +
+            '<div class="condition-field-wrapper flex-1 min-w-[160px]">' +
+            '<select class="condition-field rtf-field" style="display:none">' +
+            '<option value="">选择字段</option>' + getRefTplFieldOptionsHtml(fval) +
+            '</select>' +
+            '<div class="custom-field-trigger" tabindex="0" role="combobox" aria-haspopup="listbox">' +
+            '<span class="custom-field-text">' + (fval ? escapeHtml(fval) : '选择字段') + '</span>' +
+            '<span class="custom-field-arrow">▼</span></div>' +
+            '<div class="custom-field-dropdown">' +
+            '<div class="custom-field-search-box"><input type="text" class="custom-field-search-input" placeholder="🔍 搜索字段..."></div>' +
+            '<div class="custom-field-options"></div>' +
+            '</div></div>' +
             '<select class="rtf-op text-sm p-1.5 border rounded">' +
-            '<option value="eq"' + ((cond && cond.op) === 'eq' ? ' selected' : '') + '>=（等于）</option>' +
-            '<option value="ne"' + ((cond && cond.op) === 'ne' ? ' selected' : '') + '>≠（不等于）</option>' +
-            '<option value="ge"' + ((cond && cond.op) === 'ge' ? ' selected' : '') + '>≥（不低于）</option>' +
-            '<option value="gt"' + ((cond && cond.op) === 'gt' ? ' selected' : '') + '>＞（大于）</option>' +
-            '<option value="le"' + ((cond && cond.op) === 'le' ? ' selected' : '') + '>≤（不高于）</option>' +
-            '<option value="lt"' + ((cond && cond.op) === 'lt' ? ' selected' : '') + '>＜（小于）</option>' +
+            '<option value="eq"' + (opSelected === 'eq' ? ' selected' : '') + '>=（等于）</option>' +
+            '<option value="ne"' + (opSelected === 'ne' ? ' selected' : '') + '>≠（不等于）</option>' +
+            '<option value="ge"' + (opSelected === 'ge' ? ' selected' : '') + '>≥（不低于）</option>' +
+            '<option value="gt"' + (opSelected === 'gt' ? ' selected' : '') + '>＞（大于）</option>' +
+            '<option value="le"' + (opSelected === 'le' ? ' selected' : '') + '>≤（不高于）</option>' +
+            '<option value="lt"' + (opSelected === 'lt' ? ' selected' : '') + '>＜（小于）</option>' +
             '</select>' +
             '<input class="rtf-val flex-1 min-w-[90px] text-sm p-1.5 border rounded" placeholder="值（如 食伤 / 2）" value="' + escapeHtml((cond && cond.val !== undefined) ? cond.val : '') + '">' +
             '<button type="button" class="text-red-500 text-sm px-1 shrink-0" title="删除该条件" onclick="this.closest(\'.ref-tpl-cond-row\').remove()">✕</button>';
+        // 绑定分组+搜索字段选择器（与断语条件编辑器一致）
+        try { if (typeof initCustomFieldSelect === 'function') initCustomFieldSelect(row); } catch (e) {}
         return row;
     }
     function addRefTplMatchCond() {
@@ -10097,7 +10116,7 @@
             if (exactVals.length) relationRefs.push({ relation: relation, type: 'eq', values: exactVals });
         });
         if (relationRefs.length) ro.relationRefs = relationRefs;
-        // 基础匹配条件收集（AND 组合）
+        // 基础匹配条件收集（AND 组合；无有效条件行时写空结构，覆盖旧值 → 不参与命局直接匹配）
         const matchChildren = [];
         document.querySelectorAll('#ref-tpl-match-box .ref-tpl-cond-row').forEach(function(row) {
             const field = row.querySelector('.rtf-field').value.trim();
@@ -10105,8 +10124,8 @@
             const val = row.querySelector('.rtf-val').value.trim();
             if (field && val !== '') matchChildren.push({ field: field, op: op, val: val });
         });
-        if (matchChildren.length) ro.matchConditions = { logic: 'and', children: matchChildren };
-        // 生克关系喜忌收集（每条 = 喜/忌 + 关联关系 + 触发条件）
+        ro.matchConditions = { logic: 'and', children: matchChildren };
+        // 生克关系喜忌收集（每条 = 喜/忌 + 关联关系 + 触发条件；无有效规则时写空数组，覆盖旧值）
         const prefs = [];
         document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').forEach(function(row) {
             const relId = row.querySelector('.rtp-rel').value;
@@ -10120,7 +10139,7 @@
             });
             prefs.push({ pref: row.querySelector('.rtp-pref').value === 'ji' ? 'ji' : 'xi', relId: relId, conds: conds.length ? { logic: 'and', children: conds } : { logic: 'and', children: [] } });
         });
-        if (prefs.length) ro.relationPrefs = prefs;
+        ro.relationPrefs = prefs;
         return Object.keys(ro).length ? ro : null;
     }
     // 保存模板（新建/更新到云端）
