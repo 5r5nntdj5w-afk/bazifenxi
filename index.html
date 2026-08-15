@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -26768,6 +26768,8 @@ async function initApp() {
     try { await loadGlobalDisplayConfig(); } catch (e) { console.error('加载断语显示全局配置失败:', e); }
     // 加载柱状对比图显示设置（管理员自定义的标识颜色；未配置时用默认）
     try { await loadShenDisplaySettings(); } catch (e) { console.error('加载柱状对比图显示设置失败:', e); }
+    // 加载映射规则云端配置（自定义映射规则换设备沿用；未配置时用本地/默认）
+    try { await loadMappingRulesFromCloud(); } catch (e) { console.error('加载映射规则云端配置失败:', e); }
     // 无论是否登录，都初始化页面
     initAll();
     if (isLoggedIn) {
@@ -33360,6 +33362,8 @@ var _editingRuleId = null; // 当前编辑的规则ID
 
 var _mappingRulesCache = null;
 var _mappingRulesCacheRaw = '';
+var _mappingRulesCloudCache = null;   // 云端加载的映射规则（含预设，换设备沿用）
+var _mappingRulesCloudLoaded = false; // 是否已从云端加载
 
 function getMappingRules() {
     // 默认预设规则
@@ -33373,6 +33377,11 @@ function getMappingRules() {
         {id: 'map_wx_3', name: '火克金', type: '五行', offset: 3},
         {id: 'map_wx_4', name: '土克水', type: '五行', offset: 4}
     ];
+    // 云端优先（登录后已加载，换设备可沿用）
+    if (_mappingRulesCloudLoaded && _mappingRulesCloudCache) {
+        if (_mappingRulesCloudCache.length === 0) return defaultRules;
+        return _mappingRulesCloudCache;
+    }
     try {
         var raw = localStorage.getItem(MAPPING_RULES_KEY);
         if (raw) {
@@ -33392,6 +33401,48 @@ function getMappingRules() {
 
 function saveMappingRules(rules) {
     try { localStorage.setItem(MAPPING_RULES_KEY, JSON.stringify(rules)); } catch(e) {}
+    if (Array.isArray(rules)) {
+        _mappingRulesCacheRaw = JSON.stringify(rules);
+        _mappingRulesCache = rules;
+        _mappingRulesCloudCache = rules;
+        _mappingRulesCloudLoaded = true;
+    }
+    // 登录后同步到云端（app_config.pb_mapping_rules），换设备自动沿用
+    try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+            supabaseClient
+                .from('app_config')
+                .upsert({ config_key: 'pb_mapping_rules', config_value: JSON.stringify(rules) }, { onConflict: 'config_key' })
+                .then(function(res) { if (res.error) console.warn('映射规则云端同步失败（无权限时仅本地保存）:', res.error.message); })
+                .catch(function(e) { console.warn('映射规则云端同步异常:', e); });
+        }
+    } catch(e) { console.warn('映射规则云端同步异常:', e); }
+}
+
+// 从云端加载映射规则（登录时调用，与十神标识符一致：云端优先，换设备沿用）
+async function loadMappingRulesFromCloud() {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('app_config')
+            .select('config_value')
+            .eq('config_key', 'pb_mapping_rules')
+            .limit(1);
+        if (error) throw error;
+        if (data && data.length && data[0].config_value) {
+            let cloudRules = null;
+            try { cloudRules = JSON.parse(data[0].config_value); } catch(e) { cloudRules = null; }
+            if (Array.isArray(cloudRules)) {
+                _mappingRulesCloudCache = cloudRules;
+                _mappingRulesCloudLoaded = true;
+                _mappingRulesCacheRaw = JSON.stringify(cloudRules);
+                _mappingRulesCache = cloudRules;
+                try { localStorage.setItem(MAPPING_RULES_KEY, JSON.stringify(cloudRules)); } catch(e) {}
+            }
+        }
+    } catch(e) {
+        console.warn('加载映射规则云端配置失败，使用本地:', e);
+    }
 }
 
 // 根据映射规则对值进行转换
