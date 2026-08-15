@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9558,7 +9558,7 @@
             '<div class="font-bold text-xs text-gray-600 mb-1">符号 / 文字设置</div>' +
             '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-2">' + symRows + '</div>' +
             (isAdminUser ? '<button type="button" id="ds-reset-btn" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded text-sm">恢复默认</button>' : '') +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格底色=达标 / 未达标（需参考比例）· 数字后 符号=绑定断语/宏命中，未命中反之 · 喜/忌=参考值模板喜忌标注（生克或十神强弱任一命中即标出，随范围动态变化）· 绑定/解绑符号=范围切换时的状态变化</div>';
+            '<div class="text-[11px] text-gray-400 mt-1">' + buildShenBarLegendHtml(ds) + '</div>';
         // 颜色 ↔ 文本输入同步
         box.querySelectorAll('[data-ds-key]').forEach(function(input) {
             input.addEventListener('input', function() {
@@ -9777,6 +9777,21 @@
 
     // 单张关系对比表：关系列 + 范围列与「状态变化」列交错显示（跟随大运/流年选择）
     // 状态显示（方案A·文字徽章式）：达标 ✓/✗ 徽章 · 命中 🔔 徽章 · 变化 ↗绑定 / ↘解绑 徽章
+    // 生成柱状对比图/生克表图例说明（动态绑定显示设置：颜色/符号/文字随设置一一对应）
+    function buildShenBarLegendHtml(ds) {
+        ds = ds || getDisplaySettings();
+        const esc = function(s) { return s === null || s === undefined ? '' : escapeHtml(String(s)); };
+        const hitOk = (ds.hitOkSym || '✓') + (ds.hitOkText ? ' ' + ds.hitOkText : '');
+        const hitFail = (ds.hitFailSym || '✗') + (ds.hitFailText ? ' ' + ds.hitFailText : '');
+        const xi = ds.xiText || '喜';
+        const ji = ds.jiText || '忌';
+        const bind = (ds.bindSym || '↗') + (ds.bindText ? ' ' + ds.bindText : '');
+        const unbind = (ds.unbindSym || '↘') + (ds.unbindText ? ' ' + ds.unbindText : '');
+        return '图例：<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.okBg) + '">达标</span>/<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.failBg) + '">未达标</span>（需参考比例）' +
+            ' · 数字后 <span style="color:' + esc(ds.hitOkColor) + '">' + esc(hitOk) + '</span>=绑定断语/宏命中，<span style="color:' + esc(ds.hitFailColor) + '">' + esc(hitFail) + '</span>=未命中' +
+            ' · <span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.xiBg) + ';color:' + esc(ds.xiColor) + '">' + esc(xi) + '</span>=喜用，<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.jiBg) + ';color:' + esc(ds.jiColor) + '">' + esc(ji) + '</span>=忌讳（生克或十神强弱任一命中即标出，随范围动态变化）' +
+            ' · <span style="color:' + esc(ds.bindColor) + '">' + esc(bind) + '</span>=范围切换绑定，<span style="color:' + esc(ds.unbindColor) + '">' + esc(unbind) + '</span>=范围切换解绑';
+    }
     function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount, prefSets, strongPrefSets) {
         visibleCount = (visibleCount === undefined || visibleCount === null) ? 3 : visibleCount;
         const isKe = title.indexOf('相克') >= 0;
@@ -9882,7 +9897,7 @@
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
             '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-gray-500">' + headHtml +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格底色=达标 / 未达标（需参考比例，颜色可在显示设置中自定义）· 数字后 命中符号/未命中符号=绑定断语/宏命中与否 · 喜/忌=参考值模板喜忌标注（青=喜用，紫=忌讳，生克或十神强弱任一命中即标出，随范围动态变化）· 绑定/解绑符号=范围切换时的状态变化</div>';
+            '<div class="text-[11px] text-gray-400 mt-1">' + buildShenBarLegendHtml(ds) + '</div>';
     }
 
     // 渲染参考比例：精确值数组（多个时折叠展开）/ 区间
