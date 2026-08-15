@@ -6694,10 +6694,8 @@
                 return;
             }
             closeModal();
-            // 刷新断语匹配结果（主格局面板实时应用新阈值）
-            reloadAll();
-            clearScfRuleCache();
-            clearClientApiCache();
+            // 重新匹配并渲染结果（主格局面板实时应用新阈值/名称/分类）
+            await refreshApiDuanyu();
             alert('✅ 主格局层次阈值已保存（全局生效）');
         };
         overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
