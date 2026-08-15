@@ -810,6 +810,16 @@
             margin-left: 6px; color: #6b7280;
         }
         .shen-settings-gear:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
+        .shen-set-tab-btn { border: 2px solid #e5e7eb; color: #374151; background: #fff; cursor: pointer; transition: all 0.15s; }
+        .shen-set-tab-btn:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
+        .shen-set-tab-btn.active { border-color: #6366f1; background: #e0e7ff; color: #4338ca; }
+        .ds-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f3f4f6; }
+        .ds-opt-row:last-child { border-bottom: none; }
+        .ds-opt-label { font-size: 13px; color: #374151; white-space: nowrap; }
+        .ds-opt-ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .ds-opt-ctl input[type="color"] { width: 40px; height: 26px; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px; cursor: pointer; background: #fff; }
+        .ds-opt-ctl input[type="text"] { width: 56px; font-size: 12px; padding: 2px 6px; border: 1px solid #e5e7eb; border-radius: 4px; text-align: center; }
+        .ds-opt-ctl input:disabled { opacity: 0.5; cursor: not-allowed; }
         /* 移动端响应式 */
         @media (max-width: 640px) {
             .rule-toolbar { flex-wrap: wrap !important; }
@@ -3235,53 +3245,61 @@
         </div>
     </div>
 
-    <!-- 查看案例弹窗 -->
-    <!-- 十神标识设置弹窗 -->
+    <!-- 显示设置弹窗（合并：十神标识符 + 柱状对比图显示设置） -->
     <div id="shen-settings-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-[9999]">
         <div class="bg-white rounded-lg p-6 mx-4 shadow-2xl shen-settings-modal">
-            <div class="flex justify-between items-center mb-5 pb-3 border-b">
-                <h3 class="text-lg font-bold text-gray-800">⚙ 十神标识符设置</h3>
+            <div class="flex justify-between items-center mb-4 pb-3 border-b">
+                <h3 class="text-lg font-bold text-gray-800">⚙ 显示设置</h3>
                 <span onclick="closeShenSettingsModal()" class="text-gray-400 hover:text-gray-600 text-xl cursor-pointer">&times;</span>
             </div>
-            <div class="text-xs text-gray-500 mb-3">可选择预设标识符或手动输入自定义符号</div>
-            
-            <div class="shen-settings-group">
-                <label>年柱标识</label>
-                <div class="shen-settings-presets" data-target="nian"></div>
-                <input class="shen-settings-input" type="text" id="shen-settings-nian" maxlength="2" oninput="onShenSettingInput('nian')">
+            <div class="flex gap-2 mb-4">
+                <button type="button" id="shen-set-tab-symbols" class="shen-set-tab-btn px-3 py-1.5 rounded text-sm font-medium active" onclick="switchShenSettingsTab('symbols')">十神标识符</button>
+                <button type="button" id="shen-set-tab-display" class="shen-set-tab-btn px-3 py-1.5 rounded text-sm font-medium" onclick="switchShenSettingsTab('display')">柱状图显示</button>
             </div>
-            <div class="shen-settings-group">
-                <label>月柱标识</label>
-                <div class="shen-settings-presets" data-target="yue"></div>
-                <input class="shen-settings-input" type="text" id="shen-settings-yue" maxlength="2" oninput="onShenSettingInput('yue')">
+            <!-- Tab1：十神标识符 -->
+            <div id="shen-settings-tab-symbols">
+                <div class="text-xs text-gray-500 mb-3">可选择预设标识符或手动输入自定义符号（登录后保存到云端，换设备自动沿用）</div>
+                
+                <div class="shen-settings-group">
+                    <label>年柱标识</label>
+                    <div class="shen-settings-presets" data-target="nian"></div>
+                    <input class="shen-settings-input" type="text" id="shen-settings-nian" maxlength="2" oninput="onShenSettingInput('nian')">
+                </div>
+                <div class="shen-settings-group">
+                    <label>月柱标识</label>
+                    <div class="shen-settings-presets" data-target="yue"></div>
+                    <input class="shen-settings-input" type="text" id="shen-settings-yue" maxlength="2" oninput="onShenSettingInput('yue')">
+                </div>
+                <div class="shen-settings-group">
+                    <label>日柱标识</label>
+                    <div class="shen-settings-presets" data-target="ri"></div>
+                    <input class="shen-settings-input" type="text" id="shen-settings-ri" maxlength="2" oninput="onShenSettingInput('ri')">
+                </div>
+                <div class="shen-settings-group">
+                    <label>时柱标识</label>
+                    <div class="shen-settings-presets" data-target="shi"></div>
+                    <input class="shen-settings-input" type="text" id="shen-settings-shi" maxlength="2" oninput="onShenSettingInput('shi')">
+                </div>
+                <div class="border-t pt-3 mt-1 mb-3"></div>
+                <div class="shen-settings-group">
+                    <label>大运标记</label>
+                    <div class="shen-settings-presets" data-target="dayun"></div>
+                    <input class="shen-settings-input" type="text" id="shen-settings-dayun" maxlength="2" oninput="onShenSettingInput('dayun')">
+                </div>
+                <div class="shen-settings-group">
+                    <label>流年标记</label>
+                    <div class="shen-settings-presets" data-target="liunian"></div>
+                    <input class="shen-settings-input" type="text" id="shen-settings-liunian" maxlength="2" oninput="onShenSettingInput('liunian')">
+                </div>
+                
+                <div class="shen-settings-preview">
+                    <div><span class="shen-label">预览：</span>天干: 3 <span id="shen-preview-tian" style="font-size:9px;opacity:0.8;vertical-align:super;">年月日</span></div>
+                    <div><span class="shen-label">预览：</span>地支: 2 <span id="shen-preview-di" style="font-size:9px;opacity:0.8;vertical-align:super;">年时</span></div>
+                    <div><span class="shen-label" style="font-size:11px;">大运</span><span id="shen-preview-dayun" style="color:#3B82F6;">●</span> <span class="shen-label" style="font-size:11px;">流年</span><span id="shen-preview-liunian" style="color:#F97316;">■</span></div>
+                </div>
             </div>
-            <div class="shen-settings-group">
-                <label>日柱标识</label>
-                <div class="shen-settings-presets" data-target="ri"></div>
-                <input class="shen-settings-input" type="text" id="shen-settings-ri" maxlength="2" oninput="onShenSettingInput('ri')">
-            </div>
-            <div class="shen-settings-group">
-                <label>时柱标识</label>
-                <div class="shen-settings-presets" data-target="shi"></div>
-                <input class="shen-settings-input" type="text" id="shen-settings-shi" maxlength="2" oninput="onShenSettingInput('shi')">
-            </div>
-            <div class="border-t pt-3 mt-1 mb-3"></div>
-            <div class="shen-settings-group">
-                <label>大运标记</label>
-                <div class="shen-settings-presets" data-target="dayun"></div>
-                <input class="shen-settings-input" type="text" id="shen-settings-dayun" maxlength="2" oninput="onShenSettingInput('dayun')">
-            </div>
-            <div class="shen-settings-group">
-                <label>流年标记</label>
-                <div class="shen-settings-presets" data-target="liunian"></div>
-                <input class="shen-settings-input" type="text" id="shen-settings-liunian" maxlength="2" oninput="onShenSettingInput('liunian')">
-            </div>
-            
-            <div class="shen-settings-preview">
-                <div><span class="shen-label">预览：</span>天干: 3 <span id="shen-preview-tian" style="font-size:9px;opacity:0.8;vertical-align:super;">年月日</span></div>
-                <div><span class="shen-label">预览：</span>地支: 2 <span id="shen-preview-di" style="font-size:9px;opacity:0.8;vertical-align:super;">年时</span></div>
-                <div><span class="shen-label" style="font-size:11px;">大运</span><span id="shen-preview-dayun" style="color:#3B82F6;">●</span> <span class="shen-label" style="font-size:11px;">流年</span><span id="shen-preview-liunian" style="color:#F97316;">■</span></div>
-            </div>
+            <!-- Tab2：柱状对比图显示设置（JS 动态渲染） -->
+            <div id="shen-settings-tab-display" class="hidden"></div>
             
             <div class="shen-settings-actions">
                 <button class="btn-cancel" onclick="closeShenSettingsModal()">取消</button>
@@ -4542,24 +4560,41 @@
         updateAdjustDisplay();
     }
     
-    // ===== 十神柱位来源标识设置系统 =====
+    // ===== 十神柱位来源标识设置系统（云端同步：登录后保存到 app_config.shen_source_symbols，换设备沿用） =====
     window.SHEN_SOURCE_DEFAULTS = { nian: '年', yue: '月', ri: '日', shi: '时', dayun: '●', liunian: '■' };
     window.SHEN_SOURCE_PRESETS = {
         pillar: { nian: ['年', '⓵', '❶', '①', 'Y', '甲'], yue: ['月', '⓶', '❷', '②', 'M', '乙'], ri: ['日', '⓷', '❸', '③', 'D', '丙'], shi: ['时', '⓸', '❹', '④', 'H', '丁'] },
         marker: { dayun: ['●', '▲', '★', '◆', '♦'], liunian: ['■', '▼', '☆', '◇', '⬢'] }
     };
+    let _shenSourceSymbols = null;  // 云端缓存（登录时从 app_config 加载）
     window.shenSourceSettings = getShenSourceSettings();
     
     function getShenSourceSettings() {
-        try { var saved = JSON.parse(localStorage.getItem('shenSourceSettings')); return saved || {nian:'年',yue:'月',ri:'日',shi:'时',dayun:'●',liunian:'■'}; }
-        catch(e) { return {nian:'年',yue:'月',ri:'日',shi:'时',dayun:'●',liunian:'■'}; }
+        // 优先级：云端（换设备沿用）→ 本地（旧设置兼容）→ 默认
+        if (_shenSourceSymbols) return Object.assign({}, window.SHEN_SOURCE_DEFAULTS, _shenSourceSymbols);
+        try {
+            var saved = JSON.parse(localStorage.getItem('shenSourceSettings'));
+            return Object.assign({}, window.SHEN_SOURCE_DEFAULTS, saved || {});
+        } catch(e) { return Object.assign({}, window.SHEN_SOURCE_DEFAULTS); }
     }
     function saveShenSourceSettings(settings) {
-        localStorage.setItem('shenSourceSettings', JSON.stringify(settings));
-        Object.assign(window.shenSourceSettings, settings);
+        const merged = Object.assign({}, window.SHEN_SOURCE_DEFAULTS, settings || {});
+        localStorage.setItem('shenSourceSettings', JSON.stringify(merged));
+        _shenSourceSymbols = merged;
+        Object.assign(window.shenSourceSettings, merged);
         renderShenSources();
         // 重新渲染增量标记（刷新页面函数的标记会同步使用新设置）
         try { if (typeof calcAll === 'function') calcAll(); } catch(e) {}
+        // 登录后同步到云端（app_config.shen_source_symbols），换设备自动沿用
+        try {
+            if (supabaseClient) {
+                supabaseClient
+                    .from('app_config')
+                    .upsert({ config_key: 'shen_source_symbols', config_value: JSON.stringify(merged) }, { onConflict: 'config_key' })
+                    .then(function(res) { if (res.error) console.warn('十神标识符云端同步失败（无权限时仅本地保存）:', res.error.message); })
+                    .catch(function(e) { console.warn('十神标识符云端同步异常:', e); });
+            }
+        } catch(e) { console.warn('十神标识符云端同步异常:', e); }
     }
     function renderShenSources() {
         var settings = window.shenSourceSettings || getShenSourceSettings();
@@ -4629,6 +4664,9 @@
         });
         
         updateShenSettingsPreview(settings);
+        // 确保 Tab1 为默认视图，并预渲染 Tab2 内容（切换时即时显示）
+        window.switchShenSettingsTab('symbols');
+        renderShenDisplaySettingsArea();
         modal.classList.remove('hidden');
     }
     
@@ -4678,8 +4716,16 @@
     }
     
     function saveShenSettingsFromModal() {
+        // 保存十神标识符（本地 + 云端）
         var settings = getCurrentSettingsFromModal();
         saveShenSourceSettings(settings);
+        // 保存柱状图显示设置（仅管理员可写入云端；非管理员输入为只读，无需保存）
+        if (currentUser && isAdmin(currentUser.email)) {
+            const disp = collectShenDisplaySettingsFromForm();
+            saveShenDisplaySettings(disp).then(function(res) {
+                if (res && res.error) alert('柱状图显示设置保存失败：' + (res.error.message || res.error));
+            });
+        }
         closeShenSettingsModal();
     }
     
@@ -9379,14 +9425,24 @@
     const DEFAULT_SHEN_DISPLAY = {
         okBg: '#d1fae5',          // 达标底色（默认绿）
         failBg: '#fee2e2',        // 未达标底色（默认红）
-        hitOkColor: '#16a34a',    // 命中 ✓ 颜色
-        hitFailColor: '#dc2626',  // 未命中 ✗ 颜色
+        hitOkColor: '#16a34a',    // 命中符号颜色
+        hitFailColor: '#dc2626',  // 未命中符号颜色
         xiBg: '#cffafe',          // 喜徽章底色（默认青）
         xiColor: '#0e7490',       // 喜徽章文字颜色
         jiBg: '#f3e8ff',          // 忌徽章底色（默认紫）
         jiColor: '#7e22ce',       // 忌徽章文字颜色
         bindColor: '#16a34a',     // ↗ 绑定符号颜色
-        unbindColor: '#dc2626'    // ↘ 解绑符号颜色
+        unbindColor: '#dc2626',   // ↘ 解绑符号颜色
+        hitOkSym: '✓',            // 命中符号
+        hitOkText: '',            // 命中文字（留空则仅显示符号）
+        hitFailSym: '✗',          // 未命中符号
+        hitFailText: '',          // 未命中文字（留空则仅显示符号）
+        xiText: '喜',             // 喜徽章文字
+        jiText: '忌',             // 忌徽章文字
+        bindSym: '↗',             // 绑定符号
+        bindText: '绑定',         // 绑定文字
+        unbindSym: '↘',           // 解绑符号
+        unbindText: '解绑'        // 解绑文字
     };
     let _shenDisplaySettings = null;
     function getDisplaySettings() {
@@ -9398,16 +9454,21 @@
         try {
             const { data, error } = await supabaseClient
                 .from('app_config')
-                .select('config_value')
-                .eq('config_key', 'shen_chart_display')
-                .maybeSingle();
+                .select('config_key, config_value')
+                .in('config_key', ['shen_chart_display', 'shen_source_symbols']);
             if (error) throw error;
-            if (data && data.config_value) {
-                const parsed = JSON.parse(data.config_value);
-                if (parsed && typeof parsed === 'object') {
+            (data || []).forEach(function(row) {
+                if (!row.config_value) return;
+                let parsed = null;
+                try { parsed = JSON.parse(row.config_value); } catch (e) { return; }
+                if (!parsed || typeof parsed !== 'object') return;
+                if (row.config_key === 'shen_chart_display') {
                     _shenDisplaySettings = Object.assign({}, DEFAULT_SHEN_DISPLAY, parsed);
+                } else if (row.config_key === 'shen_source_symbols') {
+                    _shenSourceSymbols = Object.assign({}, window.SHEN_SOURCE_DEFAULTS, parsed);
+                    window.shenSourceSettings = getShenSourceSettings();
                 }
-            }
+            });
         } catch (e) {
             console.warn('加载显示设置失败，使用默认:', e);
         }
@@ -9425,85 +9486,109 @@
         refreshShenBarIfVisible();
         return { error: null };
     }
-    // 显示设置面板（管理员可编辑；非管理员只读查看）
-    window.openShenDisplaySettingsModal = function() {
+    // ===== 显示设置 Tab 切换与柱状图显示设置区渲染（并入「⚙ 显示设置」弹窗 Tab2） =====
+    window.switchShenSettingsTab = function(tab) {
+        const symbolsTab = document.getElementById('shen-settings-tab-symbols');
+        const displayTab = document.getElementById('shen-settings-tab-display');
+        const btnSym = document.getElementById('shen-set-tab-symbols');
+        const btnDisp = document.getElementById('shen-set-tab-display');
+        if (!symbolsTab || !displayTab || !btnSym || !btnDisp) return;
+        const isDisp = tab === 'display';
+        symbolsTab.classList.toggle('hidden', isDisp);
+        displayTab.classList.toggle('hidden', !isDisp);
+        btnSym.classList.toggle('active', !isDisp);
+        btnDisp.classList.toggle('active', isDisp);
+        if (isDisp) renderShenDisplaySettingsArea();
+    };
+    // 渲染 Tab2（柱状对比图显示设置）：颜色 + 符号/文字，全部可自定义；管理员可编辑，非管理员只读
+    function renderShenDisplaySettingsArea() {
+        const box = document.getElementById('shen-settings-tab-display');
+        if (!box) return;
         const isAdminUser = currentUser && isAdmin(currentUser.email);
         const ds = getDisplaySettings();
-        const items = [
-            ['okBg', '达标底色（单元格绿底）', ds.okBg],
-            ['failBg', '未达标底色（单元格红底）', ds.failBg],
-            ['hitOkColor', '命中 ✓ 符号颜色', ds.hitOkColor],
-            ['hitFailColor', '未命中 ✗ 符号颜色', ds.hitFailColor],
-            ['xiBg', '喜徽章底色', ds.xiBg],
-            ['xiColor', '喜徽章文字颜色', ds.xiColor],
-            ['jiBg', '忌徽章底色', ds.jiBg],
-            ['jiColor', '忌徽章文字颜色', ds.jiColor],
-            ['bindColor', '↗ 绑定符号颜色', ds.bindColor],
-            ['unbindColor', '↘ 解绑符号颜色', ds.unbindColor]
+        const ro = isAdminUser ? '' : ' disabled';
+        // 颜色项：标签 + 颜色选择 + 十六进制文本
+        const colorItems = [
+            ['okBg', '达标底色'],
+            ['failBg', '未达标底色'],
+            ['hitOkColor', '命中符号颜色'],
+            ['hitFailColor', '未命中符号颜色'],
+            ['xiBg', '喜徽章底色'],
+            ['xiColor', '喜徽章文字颜色'],
+            ['jiBg', '忌徽章底色'],
+            ['jiColor', '忌徽章文字颜色'],
+            ['bindColor', '绑定符号颜色'],
+            ['unbindColor', '解绑符号颜色']
         ];
-        const rowHtml = items.map(function(it) {
-            return '<div class="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 last:border-0">' +
-                '<span class="text-sm text-gray-700">' + it[1] + '</span>' +
-                '<div class="flex items-center gap-2">' +
-                '<input type="color" data-ds-key="' + it[0] + '" value="' + it[2] + '" class="border rounded h-7 w-10 cursor-pointer">' +
-                '<input type="text" data-ds-key="' + it[0] + '" value="' + it[2] + '" class="w-24 px-1 py-0.5 border rounded text-xs">' +
-                '</div></div>';
+        const colorRows = colorItems.map(function(it) {
+            const v = ds[it[0]];
+            return '<div class="ds-opt-row"><span class="ds-opt-label">' + it[1] + '</span>' +
+                '<span class="ds-opt-ctl">' +
+                '<input type="color" data-ds-key="' + it[0] + '" value="' + v + '"' + ro + '>' +
+                '<input type="text" data-ds-key="' + it[0] + '" value="' + v + '" maxlength="9"' + ro + '>' +
+                '</span></div>';
         }).join('');
-        const btns = isAdminUser
-            ? '<button type="button" id="ds-reset-btn" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">恢复默认</button>' +
-              '<button type="button" id="ds-save-btn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">保存</button>' +
-              '<button type="button" id="ds-close-btn" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">取消</button>'
-            : '<button type="button" id="ds-close-btn" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">关闭</button>';
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/40';
-        modal.id = 'shen-display-settings-modal';
-        modal.innerHTML = '<div class="bg-white rounded-lg shadow-xl w-[440px] max-w-[92vw] max-h-[85vh] flex flex-col">' +
-            '<div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-200">' +
-            '<div class="font-bold text-sm text-gray-800">⚙ 柱状对比图显示设置</div>' +
-            '<button type="button" id="ds-x-btn" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button></div>' +
-            '<div class="px-4 py-2 overflow-y-auto">' +
+        // 符号/文字项：标签 + 符号输入 + 文字输入（文字留空则仅显示符号）
+        const symTextItems = [
+            ['hitOkSym', '命中符号', 'hitOkText', '命中文字'],
+            ['hitFailSym', '未命中符号', 'hitFailText', '未命中文字'],
+            ['xiText', '喜徽章文字', null, null],
+            ['jiText', '忌徽章文字', null, null],
+            ['bindSym', '绑定符号', 'bindText', '绑定文字'],
+            ['unbindSym', '解绑符号', 'unbindText', '解绑文字']
+        ];
+        const symRows = symTextItems.map(function(it) {
+            const symV = ds[it[0]] || '';
+            const txtHtml = it[2]
+                ? '<span class="ds-opt-label text-gray-400 text-xs">' + it[3] + '</span><input type="text" data-ds-key="' + it[2] + '" value="' + (ds[it[2]] || '') + '" maxlength="6"' + ro + '>'
+                : '';
+            return '<div class="ds-opt-row"><span class="ds-opt-label">' + it[1] + '</span>' +
+                '<span class="ds-opt-ctl">' +
+                '<input type="text" data-ds-key="' + it[0] + '" value="' + symV + '" maxlength="3"' + ro + '>' +
+                txtHtml +
+                '</span></div>';
+        }).join('');
+        // 颜色输入与文本输入双向同步
+        box.innerHTML =
             (isAdminUser
-                ? '<div class="text-xs text-gray-400 mb-2">管理员可自定义标识颜色，保存后所有用户实时生效。</div>'
-                : '<div class="text-xs text-gray-400 mb-2">当前为只读模式（仅管理员可修改设置）。</div>') +
-            '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1.5 mb-2">' + rowHtml + '</div>' +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格底色=达标 / 未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · 💚喜/🚫忌=参考值模板喜忌标注（生克或十神强弱任一命中即标出，随范围动态变化）· ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>' +
-            '</div>' +
-            '<div class="flex justify-end gap-2 px-4 py-2.5 border-t border-gray-200">' + btns + '</div>' +
-            '</div>';
-        document.body.appendChild(modal);
-        // 颜色选择与文本输入双向同步
-        modal.querySelectorAll('[data-ds-key]').forEach(function(input) {
+                ? '<div class="text-xs text-gray-500 mb-2">自定义柱状对比图/关系表的标识颜色与符号文字，保存后所有用户实时生效。</div>'
+                : '<div class="text-xs text-gray-500 mb-2">当前为只读模式（仅管理员可修改柱状图显示设置）。</div>') +
+            '<div class="font-bold text-xs text-gray-600 mb-1">颜色设置</div>' +
+            '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-3">' + colorRows + '</div>' +
+            '<div class="font-bold text-xs text-gray-600 mb-1">符号 / 文字设置</div>' +
+            '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-2">' + symRows + '</div>' +
+            (isAdminUser ? '<button type="button" id="ds-reset-btn" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded text-sm">恢复默认</button>' : '') +
+            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格底色=达标 / 未达标（需参考比例）· 数字后 符号=绑定断语/宏命中，未命中反之 · 喜/忌=参考值模板喜忌标注（生克或十神强弱任一命中即标出，随范围动态变化）· 绑定/解绑符号=范围切换时的状态变化</div>';
+        // 颜色 ↔ 文本输入同步
+        box.querySelectorAll('[data-ds-key]').forEach(function(input) {
             input.addEventListener('input', function() {
                 const key = input.dataset.dsKey;
-                modal.querySelectorAll('[data-ds-key="' + key + '"]').forEach(function(peer) {
+                box.querySelectorAll('[data-ds-key="' + key + '"]').forEach(function(peer) {
                     if (peer !== input) peer.value = input.value;
                 });
             });
         });
         if (isAdminUser) {
-            modal.querySelector('#ds-reset-btn').addEventListener('click', function() {
+            box.querySelector('#ds-reset-btn').addEventListener('click', function() {
                 Object.keys(DEFAULT_SHEN_DISPLAY).forEach(function(k) {
-                    modal.querySelectorAll('[data-ds-key="' + k + '"]').forEach(function(peer) {
+                    box.querySelectorAll('[data-ds-key="' + k + '"]').forEach(function(peer) {
                         peer.value = DEFAULT_SHEN_DISPLAY[k];
                     });
                 });
             });
-            modal.querySelector('#ds-save-btn').addEventListener('click', async function() {
-                const settings = {};
-                Object.keys(DEFAULT_SHEN_DISPLAY).forEach(function(k) {
-                    const el = modal.querySelector('input[data-ds-key="' + k + '"]');
-                    settings[k] = (el && el.value) || DEFAULT_SHEN_DISPLAY[k];
-                });
-                const res = await saveShenDisplaySettings(settings);
-                if (res.error) { alert('保存失败：' + (res.error.message || res.error)); return; }
-                modal.remove();
-            });
         }
-        const close = function() { modal.remove(); };
-        modal.querySelector('#ds-close-btn').addEventListener('click', close);
-        modal.querySelector('#ds-x-btn').addEventListener('click', close);
-        modal.addEventListener('mousedown', function(e) { if (e.target === modal) close(); });
-    };
+    }
+    // 从 Tab2 收集显示设置
+    function collectShenDisplaySettingsFromForm() {
+        const box = document.getElementById('shen-settings-tab-display');
+        const settings = {};
+        if (!box) return settings;
+        Object.keys(DEFAULT_SHEN_DISPLAY).forEach(function(k) {
+            const el = box.querySelector('input[data-ds-key="' + k + '"]');
+            settings[k] = (el && el.value !== undefined && el.value !== null && el.value !== '') ? el.value : DEFAULT_SHEN_DISPLAY[k];
+        });
+        return settings;
+    }
 
     // 柱状图主渲染入口
     function renderShenBar() {
@@ -9540,10 +9625,6 @@
         // 模板缺失提示（引用的模板被删除或本地拉不到）
         if (selRef && selRef._resolved && selRef._resolved.missing) {
             refBarHtml += '<div class="mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">⚠ 参考值模板已缺失（可能已被删除或未同步到本机），当前仅显示实际数量统计。</div>';
-        }
-        // 显示设置入口（仅管理员可自定义，非管理员也可查看当前设置）
-        if (currentUser && isAdmin(currentUser.email)) {
-            refBarHtml += '<div class="mt-1"><button type="button" onclick="openShenDisplaySettingsModal()" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs">⚙ 显示设置</button></div>';
         }
         refBarBox.innerHTML = refBarHtml;
 
@@ -9600,8 +9681,8 @@
                     '</div>';
             }
             const markHtml = actMark ? (actMark.ok
-                ? '<span class="bar-done font-bold" style="color:' + ds.hitOkColor + '">✓</span>'
-                : '<span class="bar-miss font-bold" style="color:' + ds.hitFailColor + '">✗</span>') : '';
+                ? '<span class="bar-done font-bold" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + (ds.hitOkText ? ' ' + ds.hitOkText : '') + '</span>'
+                : '<span class="bar-miss font-bold" style="color:' + ds.hitFailColor + '">' + (ds.hitFailSym || '✗') + (ds.hitFailText ? ' ' + ds.hitFailText : '') + '</span>') : '';
             // 顺序：参考值柱在前（左），实际八字十神柱在后（右）
             html += '<div class="flex-1 flex flex-col items-center min-w-0">' +
                 '<div class="relative flex items-end justify-center gap-1 w-full" style="height:' + chartH + 'px;">' +
@@ -9758,7 +9839,9 @@
                 if (!t || !t.length) return '<td class="py-1.5 px-1 text-center text-gray-300 text-sm">—</td>';
                 const chips = t.map(function(ch) {
                     const col = ch.to ? ds.bindColor : ds.unbindColor;
-                    return '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:rgba(0,0,0,0.05);color:' + col + '">' + (ch.to ? '↗ 绑定' : '↘ 解绑') + '</span>';
+                    const sym = ch.to ? (ds.bindSym || '↗') : (ds.unbindSym || '↘');
+                    const txt = ch.to ? (ds.bindText || '') : (ds.unbindText || '');
+                    return '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:rgba(0,0,0,0.05);color:' + col + '">' + sym + (txt ? ' ' + txt : '') + '</span>';
                 });
                 return '<td class="py-1.5 px-1 text-center align-middle"><div class="flex flex-col gap-0.5 items-center">' + chips.join('') + '</div></td>';
             };
@@ -9770,13 +9853,13 @@
                 const cellBg = (c.stat && showMark && rr && c.ok !== null) ? ' style="background-color:' + (c.ok ? ds.okBg : ds.failBg) + '"' : '';
                 const hitHtml = c.stat
                     ? (c.bound
-                        ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">✓</span>'
-                        : '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitFailColor + '">✗</span>')
+                        ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + (ds.hitOkText ? ' ' + ds.hitOkText : '') + '</span>'
+                        : '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitFailColor + '">' + (ds.hitFailSym || '✗') + (ds.hitFailText ? ' ' + ds.hitFailText : '') + '</span>')
                     : '';
-                // 列级喜忌小徽章（该范围命中模板喜/忌时显示：青=喜用，紫=忌讳；颜色可自定义）
+                // 列级喜忌小徽章（该范围命中模板喜/忌时显示：青=喜用，紫=忌讳；文字与颜色可自定义）
                 const prefMark = prefByCol[ci] ? (prefByCol[ci] === 'xi'
-                    ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">💚喜</span>'
-                    : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">🚫忌</span>')
+                    ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">' + (ds.xiText || '喜') + '</span>'
+                    : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">' + (ds.jiText || '忌') + '</span>')
                     : '';
                 midHtml += '<td class="py-1.5 px-1 text-center"' + cellBg + '">' +
                     (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
@@ -9799,7 +9882,7 @@
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
             '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-gray-500">' + headHtml +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格绿底=达标 / 红底=未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · 💚喜/🚫忌=参考值模板喜忌标注（青=喜用，紫=忌讳，生克或十神强弱任一命中即标出，随范围动态变化）· ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>';
+            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格底色=达标 / 未达标（需参考比例，颜色可在显示设置中自定义）· 数字后 命中符号/未命中符号=绑定断语/宏命中与否 · 喜/忌=参考值模板喜忌标注（青=喜用，紫=忌讳，生克或十神强弱任一命中即标出，随范围动态变化）· 绑定/解绑符号=范围切换时的状态变化</div>';
     }
 
     // 渲染参考比例：精确值数组（多个时折叠展开）/ 区间
