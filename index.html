@@ -9209,14 +9209,35 @@
                     if (!hit) return;
                     // 基础条件命中：评估喜忌规则（触发条件为空 → 恒生效）
                     const prefs = [];
+                    // 取值维度对应统计字段：全部/天干/地支 → groupCount/groupTian/groupDi
+                    const grpName = shenQzMode === 'tian' ? 'groupTian' : (shenQzMode === 'di' ? 'groupDi' : 'groupCount');
+                    const baseSt = (opts.baseStats && opts.baseStats[grpName]) || null;  // 原局统计（弱判定基准）
                     ((tpl.relationPrefs) || []).forEach(function(p) {
-                        if (!p || !p.relId) return;
+                        if (!p) return;
                         let ok = true;
                         const pcChildren = (p.conds && p.conds.children && Array.isArray(p.conds.children)) ? p.conds.children : [];
                         if (pcChildren.length) {
                             ok = evaluateConditionGroup({ logic: 'and', children: pcChildren }, 0, new Set(), {});
                         }
-                        if (ok) prefs.push({ relId: String(p.relId), pref: p.pref === 'ji' ? 'ji' : 'xi' });
+                        if (!ok) return;
+                        if (p.type === 'qiangruo') {
+                            // 十神强弱喜忌：原局 A 十神弱（数量 ≤ weakVal，默认≤1）+ 当前范围 B 十神数量 > 原局 B（增加）
+                            const shenA = p.shenA, shenB = p.shenB;
+                            if (!shenA || !shenB || !GROUPED_SHEN.includes(shenA) || !GROUPED_SHEN.includes(shenB)) return;
+                            if (!baseSt) return;  // 无原局基准（无法判定"弱"与"增加"）
+                            const curSt = (stats && stats[grpName]) || {};
+                            const aBase = baseSt[shenA] || 0;
+                            const bBase = baseSt[shenB] || 0;
+                            const bCur = curSt[shenB] || 0;
+                            const weakVal = (p.weakVal !== undefined && p.weakVal !== null) ? p.weakVal : 1;
+                            const aWeak = (p.weakOp === 'lt') ? (aBase < weakVal) : (aBase <= weakVal);
+                            if (aWeak && bCur > bBase) {
+                                prefs.push({ type: 'qiangruo', shenB: shenB, pref: p.pref === 'ji' ? 'ji' : 'xi' });
+                            }
+                            return;
+                        }
+                        if (!p.relId) return;
+                        prefs.push({ type: 'shengke', relId: String(p.relId), pref: p.pref === 'ji' ? 'ji' : 'xi' });
                     });
                     if (prefs.length) {
                         matchedTplPrefs.push({ tplId: String(tpl.cloudId || tpl.id || ''), tplName: tpl.displayName || tpl.name || '', prefs: prefs });
@@ -9354,6 +9375,136 @@
     // 达标标记开关状态（localStorage 持久化）
     window._shenBarShowMark = localStorage.getItem('shenBarShowMark') !== '0';
 
+    // ===== 柱状对比图/关系表显示设置（管理员可自定义，存 Supabase app_config.shen_chart_display） =====
+    const DEFAULT_SHEN_DISPLAY = {
+        okBg: '#d1fae5',          // 达标底色（默认绿）
+        failBg: '#fee2e2',        // 未达标底色（默认红）
+        hitOkColor: '#16a34a',    // 命中 ✓ 颜色
+        hitFailColor: '#dc2626',  // 未命中 ✗ 颜色
+        xiBg: '#cffafe',          // 喜徽章底色（默认青）
+        xiColor: '#0e7490',       // 喜徽章文字颜色
+        jiBg: '#f3e8ff',          // 忌徽章底色（默认紫）
+        jiColor: '#7e22ce',       // 忌徽章文字颜色
+        bindColor: '#16a34a',     // ↗ 绑定符号颜色
+        unbindColor: '#dc2626'    // ↘ 解绑符号颜色
+    };
+    let _shenDisplaySettings = null;
+    function getDisplaySettings() {
+        if (!_shenDisplaySettings) _shenDisplaySettings = Object.assign({}, DEFAULT_SHEN_DISPLAY);
+        return _shenDisplaySettings;
+    }
+    async function loadShenDisplaySettings() {
+        if (!supabaseClient) return;
+        try {
+            const { data, error } = await supabaseClient
+                .from('app_config')
+                .select('config_value')
+                .eq('config_key', 'shen_chart_display')
+                .maybeSingle();
+            if (error) throw error;
+            if (data && data.config_value) {
+                const parsed = JSON.parse(data.config_value);
+                if (parsed && typeof parsed === 'object') {
+                    _shenDisplaySettings = Object.assign({}, DEFAULT_SHEN_DISPLAY, parsed);
+                }
+            }
+        } catch (e) {
+            console.warn('加载显示设置失败，使用默认:', e);
+        }
+    }
+    async function saveShenDisplaySettings(settings) {
+        if (!supabaseClient) return { error: { message: '未连接数据库' } };
+        const { error } = await supabaseClient
+            .from('app_config')
+            .upsert(
+                { config_key: 'shen_chart_display', config_value: JSON.stringify(settings) },
+                { onConflict: 'config_key' }
+            );
+        if (error) return { error };
+        _shenDisplaySettings = Object.assign({}, DEFAULT_SHEN_DISPLAY, settings || {});
+        refreshShenBarIfVisible();
+        return { error: null };
+    }
+    // 显示设置面板（管理员可编辑；非管理员只读查看）
+    window.openShenDisplaySettingsModal = function() {
+        const isAdminUser = currentUser && isAdmin(currentUser.email);
+        const ds = getDisplaySettings();
+        const items = [
+            ['okBg', '达标底色（单元格绿底）', ds.okBg],
+            ['failBg', '未达标底色（单元格红底）', ds.failBg],
+            ['hitOkColor', '命中 ✓ 符号颜色', ds.hitOkColor],
+            ['hitFailColor', '未命中 ✗ 符号颜色', ds.hitFailColor],
+            ['xiBg', '喜徽章底色', ds.xiBg],
+            ['xiColor', '喜徽章文字颜色', ds.xiColor],
+            ['jiBg', '忌徽章底色', ds.jiBg],
+            ['jiColor', '忌徽章文字颜色', ds.jiColor],
+            ['bindColor', '↗ 绑定符号颜色', ds.bindColor],
+            ['unbindColor', '↘ 解绑符号颜色', ds.unbindColor]
+        ];
+        const rowHtml = items.map(function(it) {
+            return '<div class="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 last:border-0">' +
+                '<span class="text-sm text-gray-700">' + it[1] + '</span>' +
+                '<div class="flex items-center gap-2">' +
+                '<input type="color" data-ds-key="' + it[0] + '" value="' + it[2] + '" class="border rounded h-7 w-10 cursor-pointer">' +
+                '<input type="text" data-ds-key="' + it[0] + '" value="' + it[2] + '" class="w-24 px-1 py-0.5 border rounded text-xs">' +
+                '</div></div>';
+        }).join('');
+        const btns = isAdminUser
+            ? '<button type="button" id="ds-reset-btn" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">恢复默认</button>' +
+              '<button type="button" id="ds-save-btn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">保存</button>' +
+              '<button type="button" id="ds-close-btn" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">取消</button>'
+            : '<button type="button" id="ds-close-btn" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">关闭</button>';
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/40';
+        modal.id = 'shen-display-settings-modal';
+        modal.innerHTML = '<div class="bg-white rounded-lg shadow-xl w-[440px] max-w-[92vw] max-h-[85vh] flex flex-col">' +
+            '<div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-200">' +
+            '<div class="font-bold text-sm text-gray-800">⚙ 柱状对比图显示设置</div>' +
+            '<button type="button" id="ds-x-btn" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button></div>' +
+            '<div class="px-4 py-2 overflow-y-auto">' +
+            (isAdminUser
+                ? '<div class="text-xs text-gray-400 mb-2">管理员可自定义标识颜色，保存后所有用户实时生效。</div>'
+                : '<div class="text-xs text-gray-400 mb-2">当前为只读模式（仅管理员可修改设置）。</div>') +
+            '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1.5 mb-2">' + rowHtml + '</div>' +
+            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格底色=达标 / 未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · 💚喜/🚫忌=参考值模板喜忌标注（生克或十神强弱任一命中即标出，随范围动态变化）· ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>' +
+            '</div>' +
+            '<div class="flex justify-end gap-2 px-4 py-2.5 border-t border-gray-200">' + btns + '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        // 颜色选择与文本输入双向同步
+        modal.querySelectorAll('[data-ds-key]').forEach(function(input) {
+            input.addEventListener('input', function() {
+                const key = input.dataset.dsKey;
+                modal.querySelectorAll('[data-ds-key="' + key + '"]').forEach(function(peer) {
+                    if (peer !== input) peer.value = input.value;
+                });
+            });
+        });
+        if (isAdminUser) {
+            modal.querySelector('#ds-reset-btn').addEventListener('click', function() {
+                Object.keys(DEFAULT_SHEN_DISPLAY).forEach(function(k) {
+                    modal.querySelectorAll('[data-ds-key="' + k + '"]').forEach(function(peer) {
+                        peer.value = DEFAULT_SHEN_DISPLAY[k];
+                    });
+                });
+            });
+            modal.querySelector('#ds-save-btn').addEventListener('click', async function() {
+                const settings = {};
+                Object.keys(DEFAULT_SHEN_DISPLAY).forEach(function(k) {
+                    const el = modal.querySelector('input[data-ds-key="' + k + '"]');
+                    settings[k] = (el && el.value) || DEFAULT_SHEN_DISPLAY[k];
+                });
+                const res = await saveShenDisplaySettings(settings);
+                if (res.error) { alert('保存失败：' + (res.error.message || res.error)); return; }
+                modal.remove();
+            });
+        }
+        const close = function() { modal.remove(); };
+        modal.querySelector('#ds-close-btn').addEventListener('click', close);
+        modal.querySelector('#ds-x-btn').addEventListener('click', close);
+        modal.addEventListener('mousedown', function(e) { if (e.target === modal) close(); });
+    };
+
     // 柱状图主渲染入口
     function renderShenBar() {
         const chartBox = document.getElementById('shen-bar-chart');
@@ -9390,6 +9541,10 @@
         if (selRef && selRef._resolved && selRef._resolved.missing) {
             refBarHtml += '<div class="mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">⚠ 参考值模板已缺失（可能已被删除或未同步到本机），当前仅显示实际数量统计。</div>';
         }
+        // 显示设置入口（仅管理员可自定义，非管理员也可查看当前设置）
+        if (currentUser && isAdmin(currentUser.email)) {
+            refBarHtml += '<div class="mt-1"><button type="button" onclick="openShenDisplaySettingsModal()" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs">⚙ 显示设置</button></div>';
+        }
         refBarBox.innerHTML = refBarHtml;
 
         // 柱状图
@@ -9422,6 +9577,7 @@
         const unit = Math.max(10, Math.min(26, Math.floor(190 / maxCount)));
         const chartH = 200;
         const showMark = window._shenBarShowMark;
+        const ds = getDisplaySettings();
 
         let html = '<div class="flex items-end justify-around gap-1 sm:gap-2 px-1" style="height:' + (chartH + 44) + 'px;">';
         // 十神对应的五行颜色（与十神关系图卡片一致：随日主五行动态变化，而非写死）
@@ -9443,7 +9599,9 @@
                     '<div class="' + refBarClass(rv) + ' rounded-sm w-full" style="height:' + Math.min(refH, chartH) + 'px;' + (rv.op === 'range' ? 'margin-bottom:' + bottom + 'px;' : '') + '"></div>' +
                     '</div>';
             }
-            const markHtml = actMark ? (actMark.ok ? '<span class="bar-done font-bold">✓</span>' : '<span class="bar-miss font-bold">✗</span>') : '';
+            const markHtml = actMark ? (actMark.ok
+                ? '<span class="bar-done font-bold" style="color:' + ds.hitOkColor + '">✓</span>'
+                : '<span class="bar-miss font-bold" style="color:' + ds.hitFailColor + '">✗</span>') : '';
             // 顺序：参考值柱在前（左），实际八字十神柱在后（右）
             html += '<div class="flex-1 flex flex-col items-center min-w-0">' +
                 '<div class="relative flex items-end justify-center gap-1 w-full" style="height:' + chartH + 'px;">' +
@@ -9491,20 +9649,31 @@
         const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
         // 模板喜忌（按范围）：scopeIdx -> { 关系DefId: 'xi'|'ji' }（scope0 缺失时回退主缓存）
         const prefSets = [null, null, null];
+        // 模板十神强弱喜忌（按范围）：scopeIdx -> { 增强十神B: 'xi'|'ji' }（共用喜忌徽章：涉及 B 十神的关系行标出）
+        const strongPrefSets = [null, null, null];
         for (let i = 0; i < 3; i++) {
             const scList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[i]);
             const list = (i === 0 && !scList) ? (cache.shenTplPrefs || []) : (scList || []);
             if (list && list.length) {
                 const map = {};
+                const smap = {};
                 list.forEach(function(tp) {
-                    (tp.prefs || []).forEach(function(p) { if (p && p.relId) map[String(p.relId)] = p.pref === 'ji' ? 'ji' : 'xi'; });
+                    (tp.prefs || []).forEach(function(p) {
+                        if (!p) return;
+                        if (p.type === 'qiangruo') {
+                            if (p.shenB) smap[String(p.shenB)] = p.pref === 'ji' ? 'ji' : 'xi';
+                        } else if (p.relId) {
+                            map[String(p.relId)] = p.pref === 'ji' ? 'ji' : 'xi';
+                        }
+                    });
                 });
                 prefSets[i] = map;
+                if (Object.keys(smap).length) strongPrefSets[i] = smap;
             }
         }
 
-        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark, visibleCount, prefSets);
-        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark, visibleCount, prefSets);
+        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark, visibleCount, prefSets, strongPrefSets);
+        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark, visibleCount, prefSets, strongPrefSets);
         return '<div class="bg-white border border-gray-200 rounded-lg p-2">' + keHtml + '</div>' +
                '<div class="bg-white border border-gray-200 rounded-lg p-2">' + shengHtml + '</div>';
     }
@@ -9527,37 +9696,40 @@
 
     // 单张关系对比表：关系列 + 范围列与「状态变化」列交错显示（跟随大运/流年选择）
     // 状态显示（方案A·文字徽章式）：达标 ✓/✗ 徽章 · 命中 🔔 徽章 · 变化 ↗绑定 / ↘解绑 徽章
-    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount, prefSets) {
+    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount, prefSets, strongPrefSets) {
         visibleCount = (visibleCount === undefined || visibleCount === null) ? 3 : visibleCount;
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
         prefSets = prefSets || [null, null, null];
+        strongPrefSets = strongPrefSets || [null, null, null];
+        const ds = getDisplaySettings();
         const boundSets = [];
         for (let i = 0; i < 3; i++) boundSets.push(buildScopeBoundSet(i));
         const changeLabels = ['原局→大运', '大运→流年'];  // 交错插入的状态变化列标题
-        // 文字徽章（统一样式）
-        const badge = function(txt, cls) {
-            return '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold ' + cls + '">' + txt + '</span>';
-        };
         let rows = '';
         defList.forEach(function(def) {
             const defaultName = def.shenA + (isKe ? '克' : '生') + def.shenB;  // 参考比例键（模板按默认名存）
             const rr = relMap[defaultName] || null;
-            // 模板喜忌（列级）：该范围是否命中喜/忌（按关系定义ID匹配）
+            // 模板喜忌（列级）：生克喜忌按关系定义ID匹配；强弱喜忌按涉及 B 十神的关系行匹配（任一命中即标出）
             const prefByCol = [];
             for (let ci = 0; ci < 3; ci++) {
                 const ps = prefSets[ci];
-                prefByCol.push(ps ? (ps[String(def.id)] || '') : '');
+                let v = ps ? (ps[String(def.id)] || '') : '';
+                if (!v) {
+                    const sps = strongPrefSets[ci];
+                    if (sps) {
+                        if (sps[String(def.shenA)]) v = sps[String(def.shenA)];
+                        else if (sps[String(def.shenB)]) v = sps[String(def.shenB)];
+                    }
+                }
+                prefByCol.push(v);
             }
-            // 行级喜忌徽章（任一可见范围命中 → 行徽章 + 行背景）
+            // 行背景（任一可见范围命中喜/忌 → 行背景着色）
             let rowHasXi = false, rowHasJi = false;
             for (let ci = 0; ci < visibleCount; ci++) {
                 if (prefByCol[ci] === 'xi') rowHasXi = true;
                 else if (prefByCol[ci] === 'ji') rowHasJi = true;
             }
-            let rowBadges = '';
-            if (rowHasXi) rowBadges += badge('喜', 'bg-emerald-100 text-emerald-700');
-            if (rowHasJi) rowBadges += badge('忌', 'bg-rose-100 text-rose-700');
             const rowBg = (rowHasXi && !rowHasJi) ? ' bg-emerald-50' : (rowHasJi && !rowHasXi) ? ' bg-rose-50' : '';
             // 各列状态：{ ok: 达标bool|null, bound: 绑定bool }
             const cols = scopes.map(function(sc, ci) {
@@ -9585,7 +9757,8 @@
             const changeTd = function(t) {
                 if (!t || !t.length) return '<td class="py-1.5 px-1 text-center text-gray-300 text-sm">—</td>';
                 const chips = t.map(function(ch) {
-                    return badge(ch.to ? '↗ 绑定' : '↘ 解绑', ch.to ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700');
+                    const col = ch.to ? ds.bindColor : ds.unbindColor;
+                    return '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:rgba(0,0,0,0.05);color:' + col + '">' + (ch.to ? '↗ 绑定' : '↘ 解绑') + '</span>';
                 });
                 return '<td class="py-1.5 px-1 text-center align-middle"><div class="flex flex-col gap-0.5 items-center">' + chips.join('') + '</div></td>';
             };
@@ -9594,15 +9767,18 @@
             let midHtml = '';
             for (let ci = 0; ci < visibleCount; ci++) {
                 const c = cols[ci];
-                const cellBg = (c.stat && showMark && rr && c.ok !== null) ? (c.ok ? ' bg-green-100' : ' bg-red-100') : '';
+                const cellBg = (c.stat && showMark && rr && c.ok !== null) ? ' style="background-color:' + (c.ok ? ds.okBg : ds.failBg) + '"' : '';
                 const hitHtml = c.stat
                     ? (c.bound
-                        ? '<span class="font-bold text-sm sm:text-base leading-tight text-green-600">✓</span>'
-                        : '<span class="font-bold text-sm sm:text-base leading-tight text-red-600">✗</span>')
+                        ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">✓</span>'
+                        : '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitFailColor + '">✗</span>')
                     : '';
-                // 列级喜忌小徽章（该范围命中模板喜/忌时显示）
-                const prefMark = prefByCol[ci] ? badge(prefByCol[ci] === 'xi' ? '喜' : '忌', prefByCol[ci] === 'xi' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700') : '';
-                midHtml += '<td class="py-1.5 px-1 text-center' + cellBg + '">' +
+                // 列级喜忌小徽章（该范围命中模板喜/忌时显示：青=喜用，紫=忌讳；颜色可自定义）
+                const prefMark = prefByCol[ci] ? (prefByCol[ci] === 'xi'
+                    ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">💚喜</span>'
+                    : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">🚫忌</span>')
+                    : '';
+                midHtml += '<td class="py-1.5 px-1 text-center"' + cellBg + '">' +
                     (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
                     (prefMark ? '<div class="mt-0.5">' + prefMark + '</div>' : '') +
                     '</td>';
@@ -9610,7 +9786,7 @@
             }
             rows += '<tr class="border-b last:border-0 border-gray-100' + rowBg + '">' +
                 '<td class="py-1.5 pl-1 pr-1">' +
-                '<div class="font-bold text-sm sm:text-base leading-tight ' + relNameColor + '">' + escapeHtml(def.name) + (rowBadges ? ' ' + rowBadges : '') + '</div>' +
+                '<div class="font-bold text-sm sm:text-base leading-tight ' + relNameColor + '">' + escapeHtml(def.name) + '</div>' +
                 '<div class="text-[11px] text-gray-400 leading-tight mt-0.5">' + (rr ? '参考 ' + renderRefRatio(rr) : (def.builtin ? '' : '自定义·无参考')) + '</div>' +
                 '</td>' + midHtml + '</tr>';
         });
@@ -9623,7 +9799,7 @@
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
             '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-gray-500">' + headHtml +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格绿底=达标 / 红底=未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · 喜/忌=参考值模板喜忌关系标注（绿=喜用，红=忌讳，随范围动态变化）· ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>';
+            '<div class="text-[11px] text-gray-400 mt-1">图例：单元格绿底=达标 / 红底=未达标（需参考比例）· 数字后 ✓=绑定断语/宏命中，✗=未命中 · 💚喜/🚫忌=参考值模板喜忌标注（青=喜用，紫=忌讳，生克或十神强弱任一命中即标出，随范围动态变化）· ↗ 绑定 / ↘ 解绑=范围切换时的状态变化</div>';
     }
 
     // 渲染参考比例：精确值数组（多个时折叠展开）/ 区间
@@ -9707,7 +9883,9 @@
         const savedStats = cache.statsCache;
         try {
             cache.statsByScope = getStatsByScope(data);
-            matchRules(data, { collectRefOnly: true, shenQz: mode });
+            // baseStats=原局统计，供模板「十神强弱喜忌」判定弱（A弱）与增加（B增>原局）
+            const baseStats = (cache.statsByScope && cache.statsByScope.scope0) || null;
+            matchRules(data, { collectRefOnly: true, shenQz: mode, baseStats: baseStats });
             const scopeData = buildScopeData(data);
             cache.shenRefRulesByScope = [];
             cache.shenRelBindingsByScope = [];
@@ -9716,7 +9894,7 @@
                 // 继承出生信息/有效年龄，保证年龄类条件在范围评估中与主评估一致
                 if (data.hasBirthData !== undefined) scopeData[i].hasBirthData = data.hasBirthData;
                 if (data.effectiveAge !== undefined) scopeData[i].effectiveAge = data.effectiveAge;
-                matchRules(scopeData[i], { collectRefOnly: true, shenQz: mode, scopeIdx: i });
+                matchRules(scopeData[i], { collectRefOnly: true, shenQz: mode, scopeIdx: i, baseStats: baseStats });
             }
         } finally {
             cache.statsCache = savedStats;
@@ -10177,19 +10355,46 @@
         window._lastGroupChildren = null;  // 防止残留的断语/宏编辑器插入位置导致错位
         openMacroSelector(target, null);
     }
-    // 喜忌规则行（喜/忌 + 关联关系 + 触发条件列表）
+    // 十神组下拉选项（强弱喜忌的 A/B 十神选择）
+    function refTplShenOptionsHtml(selected, emptyText) {
+        return GROUPED_SHEN.map(function(g) {
+            return '<option value="' + g + '"' + (String(selected) === g ? ' selected' : '') + '>' + g + '</option>';
+        }).join('');
+    }
+    // 喜忌规则行（类型=生克关系/十神强弱 + 喜/忌 + 关联关系 或 A/B十神与弱判定 + 触发条件列表）
     function createRefTplPrefRow(p) {
+        const isStrong = p && p.type === 'qiangruo';
         const row = document.createElement('div');
         row.className = 'ref-tpl-pref-row bg-white border border-rose-100 rounded p-2';
         row.innerHTML =
             '<div class="flex flex-wrap items-center gap-2 mb-1">' +
             '<span class="text-xs font-bold text-gray-600">喜忌：</span>' +
             '<select class="rtp-pref text-sm p-1 border rounded">' +
-            '<option value="xi"' + ((!p || p.pref === 'xi') ? ' selected' : '') + '>喜（喜欢此关系）</option>' +
-            '<option value="ji"' + (p && p.pref === 'ji' ? ' selected' : '') + '>忌（忌讳此关系）</option>' +
+            '<option value="xi"' + (!isStrong && (!p || p.pref === 'xi') ? ' selected' : '') + '>喜</option>' +
+            '<option value="ji"' + (!isStrong && p && p.pref === 'ji' ? ' selected' : '') + '>忌</option>' +
             '</select>' +
+            '<span class="text-xs font-bold text-gray-600">类型：</span>' +
+            '<select class="rtp-type text-sm p-1 border rounded">' +
+            '<option value="shengke"' + (!isStrong ? ' selected' : '') + '>生克关系</option>' +
+            '<option value="qiangruo"' + (isStrong ? ' selected' : '') + '>十神强弱</option>' +
+            '</select>' +
+            '<div class="rtp-rel-box flex items-center gap-1' + (isStrong ? ' hidden' : '') + '">' +
             '<span class="text-xs font-bold text-gray-600">关联关系：</span>' +
-            '<select class="rtp-rel flex-1 min-w-[160px] text-sm p-1 border rounded">' + refTplRelOptionsHtml(p && p.relId) + '</select>' +
+            '<select class="rtp-rel flex-1 min-w-[160px] text-sm p-1 border rounded">' + refTplRelOptionsHtml(!isStrong && p ? p.relId : null) + '</select>' +
+            '</div>' +
+            '<div class="rtp-strong-box flex items-center gap-1.5' + (isStrong ? '' : ' hidden') + '">' +
+            '<span class="text-xs font-bold text-gray-600">弱十神：</span>' +
+            '<select class="rtp-shen-a text-sm p-1 border rounded">' + refTplShenOptionsHtml(isStrong ? p.shenA : null) + '</select>' +
+            '<span class="text-xs font-bold text-gray-600">增十神：</span>' +
+            '<select class="rtp-shen-b text-sm p-1 border rounded">' + refTplShenOptionsHtml(isStrong ? p.shenB : null) + '</select>' +
+            '<span class="text-xs font-bold text-gray-600">弱判定：</span>' +
+            '<select class="rtp-weak-op text-sm p-1 border rounded">' +
+            '<option value="lte"' + (!(isStrong && p && p.weakOp === 'lt') ? ' selected' : '') + '>≤</option>' +
+            '<option value="lt"' + (isStrong && p && p.weakOp === 'lt' ? ' selected' : '') + '>&lt;</option>' +
+            '</select>' +
+            '<input type="number" class="rtp-weak-val text-sm p-1 border rounded" style="width:56px" min="0" max="12" value="' + (isStrong && p.weakVal !== undefined ? p.weakVal : 1) + '">' +
+            '<span class="text-xs text-gray-500">原局该十神数量（默认≤1 为弱）</span>' +
+            '</div>' +
             '<button type="button" class="text-red-500 text-sm px-1 shrink-0" onclick="this.closest(\'.ref-tpl-pref-row\').remove()">✕ 删除</button>' +
             '</div>' +
             '<div class="text-xs text-gray-500 mb-1">触发条件（可多条，全部满足时生效；不添加则恒生效）：</div>' +
@@ -10198,6 +10403,15 @@
             '<button type="button" onclick="addRefTplPrefCond(this)" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs mt-1">➕ 添加触发条件</button>' +
             '<button type="button" onclick="openRefTplMacroSelector(this, \'pref\')" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs mt-1">🧩 插入条件宏</button>' +
             '</div>';
+        // 类型切换：生克关系 ↔ 十神强弱
+        const typeSel = row.querySelector('.rtp-type');
+        const relBox = row.querySelector('.rtp-rel-box');
+        const strongBox = row.querySelector('.rtp-strong-box');
+        typeSel.onchange = function() {
+            const strong = this.value === 'qiangruo';
+            relBox.classList.toggle('hidden', strong);
+            strongBox.classList.toggle('hidden', !strong);
+        };
         const condsBox = row.querySelector('.rtp-conds');
         const pConds = (p && p.conds && p.conds.children && Array.isArray(p.conds.children)) ? p.conds.children : [];
         pConds.forEach(function(cond) { appendRefTplCond(condsBox, cond); });
@@ -10297,13 +10511,25 @@
         // 基础匹配条件收集（AND 组合；无有效条件行时写空结构，覆盖旧值 → 不参与命局直接匹配）
         const matchChildren = collectRefTplConds(document.getElementById('ref-tpl-match-box'));
         ro.matchConditions = { logic: 'and', children: matchChildren };
-        // 生克关系喜忌收集（每条 = 喜/忌 + 关联关系 + 触发条件；无有效规则时写空数组，覆盖旧值）
+        // 喜忌收集（每条 = 类型 + 喜/忌 + 关联关系 或 A/B十神与弱判定 + 触发条件；无有效规则时写空数组，覆盖旧值）
         const prefs = [];
         document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').forEach(function(row) {
-            const relId = row.querySelector('.rtp-rel').value;
-            if (!relId) return;
+            const type = row.querySelector('.rtp-type').value === 'qiangruo' ? 'qiangruo' : 'shengke';
             const conds = collectRefTplConds(row.querySelector('.rtp-conds'));
-            prefs.push({ pref: row.querySelector('.rtp-pref').value === 'ji' ? 'ji' : 'xi', relId: relId, conds: conds.length ? { logic: 'and', children: conds } : { logic: 'and', children: [] } });
+            const c = conds.length ? { logic: 'and', children: conds } : { logic: 'and', children: [] };
+            const pref = row.querySelector('.rtp-pref').value === 'ji' ? 'ji' : 'xi';
+            if (type === 'qiangruo') {
+                const shenA = row.querySelector('.rtp-shen-a').value;
+                const shenB = row.querySelector('.rtp-shen-b').value;
+                if (!shenA || !shenB) return;
+                const weakOp = row.querySelector('.rtp-weak-op').value === 'lt' ? 'lt' : 'lte';
+                const weakVal = parseInt(row.querySelector('.rtp-weak-val').value);
+                prefs.push({ type: 'qiangruo', pref: pref, shenA: shenA, shenB: shenB, weakOp: weakOp, weakVal: isNaN(weakVal) ? 1 : weakVal, conds: c });
+            } else {
+                const relId = row.querySelector('.rtp-rel').value;
+                if (!relId) return;
+                prefs.push({ type: 'shengke', pref: pref, relId: relId, conds: c });
+            }
         });
         ro.relationPrefs = prefs;
         return Object.keys(ro).length ? ro : null;
@@ -26442,6 +26668,8 @@ async function initApp() {
     await getUserPermissions();
     // 加载断语显示全局配置（前缀合并/分类顺序/分类开关）
     try { await loadGlobalDisplayConfig(); } catch (e) { console.error('加载断语显示全局配置失败:', e); }
+    // 加载柱状对比图显示设置（管理员自定义的标识颜色；未配置时用默认）
+    try { await loadShenDisplaySettings(); } catch (e) { console.error('加载柱状对比图显示设置失败:', e); }
     // 无论是否登录，都初始化页面
     initAll();
     if (isLoggedIn) {
@@ -32873,7 +33101,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </details>
             <details class="mb-3">
-                <summary class="text-sm text-rose-700 font-medium cursor-pointer select-none">⚖️ 生克关系喜忌（可选：模板命中后，命局满足某条件时在相克/相生表中标注对应关系，如 财星弱 → 喜「食伤生财」）</summary>
+                <summary class="text-sm text-rose-700 font-medium cursor-pointer select-none">⚖️ 喜忌设置（生克关系 / 十神强弱，可选：模板命中后，命局满足某条件时在相克/相生表中标注喜忌，如 财星弱 → 喜「食伤生财」；官星弱 → 喜大运/流年增加官星）</summary>
                 <div id="ref-tpl-prefs-box" class="mt-1 space-y-2"></div>
                 <button type="button" onclick="addRefTplPrefRule()" class="mt-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-sm">➕ 添加喜忌规则</button>
             </details>
