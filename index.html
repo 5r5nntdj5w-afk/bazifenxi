@@ -6602,16 +6602,29 @@
                 <span style="color:#b45309;">契合度 ≥ 上等阈值 → 上等；≥ 中等阈值 → 中等；≥ 普通阈值 → 普通；低于普通阈值 → 不成格</span>
             </p>
             <div style="margin-bottom:12px;">
-                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">上等阈值（契合度 ≥ 此值判为上等）</div>
-                <input type="number" id="geju-level-top" min="1" max="100" value="${gl.top !== undefined ? gl.top : 90}" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">上等：阈值（契合度 ≥ 此值）与名称</div>
+                <div style="display:flex;gap:8px;">
+                    <input type="number" id="geju-level-top" min="1" max="100" value="${gl.top !== undefined ? gl.top : 90}" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;" title="上等阈值（默认 90）">
+                    <input type="text" id="geju-level-top-name" value="${gl.topName || '上等'}" maxlength="6" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;" title="上等层次名称（默认：上等）">
+                </div>
             </div>
             <div style="margin-bottom:12px;">
-                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">中等阈值（契合度 ≥ 此值判为中等）</div>
-                <input type="number" id="geju-level-mid" min="1" max="100" value="${gl.mid !== undefined ? gl.mid : 70}" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">中等：阈值（契合度 ≥ 此值）与名称</div>
+                <div style="display:flex;gap:8px;">
+                    <input type="number" id="geju-level-mid" min="1" max="100" value="${gl.mid !== undefined ? gl.mid : 70}" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;" title="中等阈值（默认 70）">
+                    <input type="text" id="geju-level-mid-name" value="${gl.midName || '中等'}" maxlength="6" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;" title="中等层次名称（默认：中等）">
+                </div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">普通：阈值（契合度 ≥ 此值）与名称</div>
+                <div style="display:flex;gap:8px;">
+                    <input type="number" id="geju-level-low" min="1" max="100" value="${gl.low !== undefined ? gl.low : 50}" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;" title="普通阈值（默认 50）">
+                    <input type="text" id="geju-level-low-name" value="${gl.lowName || '普通'}" maxlength="6" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;" title="普通层次名称（默认：普通）">
+                </div>
             </div>
             <div style="margin-bottom:16px;">
-                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">普通阈值（契合度 ≥ 此值判为普通，低于则不成格）</div>
-                <input type="number" id="geju-level-low" min="1" max="100" value="${gl.low !== undefined ? gl.low : 50}" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">不成格名称（低于普通阈值的层次名称，默认：不成格）</div>
+                <input type="text" id="geju-level-none-name" value="${gl.noneName || '不成格'}" maxlength="6" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
             </div>
             <div style="margin-bottom:16px;">
                 <div style="font-size:13px;font-weight:500;margin-bottom:4px;">参与主格局识别的分类（可多选，默认勾选"格局"相关）</div>
@@ -6665,8 +6678,15 @@
                 alert('⚠️ 请至少勾选一个参与识别的分类');
                 return;
             }
+            const nameOf = (id, def) => (document.getElementById(id).value || '').trim() || def;
             const cfg = getGlobalDisplayConfig();
-            cfg.gejuLevels = { top: top, mid: mid, low: low };
+            cfg.gejuLevels = {
+                top: top, mid: mid, low: low,
+                topName: nameOf('geju-level-top-name', '上等'),
+                midName: nameOf('geju-level-mid-name', '中等'),
+                lowName: nameOf('geju-level-low-name', '普通'),
+                noneName: nameOf('geju-level-none-name', '不成格')
+            };
             cfg.gejuCategories = checkedCats.indexOf('*') >= 0 ? ['*'] : checkedCats;
             await saveGlobalDisplayConfig(cfg);
             closeModal();
@@ -11976,16 +11996,20 @@
         pool.sort((a, b) => (b.fit.percent || 0) - (a.fit.percent || 0));
         const top = pool[0];
         const percent = top.fit.percent;
-        // 层次阈值可配置（全局设置 → 主格局识别设置），默认 90/70/50
+        // 层次阈值与名称可配置（全局设置 → 主格局识别设置），默认 90/70/50 + 上等/中等/普通/不成格
         const gl = (getGlobalDisplayConfig().gejuLevels) || {};
         const L_TOP = typeof gl.top === 'number' && gl.top > 0 ? gl.top : 90;
         const L_MID = typeof gl.mid === 'number' && gl.mid > 0 ? gl.mid : 70;
         const L_LOW = typeof gl.low === 'number' && gl.low > 0 ? gl.low : 50;
-        let level = '不成格';
+        const NM_TOP = (typeof gl.topName === 'string' && gl.topName) ? gl.topName : '上等';
+        const NM_MID = (typeof gl.midName === 'string' && gl.midName) ? gl.midName : '中等';
+        const NM_LOW = (typeof gl.lowName === 'string' && gl.lowName) ? gl.lowName : '普通';
+        const NM_NONE = (typeof gl.noneName === 'string' && gl.noneName) ? gl.noneName : '不成格';
+        let level = NM_NONE;
         let levelClass = 'text-gray-600 bg-gray-100 border-gray-300';
-        if (percent >= L_TOP) { level = '上等'; levelClass = 'text-emerald-700 bg-emerald-100 border-emerald-300'; }
-        else if (percent >= L_MID) { level = '中等'; levelClass = 'text-blue-700 bg-blue-100 border-blue-300'; }
-        else if (percent >= L_LOW) { level = '普通'; levelClass = 'text-amber-700 bg-amber-100 border-amber-300'; }
+        if (percent >= L_TOP) { level = NM_TOP; levelClass = 'text-emerald-700 bg-emerald-100 border-emerald-300'; }
+        else if (percent >= L_MID) { level = NM_MID; levelClass = 'text-blue-700 bg-blue-100 border-blue-300'; }
+        else if (percent >= L_LOW) { level = NM_LOW; levelClass = 'text-amber-700 bg-amber-100 border-amber-300'; }
         return { hasGeJu: true, top, candidates: pool, percent, level, levelClass };
     }
 
@@ -12025,7 +12049,16 @@
             return '';
         }
         const top = geju.top;
-        const levelBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold border ${geju.levelClass}">${geju.level}</span>`;
+        // 层次阈值与名称可配置，徽章与提示文字同步显示当前生效值
+        const glHint = (getGlobalDisplayConfig().gejuLevels) || {};
+        const L_TOP = typeof glHint.top === 'number' && glHint.top > 0 ? glHint.top : 90;
+        const L_MID = typeof glHint.mid === 'number' && glHint.mid > 0 ? glHint.mid : 70;
+        const L_LOW = typeof glHint.low === 'number' && glHint.low > 0 ? glHint.low : 50;
+        const NM_TOP = (typeof glHint.topName === 'string' && glHint.topName) ? glHint.topName : '上等';
+        const NM_MID = (typeof glHint.midName === 'string' && glHint.midName) ? glHint.midName : '中等';
+        const NM_LOW = (typeof glHint.lowName === 'string' && glHint.lowName) ? glHint.lowName : '普通';
+        const NM_NONE = (typeof glHint.noneName === 'string' && glHint.noneName) ? glHint.noneName : '不成格';
+        const levelBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold border ${geju.levelClass}">${escapeHtml(geju.level)}</span>`;
         const fitBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">契合度 ${geju.percent}%</span>`;
         const listHtml = geju.candidates.slice(0, 5).map(c => {
             const isTop = c === geju.top;
@@ -12041,7 +12074,7 @@
             </div>
             <div class="text-gray-800 font-bold text-base">👑 ${escapeHtml(top.text)}</div>
             ${listHtml ? `<div class="mt-2 pt-2 border-t border-indigo-100 space-y-0.5">${listHtml}</div>` : ''}
-            <div class="mt-1 text-xs text-gray-400">层次按契合度划分：≥90 上等 / 70-89 中等 / 50-69 普通 / &lt;50 不成格</div>
+            <div class="mt-1 text-xs text-gray-400">层次按契合度划分：≥${L_TOP} ${escapeHtml(NM_TOP)} / ${L_MID}-${L_TOP - 1} ${escapeHtml(NM_MID)} / ${L_LOW}-${L_MID - 1} ${escapeHtml(NM_LOW)} / &lt;${L_LOW} ${escapeHtml(NM_NONE)}</div>
         </div>`;
     }
 
@@ -28081,7 +28114,7 @@ function _defaultDisplayConfig() {
     return {
         prefixMerge: { mergePrefixes: [], excludePrefixes: [] },
         categoryOrder: [], categorySwitch: {},
-        gejuLevels: { top: 90, mid: 70, low: 50 },
+        gejuLevels: { top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' },
         gejuCategories: ['格局']
     };
 }
@@ -28105,7 +28138,7 @@ async function loadGlobalDisplayConfig() {
                 prefixMerge: Object.assign({ mergePrefixes: [], excludePrefixes: [] }, parsed.prefixMerge || {}),
                 categoryOrder: Array.isArray(parsed.categoryOrder) ? parsed.categoryOrder : [],
                 categorySwitch: parsed.categorySwitch && typeof parsed.categorySwitch === 'object' ? parsed.categorySwitch : {},
-                gejuLevels: Object.assign({ top: 90, mid: 70, low: 50 }, parsed.gejuLevels || {}),
+                gejuLevels: Object.assign({ top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' }, parsed.gejuLevels || {}),
                 gejuCategories: Array.isArray(parsed.gejuCategories) && parsed.gejuCategories.length > 0 ? parsed.gejuCategories : ['格局']
             };
         } else {
