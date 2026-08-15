@@ -11848,29 +11848,39 @@
       return '原局+大运+流年';
     }
 
-    /** 主格局识别：从"格局"分类的匹配结果中选出契合度最高的作为主格局，按 90/70/50 划分层次 */
+    /** 主格局识别：扫描所有分类下启用契合度的断语，优先"格局"分类，按契合度取最高作为主格局，按 90/70/50 划分层次 */
     function analyzeGeJu() {
-        const matched = (cache.matchedByCategory && cache.matchedByCategory['格局']) || [];
-        const candidates = [];
-        for (const entry of matched) {
-            // 兼容两种条目结构：直接条目 {text,rule,fit}（renderApiDuanyu/matchRules 路径）
-            // 或 groupDuanyuByPrefix 包装结构 {type:'single'|'group',d,contents}
-            const fit = entry.fit || (entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.fit) : (entry.d && entry.d.fit));
-            if (!fit || !fit.enabled) continue;
-            const text = entry.text || (entry.type === 'group' ? entry.contents[0].d.text : (entry.d && entry.d.text)) || '';
-            candidates.push({ text, fit });
+        const catMap = (cache.matchedByCategory) || {};
+        const all = [];
+        for (const key of Object.keys(catMap)) {
+            const entries = catMap[key] || [];
+            for (const entry of entries) {
+                // 兼容两种条目结构：直接条目 {text,rule,fit}（renderApiDuanyu/matchRules 路径）
+                // 或 groupDuanyuByPrefix 包装结构 {type:'single'|'group',d,contents}
+                const fit = entry.fit || (entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.fit) : (entry.d && entry.d.fit));
+                if (!fit || !fit.enabled) continue;
+                const text = entry.text || (entry.type === 'group' ? entry.contents[0].d.text : (entry.d && entry.d.text)) || '';
+                all.push({ text, fit, cat: key });
+            }
         }
-        if (matched.length === 0) return { hasGeJu: false, noMatch: true, candidates: [] };
-        if (candidates.length === 0) return { hasGeJu: false, noFit: true, candidates: [] };
-        candidates.sort((a, b) => (b.fit.percent || 0) - (a.fit.percent || 0));
-        const top = candidates[0];
+        if (all.length === 0) {
+            // 有"格局"分类内容但未启用契合度 → 提示未启用；否则视为不成格局
+            const hasGeJuEntries = Object.keys(catMap).some(k => k.indexOf('格局') >= 0 && (catMap[k] || []).length > 0);
+            if (hasGeJuEntries) return { hasGeJu: false, noFit: true, candidates: [] };
+            return { hasGeJu: false, noMatch: true, candidates: [] };
+        }
+        // 优先取"格局"相关分类；若无格局分类则退化为契合度最高的断语
+        const gejuPool = all.filter(c => c.cat.indexOf('格局') >= 0);
+        const pool = gejuPool.length > 0 ? gejuPool : all;
+        pool.sort((a, b) => (b.fit.percent || 0) - (a.fit.percent || 0));
+        const top = pool[0];
         const percent = top.fit.percent;
         let level = '不成格';
         let levelClass = 'text-gray-600 bg-gray-100 border-gray-300';
         if (percent >= 90) { level = '上等'; levelClass = 'text-emerald-700 bg-emerald-100 border-emerald-300'; }
         else if (percent >= 70) { level = '中等'; levelClass = 'text-blue-700 bg-blue-100 border-blue-300'; }
         else if (percent >= 50) { level = '普通'; levelClass = 'text-amber-700 bg-amber-100 border-amber-300'; }
-        return { hasGeJu: true, top, candidates, percent, level, levelClass };
+        return { hasGeJu: true, top, candidates: pool, percent, level, levelClass };
     }
 
     /** 主格局识别面板 HTML */
