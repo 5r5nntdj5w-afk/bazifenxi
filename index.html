@@ -33146,6 +33146,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p class="font-medium text-yellow-700 mb-1">📝 自定义映射规则：</p>
                 <p class="text-gray-600">在列表中点击「✏️ 编辑」可以修改规则名称和偏移值；使用自定义映射可指定任意值的映射关系。</p>
             </div>
+            <div class="mb-3 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex-1">
+                        <p class="font-medium text-indigo-700 mb-1">🔍 断语/条件宏引用的映射规则</p>
+                        <p id="mapping-ref-status" class="text-gray-600">检测断语/条件宏中引用但已缺失的映射规则，补全定义后所有引用自动生效（复用原规则ID）。</p>
+                    </div>
+                    <button onclick="scanReferencedMappingRules()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs shrink-0">🔍 扫描缺失规则</button>
+                </div>
+                <div id="mapping-ref-list" class="mt-2 space-y-1.5"></div>
+            </div>
             <div id="mapping-rule-list" class="space-y-2">
                 <p class="text-gray-400 text-center py-4">暂无映射规则</p>
             </div>
@@ -33359,6 +33369,7 @@ var MAPPING_RULES_KEY = 'pb_mapping_rules';
 var PB_SHEN_GROUP_CYCLE = ['比劫','食伤','财星','官杀','印星'];
 var PB_WU_CYCLE = ['金','水','木','火','土'];
 var _editingRuleId = null; // 当前编辑的规则ID
+var _forcedRuleId = null;  // 强制指定的规则ID（恢复被引用规则时复用原ID）
 
 var _mappingRulesCache = null;
 var _mappingRulesCacheRaw = '';
@@ -33419,6 +33430,16 @@ function saveMappingRules(rules) {
     } catch(e) { console.warn('映射规则云端同步异常:', e); }
 }
 
+// 判断规则列表是否仅包含默认预设（无有效自定义内容，用于识别云端误写入/异常数据）
+function isDefaultOnlyMappingRules(rules) {
+    var defaultIds = { map_sg_1: 1, map_sg_2: 1, map_sg_3: 1, map_sg_4: 1, map_wx_1: 1, map_wx_2: 1, map_wx_3: 1, map_wx_4: 1 };
+    if (!Array.isArray(rules) || rules.length !== 8) return false;
+    for (var i = 0; i < rules.length; i++) {
+        if (!defaultIds[rules[i].id]) return false;
+    }
+    return true;
+}
+
 // 从云端加载映射规则（登录时调用，与十神标识符一致：云端优先，换设备沿用）
 async function loadMappingRulesFromCloud() {
     if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
@@ -33433,6 +33454,21 @@ async function loadMappingRulesFromCloud() {
             let cloudRules = null;
             try { cloudRules = JSON.parse(data[0].config_value); } catch(e) { cloudRules = null; }
             if (Array.isArray(cloudRules)) {
+                // 保护本地自定义规则：云端仅为默认预设（异常/误写入数据）时，若本地已有自定义规则则不覆盖
+                if (isDefaultOnlyMappingRules(cloudRules)) {
+                    let localRules = null;
+                    try { localRules = JSON.parse(localStorage.getItem(MAPPING_RULES_KEY) || 'null'); } catch(e) { localRules = null; }
+                    if (localRules && Array.isArray(localRules) && !isDefaultOnlyMappingRules(localRules)) {
+                        _mappingRulesCloudCache = localRules;
+                        _mappingRulesCloudLoaded = true;
+                        return;
+                    }
+                }
+                // 覆盖前备份本地数据，防止丢失
+                try {
+                    var oldLocal = localStorage.getItem(MAPPING_RULES_KEY);
+                    if (oldLocal) localStorage.setItem(MAPPING_RULES_KEY + '_backup', oldLocal);
+                } catch(e) {}
                 _mappingRulesCloudCache = cloudRules;
                 _mappingRulesCloudLoaded = true;
                 _mappingRulesCacheRaw = JSON.stringify(cloudRules);
@@ -33620,7 +33656,7 @@ window.addMappingRule = function() {
     var type = document.getElementById('mapping-rule-type').value;
     if (!name) { alert('请输入映射规则名称'); return; }
 
-    var ruleData = { id: _editingRuleId || 'map_' + Date.now(), name: name, type: type };
+    var ruleData = { id: _forcedRuleId || _editingRuleId || 'map_' + Date.now(), name: name, type: type };
 
     // 自定义映射
     if (type.includes('自定义')) {
@@ -33650,7 +33686,15 @@ window.addMappingRule = function() {
 
     var rules = getMappingRules();
 
-    if (_editingRuleId) {
+    if (_forcedRuleId) {
+        // 恢复被引用规则：复用原ID，若已存在则替换，否则追加
+        var fi = rules.findIndex(function(r) { return r.id === _forcedRuleId; });
+        if (fi >= 0) { rules[fi] = ruleData; } else { rules.push(ruleData); }
+        _forcedRuleId = null;
+        _editingRuleId = null;
+        document.getElementById('mapping-rule-name').value = '';
+        document.getElementById('custom-mapping-text').value = '';
+    } else if (_editingRuleId) {
         // 编辑模式
         var idx = rules.findIndex(function(r) { return r.id === _editingRuleId; });
         if (idx >= 0) {
@@ -33734,6 +33778,79 @@ window.deleteMappingRule = function(id) {
     if (sel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(sel);
     var biSel = document.getElementById('bi-mapping-rule');
     if (biSel && typeof populateMappingRuleSelect === 'function') populateMappingRuleSelect(biSel);
+};
+
+// 递归扫描条件树，收集引用的映射规则ID（defaultMapping 引用 + 批量定位/批量包含编码中的 mapping= 段）
+function scanConditionsForMappingRefs(node, addId) {
+    if (!node || typeof node !== 'object') return;
+    if (node.defaultMapping && typeof node.defaultMapping === 'object') {
+        Object.keys(node.defaultMapping).forEach(function(k) {
+            var id = node.defaultMapping[k];
+            if (id) addId(id);
+        });
+    }
+    // 叶子值中可能含批量定位/批量包含编码（mapping=规则ID）
+    if (typeof node.val === 'string' && node.val.indexOf('mapping=') >= 0) {
+        var m = node.val.match(/mapping=[^|]+/g);
+        if (m) m.forEach(function(s) { var id = s.replace('mapping=', ''); if (id) addId(id); });
+    }
+    if (Array.isArray(node.children)) node.children.forEach(function(c) { scanConditionsForMappingRefs(c, addId); });
+    if (node.conditions && typeof node.conditions === 'object') scanConditionsForMappingRefs(node.conditions, addId);
+}
+
+// 扫描断语/条件宏引用的映射规则，返回 {id: 引用次数}
+function collectReferencedMappingRuleIds() {
+    var refs = {};
+    var addId = function(id) { refs[id] = (refs[id] || 0) + 1; };
+    var rules = (typeof cache !== 'undefined' && cache.rules) ? cache.rules : [];
+    rules.forEach(function(r) { if (r.conditions) scanConditionsForMappingRefs(r.conditions, addId); });
+    var macros = (typeof cache !== 'undefined' && cache.conditionMacros) ? cache.conditionMacros : [];
+    macros.forEach(function(m) { if (m.conditions) scanConditionsForMappingRefs(m.conditions, addId); });
+    return refs;
+}
+
+// 渲染缺失的引用规则列表（点击扫描后调用）
+function scanReferencedMappingRules() {
+    var listEl = document.getElementById('mapping-ref-list');
+    var statusEl = document.getElementById('mapping-ref-status');
+    if (!listEl || !statusEl) return;
+    var refs = collectReferencedMappingRuleIds();
+    var existing = getMappingRules();
+    var existingIds = {};
+    existing.forEach(function(r) { existingIds[r.id] = true; });
+    var missing = [];
+    Object.keys(refs).forEach(function(id) {
+        if (!existingIds[id]) missing.push({ id: id, count: refs[id] });
+    });
+    missing.sort(function(a, b) { return b.count - a.count; });
+    if (missing.length === 0) {
+        statusEl.textContent = '未发现缺失的映射规则引用，所有断语/条件宏引用均正常。';
+        listEl.innerHTML = '';
+        return;
+    }
+    statusEl.textContent = '发现 ' + missing.length + ' 个被引用但缺失的映射规则，点击「补全定义」按原ID重建（恢复后所有引用自动生效）：';
+    listEl.innerHTML = missing.map(function(m) {
+        return '<div class="flex items-center justify-between bg-white border border-indigo-200 rounded px-2 py-1">' +
+            '<div class="flex-1 truncate"><span class="font-mono text-[11px] text-indigo-700">' + m.id + '</span>' +
+            '<span class="ml-2 text-gray-500">被 ' + m.count + ' 处引用</span></div>' +
+            '<button onclick="createRuleWithId(\'' + m.id + '\')" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs shrink-0">补全定义</button>' +
+            '</div>';
+    }).join('');
+}
+
+// 用指定ID新建规则（复用旧引用ID，补全定义后保存即恢复全部引用）
+window.createRuleWithId = function(id) {
+    _forcedRuleId = id;
+    _editingRuleId = null;
+    document.getElementById('mapping-rule-name').value = '恢复规则 ' + id;
+    document.getElementById('mapping-rule-type').value = '十神组';
+    document.getElementById('mapping-rule-offset').value = '1';
+    document.getElementById('custom-mapping-text').value = '';
+    window.toggleCustomMappingArea();
+    var btn = document.querySelector('#mapping-rule-modal button[onclick="addMappingRule()"]');
+    if (btn) btn.textContent = '➕ 添加';
+    var nameInput = document.getElementById('mapping-rule-name');
+    if (nameInput) nameInput.focus();
 };
 
 function renderMappingRuleList() {
