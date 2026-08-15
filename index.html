@@ -1671,6 +1671,13 @@
                     </div>
                 </div>
             </div>
+            <div class="mb-3 p-2 border border-emerald-200 rounded bg-emerald-50">
+                <label class="block text-sm font-medium text-emerald-700 mb-1">🎯 最低契合度阈值 <span class="text-xs text-gray-500">（0-100；条件按权重计分，低于阈值的断语灰色弱化显示。留空=不启用契合度评估，行为与原来完全一致）</span></label>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="rule-min-fit" class="w-24 p-2 border rounded text-sm" min="0" max="100" placeholder="如 60">
+                    <span class="text-xs text-gray-400">命中条件按各自权重计分，契合度 = 命中权重 ÷ 总权重 × 100%。各条件可在条件项中设置权重（1-10）。</span>
+                </div>
+            </div>
             <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel relative" id="ref-output-panel-rule">
                 <div class="flex items-center justify-between mb-1">
                     <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本断语时作为十神柱状对比图的参考值基准；从下方模板库中选择，模板修改后自动生效）</span></label>
@@ -2272,6 +2279,7 @@
                     </select>
                     <input type="number" min="0" class="condition-val-input flex-1 p-2 border rounded hidden" placeholder="输入正整数">
                     <div class="condition-val-checkbox flex-1 flex flex-wrap gap-2 p-2 border rounded hidden"></div>
+                    <input type="number" min="1" max="10" class="condition-weight w-14 p-1.5 border rounded text-sm" value="1" title="权重：该条件的重要程度（1-10），权重越高对断语契合度影响越大">
                     <button class="del-condition px-3 bg-red-500 text-white rounded">−</button>
                 </div>
             </template>
@@ -9132,6 +9140,152 @@
             }
             return false;
         }
+        // ===== 契合度评分：在布尔匹配之外，按条件权重计算契合度与命中明细 =====
+        // 返回 { ok, hit, total, details }；ok 与布尔匹配结果一致，hit/total 用于契合度 = hit/total*100
+        // 计分规则：and 累加；or 取命中项中权重最高者；not_all 全部达成计满分；叶子权重默认 1
+        function scoreChildNode(child, depth, visitedMacros, ctxMapping) {
+            ctxMapping = ctxMapping || {};
+            if (child.macroRef) {
+                if (visitedMacros.has(child.macroRef)) return { ok: false, hit: 0, total: 0, details: [] };
+                const macro = getMacroById(child.macroRef);
+                if (macro && macro.conditions) {
+                    const newVisited = new Set(visitedMacros);
+                    newVisited.add(child.macroRef);
+                    const newCtx = {
+                        ruleDefaultQuZhi: ctxMapping.ruleDefaultQuZhi || '',
+                        macroDefaultQuZhi: (macro.conditions && macro.conditions.defaultQuZhi) || '',
+                        ruleDefaultMapping: ctxMapping.ruleDefaultMapping || null,
+                        macroDefaultMapping: (macro.conditions && macro.conditions.defaultMapping) || null,
+                        shenQzOverride: ctxMapping.shenQzOverride || ''
+                    };
+                    return scoreChildNode(macro.conditions, depth + 1, newVisited, newCtx);
+                }
+                return { ok: false, hit: 0, total: 0, details: [] };
+            }
+            if (child.ruleRef) {
+                if (visitedMacros.has('rule:' + child.ruleRef)) return { ok: false, hit: 0, total: 0, details: [] };
+                const refRule = (cache.rules || []).find(r => String(r.id) === String(child.ruleRef) || String(r.cloudId) === String(child.ruleRef));
+                if (refRule && refRule.conditions) {
+                    let refCond = refRule.conditions;
+                    if (Array.isArray(refCond)) refCond = { logic: 'and', children: refCond };
+                    const newVisited = new Set(visitedMacros);
+                    newVisited.add('rule:' + child.ruleRef);
+                    const newCtx = {
+                        ruleDefaultQuZhi: (refRule.conditions.defaultQuZhi) || ctxMapping.ruleDefaultQuZhi || '',
+                        macroDefaultQuZhi: ctxMapping.macroDefaultQuZhi || '',
+                        ruleDefaultMapping: (refRule.conditions.defaultMapping) || ctxMapping.ruleDefaultMapping || null,
+                        macroDefaultMapping: ctxMapping.macroDefaultMapping || null,
+                        shenQzOverride: ctxMapping.shenQzOverride || ''
+                    };
+                    return scoreChildNode(refCond, depth + 1, newVisited, newCtx);
+                }
+                return { ok: false, hit: 0, total: 0, details: [] };
+            }
+            if (child.children) {
+                return scoreConditionGroupScored(child, depth + 1, new Set(visitedMacros), ctxMapping);
+            }
+            if (child.field) {
+                const weight = child.weight && child.weight > 0 ? child.weight : 1;
+                const ev = evaluateSingleCondition(child, ctxMapping);
+                const ok = child.exclude ? !ev.res : ev.res;
+                return {
+                    ok: ok,
+                    hit: ok ? weight : 0,
+                    total: weight,
+                    details: [{
+                        field: child.field,
+                        op: child.op || '',
+                        val: child.val || '',
+                        actual: ev.actual || '',
+                        hit: ok,
+                        weight: weight,
+                        exclude: !!child.exclude
+                    }]
+                };
+            }
+            return { ok: false, hit: 0, total: 0, details: [] };
+        }
+        // 组评分：logic and/or/not_all
+        function scoreConditionGroupScored(group, depth = 0, visitedMacros = new Set(), ctxMapping) {
+            ctxMapping = ctxMapping || {};
+            const logic = group.logic || 'and';
+            const children = group.children || [];
+            if (depth > 20) return { ok: false, hit: 0, total: 0, details: [] };
+            if (logic === 'not_all') {
+                // 全排除：所有子条件取反后都不满足才通过
+                let allOk = true;
+                let hitSum = 0, totalSum = 0;
+                const details = [];
+                for (const ch of children) {
+                    const s = scoreChildNode(ch, depth, visitedMacros, ctxMapping);
+                    details.push.apply(details, s.details);
+                    totalSum += s.total;
+                    // not_all 要求取反后为假（原条件不满足），此时该子约束达成
+                    if (s.ok) allOk = false;
+                    else hitSum += s.total; // 该子不满足 → 排除约束达成，计其权重
+                }
+                return { ok: allOk, hit: allOk ? hitSum : 0, total: totalSum, details: details };
+            }
+            let result = logic === 'and';
+            let hit = 0, total = 0;
+            let maxHitOr = 0, maxTotalOr = 0;
+            const details = [];
+            for (const ch of children) {
+                const s = scoreChildNode(ch, depth, visitedMacros, ctxMapping);
+                details.push.apply(details, s.details);
+                if (logic === 'and') {
+                    total += s.total;
+                    result = result && s.ok;
+                    if (s.ok) hit += s.hit;
+                } else {
+                    // or：任一满足即通过；hit 取命中项中权重最高者；total 取所有子 total 最高者
+                    total = Math.max(total, s.total);
+                    if (s.ok) {
+                        result = true;
+                        maxHitOr = Math.max(maxHitOr, s.hit);
+                    }
+                }
+            }
+            if (logic === 'or') {
+                hit = result ? maxHitOr : 0;
+            } else {
+                hit = result ? hit : 0;
+            }
+            return { ok: result, hit: hit, total: total, details: details };
+        }
+        // 检测条件树中是否存在显式设置的权重（用于判断是否启用契合度评估）
+        function hasCustomWeightInTree(node) {
+            if (!node) return false;
+            if (node.children) {
+                for (const ch of node.children) {
+                    if (hasCustomWeightInTree(ch)) return true;
+                }
+                return false;
+            }
+            if (node.field) return !!(node.weight && node.weight > 0 && node.weight !== 1);
+            if (node.macroRef || node.ruleRef) return false; // 引用节点的权重随被引用内容，不视为本层自定义
+            return false;
+        }
+        // 评估断语契合度（供匹配命中后计算）
+        function evaluateRuleFitScore(rule, ctx) {
+            if (!rule || !rule.conditions) return { ok: false, hit: 0, total: 0, details: [], percent: 0, minFit: 0, enabled: false };
+            const cond = rule.conditions;
+            const scored = (cond.children && cond.children.length > 0)
+                ? scoreConditionGroupScored(cond, 0, new Set(), ctx)
+                : { ok: false, hit: 0, total: 0, details: [] };
+            const percent = scored.total > 0 ? Math.round((scored.hit / scored.total) * 100) : 100;
+            const minFit = cond.minFit || 0;
+            return {
+                ok: scored.ok,
+                hit: scored.hit,
+                total: scored.total,
+                details: scored.details,
+                percent: percent,
+                minFit: minFit,
+                // 仅当断语显式设置了 minFit 或存在非默认权重时才启用契合度评估，保证旧数据行为完全不变
+                enabled: !!(minFit > 0 || hasCustomWeightInTree(cond))
+            };
+        }
         // 取值维度联动评估：shenDims 为空（生产匹配）时单次评估；收集模式下按维度逐一评估，任一命中即通过
         function evalRuleWithDim(rule, ctxBase) {
             if (shenDims.length === 0) return evaluateRuleConditions(rule, ctxBase);
@@ -9176,8 +9330,16 @@
                 // 检查用户是否有该分类的权限
                 const allowedCategories = getCurrentUserAllowedCategories();
                 if (allowedCategories.includes(rule.category)) {
-                    if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
-                    matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule });
+                    // 契合度评估（仅在启用时附加，旧数据不带 fit 字段行为完全不变）
+                    let fit = null;
+                    try { fit = evaluateRuleFitScore(rule, ruleCtx); } catch (e) { fit = null; }
+                    if (fit && fit.enabled) {
+                        if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
+                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, fit: fit });
+                    } else {
+                        if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
+                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule });
+                    }
                 }
             }
         });
@@ -11566,6 +11728,41 @@
         return entry.text;
     }
 
+    // 契合度徽章 + 命中明细折叠区（供结果列表使用）
+    function buildFitBadgeHtml(fit) {
+        if (!fit || !fit.enabled) return '';
+        const pct = fit.percent;
+        const low = fit.minFit > 0 && pct < fit.minFit;
+        const badgeColor = low
+            ? 'bg-gray-200 text-gray-500'
+            : (pct >= 80 ? 'bg-green-100 text-green-700' : (pct >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700'));
+        let detailsHtml = '';
+        if (fit.details && fit.details.length) {
+            const rows = fit.details.map((d) => {
+                const hitIcon = d.hit ? '✓' : '✗';
+                const valText = d.val || '';
+                const actualText = (d.actual !== undefined && d.actual !== '') ? `<span class="text-gray-400">（实际 ${escapeHtml(d.actual)}）</span>` : '';
+                return `<div class="flex items-center gap-1.5 text-[11px] leading-4 ${d.hit ? 'text-green-700' : 'text-red-500'}">
+                    <span class="font-bold">${hitIcon}</span>
+                    <span class="font-medium">${escapeHtml(d.field)}</span>
+                    <span class="text-gray-400">${escapeHtml(d.op)} ${escapeHtml(valText)}</span>${actualText}
+                    <span class="ml-auto text-gray-400">权重 ${d.weight}</span>
+                </div>`;
+            }).join('');
+            detailsHtml = `<div class="mt-1 pl-2 border-l-2 border-gray-300 space-y-0.5">${rows}</div>`;
+        }
+        return `<div class="mt-0.5">
+            <span class="fit-badge inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full cursor-pointer select-none ${badgeColor}" onclick="toggleFitDetails(this)" title="点击查看命中明细">🎯 契合度 ${pct}%${low ? '<span class="text-gray-400">（未达阈值）</span>' : ''} ▾</span>
+            <div class="fit-details hidden">${detailsHtml}</div>
+        </div>`;
+    }
+
+    // 切换契合度命中明细展开/收起
+    function toggleFitDetails(badge) {
+        const details = badge && badge.nextElementSibling;
+        if (details) details.classList.toggle('hidden');
+    }
+
     function displayDuanyuResult() {
         const resultFilter = DOM.resultFilterCategory ? DOM.resultFilterCategory.value : 'all';
         const matchedByCategory = cache.matchedByCategory || {};
@@ -11588,7 +11785,13 @@
             return groupDuanyuByPrefix(duanyus).map((entry, i) => {
                 const displayText = mergedDuanyuText(entry);
                 const rule = entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.rule) : (entry.d && entry.d.rule);
-                return `<div class="text-gray-800 flex items-start gap-2"><span class="text-amber-600 flex-shrink-0 font-bold">${i + 1}.</span><div class="result-duanyu-text">${renderDuanyu(displayText, rule)}</div></div>`;
+                // 取契合度（同前缀合并时取第一项的）
+                const fit = entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.fit) : (entry.d && entry.d.fit);
+                // 低于最低契合度阈值 → 灰色弱化显示
+                const lowFit = fit && fit.enabled && fit.minFit > 0 && fit.percent < fit.minFit;
+                const weakClass = lowFit ? ' opacity-60' : '';
+                const fitHtml = buildFitBadgeHtml(fit);
+                return `<div class="text-gray-800 flex items-start gap-2${weakClass}"><span class="text-amber-600 flex-shrink-0 font-bold">${i + 1}.</span><div class="result-duanyu-text">${renderDuanyu(displayText, rule)}${fitHtml}</div></div>`;
             }).join('');
         };
         
@@ -11651,7 +11854,8 @@
           if (matchedByCategory[cat][ci].text === text) { exists = true; break; }
         }
         if (!exists) {
-          matchedByCategory[cat].push({ text: text, rule: null });
+          var fitItem = (item.fit && item.fit.enabled) ? item.fit : undefined;
+          matchedByCategory[cat].push({ text: text, rule: null, fit: fitItem });
         }
       }
 
@@ -12429,6 +12633,10 @@
                 
                 const excludeCb = item.querySelector('.condition-exclude');
                 if (excludeCb) excludeCb.checked = child.exclude === true;
+                
+                // 回填条件权重（缺省为1）
+                const weightInp = item.querySelector('.condition-weight');
+                if (weightInp) weightInp.value = child.weight || 1;
                 
                 // 设置值
                 if (!valCheckbox.classList.contains('hidden') && child.val) {
@@ -13543,7 +13751,13 @@
                 if (!field || !val) {
                     return { error: '请完善所有条件！' };
                 }
-                children.push({ logic, field, op, val, exclude: exclude || undefined });
+                const weightInput = child.querySelector('.condition-weight');
+                let weight = 1;
+                if (weightInput && weightInput.value) {
+                    const w = parseInt(weightInput.value, 10);
+                    if (!isNaN(w) && w > 0) weight = w;
+                }
+                children.push({ logic, field, op, val, exclude: exclude || undefined, weight: weight !== 1 ? weight : undefined });
             } else if (child.classList.contains('condition-group')) {
                 // 递归收集条件组数据
                 const groupLogic = child.querySelector('.group-logic').value;
@@ -13625,6 +13839,12 @@
                 defaultQuZhi: ruleDefaultQuZhi,
                 defaultMapping: ruleDefaultMapping
             };
+            // 最低契合度阈值（留空=不启用契合度评估）
+            const minFitVal = document.getElementById('rule-min-fit')?.value;
+            if (minFitVal !== undefined && minFitVal !== '') {
+                const mf = parseInt(minFitVal, 10);
+                if (!isNaN(mf) && mf > 0) conditionGroup.minFit = mf;
+            }
 
             // 参考值输出（十神柱状对比图）：随 conditions 一起同步
             const ruleRefOutput = collectRefOutput(document.getElementById('ref-output-panel-rule'));
@@ -14397,6 +14617,12 @@
                     // 回填关联生克关系（关系表打 ✓ 提醒）
                     loadRelationBindings(document.getElementById('ref-output-panel-rule'), (rule.conditions && rule.conditions.relationBindings) || []);
                     
+                    // 回填最低契合度阈值
+                    const ruleMinFitInputA = document.getElementById('rule-min-fit');
+                    if (ruleMinFitInputA) {
+                        ruleMinFitInputA.value = (rule.conditions && rule.conditions.minFit) || '';
+                    }
+                    
                     // 清空现有条件组
                     const rootContainer = DOM.ruleConditions.querySelector('.condition-group-root');
                     rootContainer.innerHTML = '';
@@ -14532,6 +14758,12 @@
                     loadRefOutput(document.getElementById('ref-output-panel-rule'), (rule.conditions && rule.conditions.referenceOutput) || null);
                     // 回填关联生克关系（关系表打 ✓ 提醒）
                     loadRelationBindings(document.getElementById('ref-output-panel-rule'), (rule.conditions && rule.conditions.relationBindings) || []);
+                    
+                    // 回填最低契合度阈值
+                    const ruleMinFitInputB = document.getElementById('rule-min-fit');
+                    if (ruleMinFitInputB) {
+                        ruleMinFitInputB.value = (rule.conditions && rule.conditions.minFit) || '';
+                    }
                     
                     
                     // 清空现有条件组
@@ -26622,6 +26854,9 @@ function loadConditionsToEditor(container, conditions) {
                 // 设置排除复选框
                 const excludeCb = item.querySelector('.condition-exclude');
                 if (excludeCb) excludeCb.checked = child.exclude === true;
+                // 回填条件权重（缺省为1）
+                const weightInp2 = item.querySelector('.condition-weight');
+                if (weightInp2) weightInp2.value = child.weight || 1;
                 // 设置值
                 setTimeout(() => {
                     const valSelect = item.querySelector('.condition-val-select');
