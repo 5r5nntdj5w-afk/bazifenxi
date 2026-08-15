@@ -2050,16 +2050,58 @@ function evaluateLeafCondition(data, cond, context) {
 // 叶子权重默认 1；fit 对象：{ ok, hit, total, details, percent, minFit, enabled }
 // enabled 仅当 minFit > 0 或条件树中存在非默认权重时为 true，旧断语（无权重/minFit）行为完全不变、不带 fit 字段
 
-function hasCustomWeightInTree(node) {
+function hasCustomWeightInTree(node, data, visited) {
   if (!node) return false;
+  visited = visited || [];
   if (node.children) {
     for (var i = 0; i < node.children.length; i++) {
-      if (hasCustomWeightInTree(node.children[i])) return true;
+      if (hasCustomWeightInTree(node.children[i], data, visited)) return true;
     }
     return false;
   }
   if (node.field) return !!(node.weight && node.weight > 0 && node.weight !== 1);
-  return false; // 引用节点（macroRef/ruleRef）的权重随被引用内容，不视为本层自定义
+  // 引用节点（宏/断语）：递归检查被引用内容，被引用宏/断语内部的权重同样参与契合度计算（防循环）
+  if (node.macroRef) {
+    var mKey = 'macro:' + String(node.macroRef);
+    if (visited.indexOf(mKey) >= 0) return false;
+    visited.push(mKey);
+    var macros = data && data.macros;
+    if (macros) {
+      for (var mi = 0; mi < macros.length; mi++) {
+        var m = macros[mi];
+        if (m && m.conditions && (String(m.id) === String(node.macroRef) || String(m.cloudId) === String(node.macroRef))) {
+          return hasCustomWeightInTree(m.conditions, data, visited);
+        }
+      }
+      if (data.idMapping && data.idMapping.macros) {
+        var rc = data.idMapping.macros[String(node.macroRef)];
+        if (rc) {
+          for (var mi2 = 0; mi2 < macros.length; mi2++) {
+            if (macros[mi2] && macros[mi2].conditions && String(macros[mi2].id) === String(rc)) {
+              return hasCustomWeightInTree(macros[mi2].conditions, data, visited);
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+  if (node.ruleRef) {
+    var rKey = 'rule:' + String(node.ruleRef);
+    if (visited.indexOf(rKey) >= 0) return false;
+    visited.push(rKey);
+    var rulesList = data && data.rules;
+    if (rulesList) {
+      for (var ri = 0; ri < rulesList.length; ri++) {
+        var rr = rulesList[ri];
+        if (rr && rr.conditions && (String(rr.id) === String(node.ruleRef) || String(rr.cloudId) === String(node.ruleRef))) {
+          return hasCustomWeightInTree(rr.conditions, data, visited);
+        }
+      }
+    }
+    return false;
+  }
+  return false;
 }
 
 function scoreChildNode(data, child, depth, visitedMacros, context) {
@@ -2216,8 +2258,8 @@ function evaluateRuleFitScore(data, conditions) {
     details: scored.details,
     percent: percent,
     minFit: minFit,
-    // 仅当断语显式设置了 minFit 或存在非默认权重时才启用契合度评估，保证旧数据行为完全不变
-    enabled: !!(minFit > 0 || hasCustomWeightInTree(cond))
+    // 仅当断语显式设置了 minFit 或条件树（含被引用宏/断语内部）存在非默认权重时才启用契合度评估，保证旧数据行为完全不变
+    enabled: !!(minFit > 0 || hasCustomWeightInTree(cond, data))
   };
 }
 

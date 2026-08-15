@@ -9254,16 +9254,33 @@
             return { ok: result, hit: hit, total: total, details: details };
         }
         // 检测条件树中是否存在显式设置的权重（用于判断是否启用契合度评估）
-        function hasCustomWeightInTree(node) {
+        // 引用节点（宏/断语）会递归检查被引用内容，被引用宏/断语内部的权重同样参与契合度计算
+        function hasCustomWeightInTree(node, visited) {
             if (!node) return false;
+            visited = visited || new Set();
             if (node.children) {
                 for (const ch of node.children) {
-                    if (hasCustomWeightInTree(ch)) return true;
+                    if (hasCustomWeightInTree(ch, visited)) return true;
                 }
                 return false;
             }
             if (node.field) return !!(node.weight && node.weight > 0 && node.weight !== 1);
-            if (node.macroRef || node.ruleRef) return false; // 引用节点的权重随被引用内容，不视为本层自定义
+            if (node.macroRef) {
+                const key = 'macro:' + String(node.macroRef);
+                if (visited.has(key)) return false;
+                visited.add(key);
+                const macro = getMacroById(node.macroRef);
+                if (macro && macro.conditions) return hasCustomWeightInTree(macro.conditions, visited);
+                return false;
+            }
+            if (node.ruleRef) {
+                const key = 'rule:' + String(node.ruleRef);
+                if (visited.has(key)) return false;
+                visited.add(key);
+                const refRule = (cache.rules || []).find(r => String(r.id) === String(node.ruleRef) || String(r.cloudId) === String(node.ruleRef));
+                if (refRule && refRule.conditions) return hasCustomWeightInTree(refRule.conditions, visited);
+                return false;
+            }
             return false;
         }
         // 评估断语契合度（供匹配命中后计算）
