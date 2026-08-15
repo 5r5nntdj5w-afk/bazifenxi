@@ -1600,6 +1600,11 @@
                 <select id="result-filter-category" class="p-2 border-2 border-amber-300 rounded-lg bg-white text-amber-700 font-medium focus:border-amber-500 focus:outline-none">
                     <option value="all">全部断语</option>
                 </select>
+                <select id="eval-scope" class="p-2 border-2 border-indigo-300 rounded-lg bg-white text-indigo-700 font-medium focus:border-indigo-500 focus:outline-none" title="评估范围：决定断语匹配时是否纳入大运/流年（仅原局 = 原局格局判定；原局+大运 = 大运影响；原局+大运+流年 = 流年影响）">
+                    <option value="all">评估范围：原局+大运+流年</option>
+                    <option value="dayun">评估范围：原局+大运</option>
+                    <option value="bazi">评估范围：仅原局</option>
+                </select>
             </div>
             <div id="duanyu-result" class="min-h-32 p-4 rounded-lg bg-white border-2 border-amber-100 shadow-inner">
                 <p class="text-gray-500 text-center">请输入八字，系统将自动分析</p>
@@ -1802,6 +1807,29 @@
                     <div class="condition-field-wrapper">
                         <select class="condition-field" style="display:none">
                         <option value="">选择字段</option>
+
+                        <optgroup label="【当前评估范围】跟随评估范围开关自动统计（仅原局8字/原局+大运10字/原局+大运+流年12字）">
+                        <option value="当前评估范围五行数量-木">当前评估范围木五行数量</option>
+                        <option value="当前评估范围五行数量-火">当前评估范围火五行数量</option>
+                        <option value="当前评估范围五行数量-土">当前评估范围土五行数量</option>
+                        <option value="当前评估范围五行数量-金">当前评估范围金五行数量</option>
+                        <option value="当前评估范围五行数量-水">当前评估范围水五行数量</option>
+                        <option value="当前评估范围十神数量-比劫">当前评估范围比劫数量</option>
+                        <option value="当前评估范围十神数量-食伤">当前评估范围食伤数量</option>
+                        <option value="当前评估范围十神数量-财星">当前评估范围财星数量</option>
+                        <option value="当前评估范围十神数量-官杀">当前评估范围官杀数量</option>
+                        <option value="当前评估范围十神数量-印星">当前评估范围印星数量</option>
+                        <option value="当前评估范围十神数量-比肩">当前评估范围比肩数量</option>
+                        <option value="当前评估范围十神数量-劫财">当前评估范围劫财数量</option>
+                        <option value="当前评估范围十神数量-食神">当前评估范围食神数量</option>
+                        <option value="当前评估范围十神数量-伤官">当前评估范围伤官数量</option>
+                        <option value="当前评估范围十神数量-偏财">当前评估范围偏财数量</option>
+                        <option value="当前评估范围十神数量-正财">当前评估范围正财数量</option>
+                        <option value="当前评估范围十神数量-七杀">当前评估范围七杀数量</option>
+                        <option value="当前评估范围十神数量-正官">当前评估范围正官数量</option>
+                        <option value="当前评估范围十神数量-偏印">当前评估范围偏印数量</option>
+                        <option value="当前评估范围十神数量-正印">当前评估范围正印数量</option>
+                        </optgroup>
 
                         <optgroup label="【原局精确匹配】原局五行数量判断">
                         <option value="原局五行数量-木">原局木五行数量</option>
@@ -3805,6 +3833,20 @@
 
     // 异步调 SCF API 获取断语
     /** 调用 /api/matchDuanyu（Vercel 服务端匹配） */
+    /** 评估范围：'all'=原局+大运+流年（默认） / 'dayun'=原局+大运 / 'bazi'=仅原局 */
+    function getEvalScope() {
+      var s = window.__evalScope;
+      if (s !== 'dayun' && s !== 'bazi') s = 'all';
+      return s;
+    }
+    /** 按评估范围过滤当前选中项：仅原局 → 不带大运/流年/流月；原局+大运 → 不带流年/流月；原局+大运+流年 → 带大运+流年（不传流月） */
+    function applyEvalScope(scope, dayunItem, liunianItem, liuyueItem) {
+      var s = scope || getEvalScope();
+      if (s === 'bazi') return { dayun: null, liunian: null, liuyue: null };
+      if (s === 'dayun') return { dayun: dayunItem, liunian: null, liuyue: null };
+      return { dayun: dayunItem, liunian: liunianItem, liuyue: null };
+    }
+
     function callDuanyuMatchApi(baziData, gender, birthYear, dayunList, liunianList, currentDayun, currentLiunian, currentLiuyue) {
       var matchUrl = window.location.origin + '/api/matchDuanyu';
       // 调试开关：控制台执行 window.__BI_DEBUG = true 或 URL 加 ?bidebug=1
@@ -3928,6 +3970,12 @@
           zhi: liuyueZhi
         };
       }
+
+      // 按评估范围过滤：仅原局不带大运/流年；原局+大运不带流年/流月
+      var scopeFiltered = applyEvalScope(getEvalScope(), currentDayunItem, currentLiunianItem, currentLiuyueItem);
+      currentDayunItem = scopeFiltered.dayun;
+      currentLiunianItem = scopeFiltered.liunian;
+      currentLiuyueItem = scopeFiltered.liuyue;
 
       callDuanyuMatchApi(baziForMatch, genderStr, lastPaipan.birthYear, null, null,
         currentDayunItem, currentLiunianItem, currentLiuyueItem
@@ -6868,6 +6916,16 @@
             displayDuanyuResult();
         };
         
+        // 评估范围切换：按范围（仅原局/原局+大运/原局+大运+流年）重新匹配断语
+        const evalScopeSel = document.getElementById('eval-scope');
+        if (evalScopeSel) {
+            evalScopeSel.onchange = () => {
+                window.__evalScope = evalScopeSel.value;
+                window.apiDuanyuCache = null; // 强制用新范围重新匹配
+                refreshApiDuanyu();
+            };
+        }
+        
         // 准确率排序
         const accuracySort = document.getElementById('accuracy-sort');
         if (accuracySort) {
@@ -8952,9 +9010,10 @@
             // 五行数量-（统一处理各种前缀：原局、大运、流年等）
             else if(c.field.indexOf('五行数量-') >= 0){
                 const name = c.field.substring(c.field.lastIndexOf('-') + 1);
-                const hasDayun = c.field.indexOf('大运') >= 0;
-                const hasLiunian = c.field.indexOf('流年') >= 0;
-                const hasYuanJu = c.field.indexOf('原局') >= 0;
+                const isCurScope = c.field.indexOf('当前评估范围') >= 0;
+                const hasDayun = c.field.indexOf('大运') >= 0 || isCurScope;
+                const hasLiunian = c.field.indexOf('流年') >= 0 || isCurScope;
+                const hasYuanJu = c.field.indexOf('原局') >= 0 || isCurScope;
                 const onlyTiangan = c.field.indexOf('天干') >= 0;
                 const onlyDizhi = c.field.indexOf('地支') >= 0;
                 let cnt = 0;
@@ -8986,9 +9045,10 @@
             // 十神数量-（统一处理各种前缀：原局、大运、流年等）
             else if(c.field.indexOf('十神数量-') >= 0){
                 const name = c.field.substring(c.field.lastIndexOf('-') + 1);
-                const hasDayun = c.field.indexOf('大运') >= 0;
-                const hasLiunian = c.field.indexOf('流年') >= 0;
-                const hasYuanJu = c.field.indexOf('原局') >= 0;
+                const isCurScope = c.field.indexOf('当前评估范围') >= 0;
+                const hasDayun = c.field.indexOf('大运') >= 0 || isCurScope;
+                const hasLiunian = c.field.indexOf('流年') >= 0 || isCurScope;
+                const hasYuanJu = c.field.indexOf('原局') >= 0 || isCurScope;
                 const onlyTiangan = c.field.indexOf('天干') >= 0;
                 const onlyDizhi = c.field.indexOf('地支') >= 0;
                 const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
@@ -11780,6 +11840,14 @@
         if (details) details.classList.toggle('hidden');
     }
 
+    /** 评估范围显示名 */
+    function evalScopeLabel() {
+      var s = getEvalScope();
+      if (s === 'bazi') return '仅原局';
+      if (s === 'dayun') return '原局+大运';
+      return '原局+大运+流年';
+    }
+
     /** 主格局识别：从"格局"分类的匹配结果中选出契合度最高的作为主格局，按 90/70/50 划分层次 */
     function analyzeGeJu() {
         const matched = (cache.matchedByCategory && cache.matchedByCategory['格局']) || [];
@@ -11810,7 +11878,7 @@
             if (geju.noMatch) {
                 return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="font-bold text-gray-700">🔮 主格局识别</span>
+                        <span class="font-bold text-gray-700">🔮 主格局识别</span><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span>
                         <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">不成格局</span>
                     </div>
                     <div class="text-gray-600 text-sm">未匹配到任何格局类型，该八字不成格局（属"差八字"范畴）。</div>
@@ -11819,7 +11887,7 @@
             if (geju.noFit) {
                 return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-amber-50 to-yellow-50 border-l-4 border-amber-300">
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="font-bold text-gray-700">🔮 主格局识别</span>
+                        <span class="font-bold text-gray-700">🔮 主格局识别</span><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span>
                         <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-amber-700 bg-amber-100 border-amber-300">未启用</span>
                     </div>
                     <div class="text-gray-600 text-sm">已匹配到格局断语，但未启用契合度评估。请在格局断语中设置<strong>最低契合度阈值</strong>或为条件设置<strong>权重</strong>后，即可自动识别主格局与层次。</div>
@@ -11839,7 +11907,7 @@
         }).join('');
         return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 border-l-4 border-indigo-300">
             <div class="flex items-center justify-between mb-1">
-                <div class="font-bold text-gray-700">🔮 主格局识别</div>
+                <div class="font-bold text-gray-700">🔮 主格局识别</div><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span>
                 <div class="flex items-center gap-2">${levelBadge}${fitBadge}</div>
             </div>
             <div class="text-gray-800 font-bold text-base">👑 ${escapeHtml(top.text)}</div>
@@ -12322,6 +12390,12 @@
         if (liuyueGan && liuyueZhi) {
             currentLiuyueItem = { gan: liuyueGan, zhi: liuyueZhi };
         }
+        
+        // 按评估范围过滤：仅原局不带大运/流年；原局+大运不带流年/流月
+        var scopeFiltered = applyEvalScope(getEvalScope(), currentDayunItem, currentLiunianItem, currentLiuyueItem);
+        currentDayunItem = scopeFiltered.dayun;
+        currentLiunianItem = scopeFiltered.liunian;
+        currentLiuyueItem = scopeFiltered.liuyue;
         
         callDuanyuMatchApi(baziForMatch, genderStr, birthYear, null, null,
             currentDayunItem, currentLiunianItem, currentLiuyueItem

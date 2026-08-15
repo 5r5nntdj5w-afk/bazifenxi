@@ -1519,9 +1519,10 @@ function evaluateLeafCondition(data, cond, context) {
   // ---- 五行数量（统一处理所有前缀变体） ----
   else if (field.indexOf('五行数量-') >= 0) {
     var name = field.substring(field.lastIndexOf('-') + 1);
-    var hasDayun = field.indexOf('大运') >= 0;
-    var hasLiunian = field.indexOf('流年') >= 0;
-    var hasYuanJu = field.indexOf('原局') >= 0;
+    var isCurScope = field.indexOf('当前评估范围') >= 0;
+    var hasDayun = field.indexOf('大运') >= 0 || isCurScope;
+    var hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
+    var hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
     var onlyTiangan = field.indexOf('天干') >= 0;
     var onlyDizhi = field.indexOf('地支') >= 0;
     var cnt = 0;
@@ -1607,9 +1608,10 @@ function evaluateLeafCondition(data, cond, context) {
   // ---- 十神数量（统一处理所有前缀变体） ----
   else if (field.indexOf('十神数量-') >= 0) {
     var name = field.substring(field.lastIndexOf('-') + 1);
-    var hasDayun = field.indexOf('大运') >= 0;
-    var hasLiunian = field.indexOf('流年') >= 0;
-    var hasYuanJu = field.indexOf('原局') >= 0;
+    var isCurScope = field.indexOf('当前评估范围') >= 0;
+    var hasDayun = field.indexOf('大运') >= 0 || isCurScope;
+    var hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
+    var hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
     var onlyTiangan = field.indexOf('天干') >= 0;
     var onlyDizhi = field.indexOf('地支') >= 0;
     var isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
