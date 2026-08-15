@@ -11780,6 +11780,74 @@
         if (details) details.classList.toggle('hidden');
     }
 
+    /** 主格局识别：从"格局"分类的匹配结果中选出契合度最高的作为主格局，按 90/70/50 划分层次 */
+    function analyzeGeJu() {
+        const matched = (cache.matchedByCategory && cache.matchedByCategory['格局']) || [];
+        const candidates = [];
+        for (const entry of matched) {
+            const fit = entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.fit) : (entry.d && entry.d.fit);
+            if (!fit || !fit.enabled) continue;
+            const text = entry.type === 'group' ? entry.contents[0].d.text : entry.d.text;
+            candidates.push({ text, fit });
+        }
+        if (matched.length === 0) return { hasGeJu: false, noMatch: true, candidates: [] };
+        if (candidates.length === 0) return { hasGeJu: false, noFit: true, candidates: [] };
+        candidates.sort((a, b) => (b.fit.percent || 0) - (a.fit.percent || 0));
+        const top = candidates[0];
+        const percent = top.fit.percent;
+        let level = '不成格';
+        let levelClass = 'text-gray-600 bg-gray-100 border-gray-300';
+        if (percent >= 90) { level = '上等'; levelClass = 'text-emerald-700 bg-emerald-100 border-emerald-300'; }
+        else if (percent >= 70) { level = '中等'; levelClass = 'text-blue-700 bg-blue-100 border-blue-300'; }
+        else if (percent >= 50) { level = '普通'; levelClass = 'text-amber-700 bg-amber-100 border-amber-300'; }
+        return { hasGeJu: true, top, candidates, percent, level, levelClass };
+    }
+
+    /** 主格局识别面板 HTML */
+    function buildGeJuPanelHtml(geju) {
+        if (!geju) return '';
+        if (!geju.hasGeJu) {
+            if (geju.noMatch) {
+                return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-gray-700">🔮 主格局识别</span>
+                        <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">不成格局</span>
+                    </div>
+                    <div class="text-gray-600 text-sm">未匹配到任何格局类型，该八字不成格局（属"差八字"范畴）。</div>
+                </div>`;
+            }
+            if (geju.noFit) {
+                return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-amber-50 to-yellow-50 border-l-4 border-amber-300">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-gray-700">🔮 主格局识别</span>
+                        <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-amber-700 bg-amber-100 border-amber-300">未启用</span>
+                    </div>
+                    <div class="text-gray-600 text-sm">已匹配到格局断语，但未启用契合度评估。请在格局断语中设置<strong>最低契合度阈值</strong>或为条件设置<strong>权重</strong>后，即可自动识别主格局与层次。</div>
+                </div>`;
+            }
+            return '';
+        }
+        const top = geju.top;
+        const levelBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold border ${geju.levelClass}">${geju.level}</span>`;
+        const fitBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">契合度 ${geju.percent}%</span>`;
+        const listHtml = geju.candidates.slice(0, 5).map(c => {
+            const isTop = c === geju.top;
+            return `<div class="flex items-center justify-between text-sm py-0.5 ${isTop ? 'font-bold text-gray-800' : 'text-gray-500'}">
+                <span>${isTop ? '👑 ' : ''}${escapeHtml(c.text)}</span>
+                <span class="text-xs">${c.fit.percent}%</span>
+            </div>`;
+        }).join('');
+        return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 border-l-4 border-indigo-300">
+            <div class="flex items-center justify-between mb-1">
+                <div class="font-bold text-gray-700">🔮 主格局识别</div>
+                <div class="flex items-center gap-2">${levelBadge}${fitBadge}</div>
+            </div>
+            <div class="text-gray-800 font-bold text-base">👑 ${escapeHtml(top.text)}</div>
+            ${listHtml ? `<div class="mt-2 pt-2 border-t border-indigo-100 space-y-0.5">${listHtml}</div>` : ''}
+            <div class="mt-1 text-xs text-gray-400">层次按契合度划分：≥90 上等 / 70-89 中等 / 50-69 普通 / &lt;50 不成格</div>
+        </div>`;
+    }
+
     function displayDuanyuResult() {
         const resultFilter = DOM.resultFilterCategory ? DOM.resultFilterCategory.value : 'all';
         const matchedByCategory = cache.matchedByCategory || {};
@@ -11846,7 +11914,9 @@
             }
         }
         
-        DOM.duanyuResult.innerHTML = html;
+        // 主格局识别面板（置于结果区顶部）
+        const gejuPanelHtml = buildGeJuPanelHtml(analyzeGeJu());
+        DOM.duanyuResult.innerHTML = gejuPanelHtml ? gejuPanelHtml + html : html;
     }
 
     /** 从 API 断语缓存渲染断语结果 */
