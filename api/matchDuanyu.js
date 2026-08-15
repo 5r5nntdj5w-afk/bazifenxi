@@ -894,6 +894,8 @@ function evaluateLeafCondition(data, cond, context) {
 
   var actual = '';
   var res = false;
+  // 契合度评分钩子：评分调用时传入 context.__fitOut 以回传 actual（实际值）供命中明细展示，不影响原返回值
+  var fitOut = context.__fitOut || null;
   var macroDefaultQuZhi = context.macroDefaultQuZhi || '';
   var ruleDefaultQuZhi = context.ruleDefaultQuZhi || '';
   var macroDefaultMapping = context.macroDefaultMapping || null;
@@ -947,6 +949,7 @@ function evaluateLeafCondition(data, cond, context) {
         else if (op === 'le') res = _cnt1 <= _cnt2;
         else if (op === 'lt') res = _cnt1 < _cnt2;
         actual = field + '=' + _cnt1 + ', ' + val + '=' + _cnt2;
+        if (fitOut) fitOut.actual = actual;
         return res;
       }
       
@@ -1014,6 +1017,7 @@ function evaluateLeafCondition(data, cond, context) {
         else if (op === 'le') res = _cntA <= _cntB;
         else if (op === 'lt') res = _cntA < _cntB;
         actual = field + '=' + _cntA + ', ' + val + '=' + _cntB;
+        if (fitOut) fitOut.actual = actual;
         return res;
       }
     }
@@ -2037,7 +2041,184 @@ function evaluateLeafCondition(data, cond, context) {
     actual = String(data.effectiveAge != null ? data.effectiveAge : 'null');
   }
 
+  if (fitOut) fitOut.actual = actual;
   return res;
+}
+
+// ===================== 契合度评分（镜像前端 index.html scoreChildNode / scoreConditionGroupScored） =====================
+// 计分规则：and 组累加命中子项权重；or 组取命中项中权重最高者（total 取所有子项 total 最高者）；not_all 全部达成计满分
+// 叶子权重默认 1；fit 对象：{ ok, hit, total, details, percent, minFit, enabled }
+// enabled 仅当 minFit > 0 或条件树中存在非默认权重时为 true，旧断语（无权重/minFit）行为完全不变、不带 fit 字段
+
+function hasCustomWeightInTree(node) {
+  if (!node) return false;
+  if (node.children) {
+    for (var i = 0; i < node.children.length; i++) {
+      if (hasCustomWeightInTree(node.children[i])) return true;
+    }
+    return false;
+  }
+  if (node.field) return !!(node.weight && node.weight > 0 && node.weight !== 1);
+  return false; // 引用节点（macroRef/ruleRef）的权重随被引用内容，不视为本层自定义
+}
+
+function scoreChildNode(data, child, depth, visitedMacros, context) {
+  context = context || {};
+  if (!child) return { ok: false, hit: 0, total: 0, details: [] };
+  // macroRef 节点：查找宏定义并递归评分（防循环引用）
+  if (child.macroRef) {
+    if (visitedMacros.has(String(child.macroRef))) return { ok: false, hit: 0, total: 0, details: [] };
+    var macro = null;
+    var macros = data && data.macros;
+    if (macros) {
+      for (var mi = 0; mi < macros.length; mi++) {
+        var m = macros[mi];
+        if (m && m.conditions && (String(m.id) === String(child.macroRef) || String(m.cloudId) === String(child.macroRef))) { macro = m; break; }
+      }
+      if (!macro && data.idMapping && data.idMapping.macros) {
+        var rc = data.idMapping.macros[String(child.macroRef)];
+        if (rc) {
+          for (var mi2 = 0; mi2 < macros.length; mi2++) {
+            if (macros[mi2] && macros[mi2].conditions && String(macros[mi2].id) === String(rc)) { macro = macros[mi2]; break; }
+          }
+        }
+      }
+    }
+    if (macro && macro.conditions) {
+      var newVisited = new Set(visitedMacros);
+      newVisited.add(String(child.macroRef));
+      var newCtx = {
+        ruleDefaultQuZhi: context.ruleDefaultQuZhi || '',
+        macroDefaultQuZhi: (macro.conditions && macro.conditions.defaultQuZhi) || macro.defaultQuZhi || '',
+        ruleDefaultMapping: context.ruleDefaultMapping || null,
+        macroDefaultMapping: (macro.conditions && macro.conditions.defaultMapping) || null
+      };
+      return scoreChildNode(data, macro.conditions, depth + 1, newVisited, newCtx);
+    }
+    return { ok: false, hit: 0, total: 0, details: [] };
+  }
+  // ruleRef 节点：查找被引用的断语并递归评分
+  if (child.ruleRef) {
+    if (visitedMacros.has('rule:' + String(child.ruleRef))) return { ok: false, hit: 0, total: 0, details: [] };
+    var refRule = null;
+    var rulesList = data && data.rules;
+    if (rulesList) {
+      for (var ri = 0; ri < rulesList.length; ri++) {
+        var rr = rulesList[ri];
+        if (rr && rr.conditions && (String(rr.id) === String(child.ruleRef) || String(rr.cloudId) === String(child.ruleRef))) { refRule = rr; break; }
+      }
+    }
+    if (refRule && refRule.conditions) {
+      var refCond = refRule.conditions;
+      if (Array.isArray(refCond)) refCond = { logic: 'and', children: refCond };
+      var newVisited2 = new Set(visitedMacros);
+      newVisited2.add('rule:' + String(child.ruleRef));
+      var newCtx2 = {
+        ruleDefaultQuZhi: (refRule.conditions && refRule.conditions.defaultQuZhi) || context.ruleDefaultQuZhi || '',
+        macroDefaultQuZhi: context.macroDefaultQuZhi || '',
+        ruleDefaultMapping: (refRule.conditions && refRule.conditions.defaultMapping) || context.ruleDefaultMapping || null,
+        macroDefaultMapping: context.macroDefaultMapping || null
+      };
+      return scoreChildNode(data, refCond, depth + 1, newVisited2, newCtx2);
+    }
+    return { ok: false, hit: 0, total: 0, details: [] };
+  }
+  // 分支节点：递归组评分
+  if (child.children) {
+    return scoreConditionGroupScored(data, child, depth + 1, new Set(visitedMacros), context);
+  }
+  // 叶子节点：读取权重，求值，收集命中明细
+  if (child.field) {
+    var weight = child.weight && child.weight > 0 ? child.weight : 1;
+    var fitOut = { actual: '' };
+    var evalCtx = {};
+    for (var ek in context) evalCtx[ek] = context[ek];
+    evalCtx.__fitOut = fitOut;
+    var res = evaluateLeafCondition(data, child, evalCtx);
+    var ok = child.exclude ? !res : res;
+    return {
+      ok: ok,
+      hit: ok ? weight : 0,
+      total: weight,
+      details: [{
+        field: child.field,
+        op: child.op || '',
+        val: child.val || '',
+        actual: fitOut.actual || '',
+        hit: ok,
+        weight: weight,
+        exclude: !!child.exclude
+      }]
+    };
+  }
+  return { ok: false, hit: 0, total: 0, details: [] };
+}
+
+function scoreConditionGroupScored(data, group, depth, visitedMacros, context) {
+  context = context || {};
+  var logic = (group && group.logic) || 'and';
+  var children = (group && group.children) || [];
+  if (depth > 20) return { ok: false, hit: 0, total: 0, details: [] };
+  // not_all 全排除：所有子条件取反后都不满足才通过；达成约束的子计其权重
+  if (logic === 'not_all') {
+    var allOk = true, hitSum = 0, totalSum = 0, detailsN = [];
+    for (var i = 0; i < children.length; i++) {
+      var sN = scoreChildNode(data, children[i], depth, visitedMacros, context);
+      detailsN = detailsN.concat(sN.details);
+      totalSum += sN.total;
+      if (sN.ok) allOk = false;
+      else hitSum += sN.total;
+    }
+    return { ok: allOk, hit: allOk ? hitSum : 0, total: totalSum, details: detailsN };
+  }
+  var result = logic === 'and';
+  var hit = 0, total = 0, maxHitOr = 0;
+  var details = [];
+  for (var i2 = 0; i2 < children.length; i2++) {
+    var s = scoreChildNode(data, children[i2], depth, visitedMacros, context);
+    details = details.concat(s.details);
+    if (logic === 'and') {
+      total += s.total;
+      result = result && s.ok;
+      if (s.ok) hit += s.hit;
+    } else {
+      // or：任一满足即通过；hit 取命中项中权重最高者；total 取所有子 total 最高者
+      total = Math.max(total, s.total);
+      if (s.ok) {
+        result = true;
+        maxHitOr = Math.max(maxHitOr, s.hit);
+      }
+    }
+  }
+  if (logic === 'or') {
+    hit = result ? maxHitOr : 0;
+  } else {
+    hit = result ? hit : 0;
+  }
+  return { ok: result, hit: hit, total: total, details: details };
+}
+
+function evaluateRuleFitScore(data, conditions) {
+  if (!conditions) return { ok: false, hit: 0, total: 0, details: [], percent: 0, minFit: 0, enabled: false };
+  var cond = conditions;
+  var ctx = {};
+  if (cond.defaultQuZhi) ctx.ruleDefaultQuZhi = cond.defaultQuZhi;
+  if (cond.defaultMapping) ctx.ruleDefaultMapping = cond.defaultMapping;
+  var scored = (cond.children && cond.children.length > 0)
+    ? scoreConditionGroupScored(data, cond, 0, new Set(), ctx)
+    : { ok: false, hit: 0, total: 0, details: [] };
+  var percent = scored.total > 0 ? Math.round((scored.hit / scored.total) * 100) : 100;
+  var minFit = cond.minFit || 0;
+  return {
+    ok: scored.ok,
+    hit: scored.hit,
+    total: scored.total,
+    details: scored.details,
+    percent: percent,
+    minFit: minFit,
+    // 仅当断语显式设置了 minFit 或存在非默认权重时才启用契合度评估，保证旧数据行为完全不变
+    enabled: !!(minFit > 0 || hasCustomWeightInTree(cond))
+  };
 }
 
 // ===================== 规则匹配 =====================
@@ -2277,7 +2458,14 @@ function matchDuanyu(baziData, dayunItem, liunianItem, liuyueItem, gender, rules
   if (!rules) return result;
   for (var i = 0; i < rules.length; i++) {
     if (matchRule(md, rules[i].conditions)) {
-      result.push(rules[i]);
+      // 契合度评估（仅在启用时附加；旧断语无权重/minFit 时 enabled=false，不带 fit 字段行为完全不变）
+      var fit = null;
+      try { fit = evaluateRuleFitScore(md, rules[i].conditions); } catch (e) { fit = null; }
+      if (fit && fit.enabled) {
+        result.push(Object.assign({}, rules[i], { fit: fit }));
+      } else {
+        result.push(rules[i]);
+      }
     }
   }
 
@@ -2423,7 +2611,8 @@ module.exports = async (req, res) => {
         category: r.category,
         group_key: r.group_key || '',
         priority: r.priority || 0,
-        rule: { category: r.category, duanyu: r.duanyu_text, group_key: r.group_key || '', priority: r.priority || 0 }
+        rule: { category: r.category, duanyu: r.duanyu_text, group_key: r.group_key || '', priority: r.priority || 0 },
+        fit: (r.fit && r.fit.enabled) ? r.fit : undefined
       };
     });
 
