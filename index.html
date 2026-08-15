@@ -11853,9 +11853,11 @@
         const matched = (cache.matchedByCategory && cache.matchedByCategory['格局']) || [];
         const candidates = [];
         for (const entry of matched) {
-            const fit = entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.fit) : (entry.d && entry.d.fit);
+            // 兼容两种条目结构：直接条目 {text,rule,fit}（renderApiDuanyu/matchRules 路径）
+            // 或 groupDuanyuByPrefix 包装结构 {type:'single'|'group',d,contents}
+            const fit = entry.fit || (entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.fit) : (entry.d && entry.d.fit));
             if (!fit || !fit.enabled) continue;
-            const text = entry.type === 'group' ? entry.contents[0].d.text : entry.d.text;
+            const text = entry.text || (entry.type === 'group' ? entry.contents[0].d.text : (entry.d && entry.d.text)) || '';
             candidates.push({ text, fit });
         }
         if (matched.length === 0) return { hasGeJu: false, noMatch: true, candidates: [] };
@@ -11876,6 +11878,17 @@
         if (!geju) return '';
         if (!geju.hasGeJu) {
             if (geju.noMatch) {
+                // 完全无匹配结果：可能 API 未就绪或当前组合确实无断语命中
+                const isEmpty = !cache.matchedByCategory || Object.keys(cache.matchedByCategory).length === 0;
+                if (isEmpty) {
+                    return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-gray-700">🔮 主格局识别</span><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span>
+                        <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">无结果</span>
+                    </div>
+                    <div class="text-gray-600 text-sm">当前没有断语匹配结果（可能 API 未就绪，或该组合确实无任何断语命中）。请确认断语匹配服务正常后再查看格局判定。</div>
+                </div>`;
+                }
                 return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
                     <div class="flex items-center gap-2 mb-1">
                         <span class="font-bold text-gray-700">🔮 主格局识别</span><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span>
