@@ -33154,6 +33154,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <button onclick="scanReferencedMappingRules()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs shrink-0">🔍 扫描缺失规则</button>
                 </div>
+                <div class="flex items-center gap-1 mt-2">
+                    <input id="mapping-ref-search" type="text" placeholder="输入映射规则ID，搜索引用它的断语/条件宏"
+                        class="flex-1 px-2 py-1 border border-indigo-200 rounded text-xs"
+                        onkeydown="if(event.key==='Enter')searchMappingRuleRefs()" />
+                    <button onclick="searchMappingRuleRefs()" class="px-2 py-1 bg-white border border-indigo-300 text-indigo-700 rounded text-xs shrink-0">搜索引用</button>
+                </div>
                 <div id="mapping-ref-list" class="mt-2 space-y-1.5"></div>
             </div>
             <div id="mapping-rule-list" class="space-y-2">
@@ -33798,14 +33804,27 @@ function scanConditionsForMappingRefs(node, addId) {
     if (node.conditions && typeof node.conditions === 'object') scanConditionsForMappingRefs(node.conditions, addId);
 }
 
-// 扫描断语/条件宏引用的映射规则，返回 {id: 引用次数}
+// 扫描断语/条件宏引用的映射规则，返回 {id: {count, refs: [{kind, name}]}}
 function collectReferencedMappingRuleIds() {
     var refs = {};
-    var addId = function(id) { refs[id] = (refs[id] || 0) + 1; };
+    var addRef = function(id, kind, name) {
+        if (!id) return;
+        if (!refs[id]) refs[id] = { count: 0, refs: [] };
+        refs[id].count++;
+        refs[id].refs.push({ kind: kind, name: name });
+    };
     var rules = (typeof cache !== 'undefined' && cache.rules) ? cache.rules : [];
-    rules.forEach(function(r) { if (r.conditions) scanConditionsForMappingRefs(r.conditions, addId); });
+    rules.forEach(function(r) {
+        if (r.conditions) scanConditionsForMappingRefs(r.conditions, function(id) {
+            addRef(id, '断语', (r.category ? '[' + r.category + '] ' : '') + r.duanyu);
+        });
+    });
     var macros = (typeof cache !== 'undefined' && cache.conditionMacros) ? cache.conditionMacros : [];
-    macros.forEach(function(m) { if (m.conditions) scanConditionsForMappingRefs(m.conditions, addId); });
+    macros.forEach(function(m) {
+        if (m.conditions) scanConditionsForMappingRefs(m.conditions, function(id) {
+            addRef(id, '条件宏', m.name || m.cloudId || m.id);
+        });
+    });
     return refs;
 }
 
@@ -33820,7 +33839,7 @@ function scanReferencedMappingRules() {
     existing.forEach(function(r) { existingIds[r.id] = true; });
     var missing = [];
     Object.keys(refs).forEach(function(id) {
-        if (!existingIds[id]) missing.push({ id: id, count: refs[id] });
+        if (!existingIds[id]) missing.push({ id: id, count: refs[id].count, refs: refs[id].refs });
     });
     missing.sort(function(a, b) { return b.count - a.count; });
     if (missing.length === 0) {
@@ -33828,15 +33847,41 @@ function scanReferencedMappingRules() {
         listEl.innerHTML = '';
         return;
     }
-    statusEl.textContent = '发现 ' + missing.length + ' 个被引用但缺失的映射规则，点击「补全定义」按原ID重建（恢复后所有引用自动生效）：';
+    statusEl.textContent = '发现 ' + missing.length + ' 个被引用但缺失的映射规则，点击「补全定义」按原ID重建（恢复后所有引用自动生效）；下方列出引用它的断语/条件宏：';
     listEl.innerHTML = missing.map(function(m) {
-        return '<div class="flex items-center justify-between bg-white border border-indigo-200 rounded px-2 py-1">' +
+        var refHtml = (m.refs || []).map(function(r) {
+            return '<div class="pl-1 text-gray-500 text-[11px] truncate">· ' + r.kind + '：「' + r.name + '」</div>';
+        }).join('');
+        return '<div class="bg-white border border-indigo-200 rounded px-2 py-1">' +
+            '<div class="flex items-center justify-between">' +
             '<div class="flex-1 truncate"><span class="font-mono text-[11px] text-indigo-700">' + m.id + '</span>' +
             '<span class="ml-2 text-gray-500">被 ' + m.count + ' 处引用</span></div>' +
             '<button onclick="createRuleWithId(\'' + m.id + '\')" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs shrink-0">补全定义</button>' +
-            '</div>';
+            '</div>' + refHtml + '</div>';
     }).join('');
 }
+
+// 按规则ID搜索引用它的断语/条件宏（更直观确认规则对应内容）
+window.searchMappingRuleRefs = function() {
+    var input = document.getElementById('mapping-ref-search');
+    var listEl = document.getElementById('mapping-ref-list');
+    var statusEl = document.getElementById('mapping-ref-status');
+    if (!input || !listEl || !statusEl) return;
+    var id = (input.value || '').trim();
+    if (!id) { scanReferencedMappingRules(); return; }
+    var refs = collectReferencedMappingRuleIds();
+    var info = refs[id];
+    if (!info) {
+        statusEl.textContent = '未找到引用规则「' + id + '」的断语/条件宏（注意：需登录后断语数据才同步到本地）。';
+        listEl.innerHTML = '';
+        return;
+    }
+    statusEl.textContent = '规则「' + id + '」被 ' + info.count + ' 处引用：';
+    listEl.innerHTML = (info.refs || []).map(function(r) {
+        return '<div class="bg-white border border-indigo-200 rounded px-2 py-1">' +
+            '<div class="text-gray-500 text-[11px] truncate">· ' + r.kind + '：「' + r.name + '」</div></div>';
+    }).join('');
+};
 
 // 用指定ID新建规则（复用旧引用ID，补全定义后保存即恢复全部引用）
 window.createRuleWithId = function(id) {
