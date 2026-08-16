@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8531,11 +8531,12 @@
                         if(pos && val) pbPositions[pos] = { op: pop, val: val };
                     }
                 });
-                // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+                // 取值维度优先级：生克设置(最高) > 断语规则默认 > 条件宏默认 > 字段自身 > 联动
                 const ruleDefQz = ctxMapping.ruleDefaultQuZhi || '';
                 const macroDefQz = ctxMapping.macroDefaultQuZhi || '';
-                if(ruleDefQz) pbQuZhi = ruleDefQz;
-                if(!pbQuZhi && macroDefQz) pbQuZhi = macroDefQz;
+                if(ctxMapping.shenkeQzOverride) pbQuZhi = ctxMapping.shenkeQzOverride;
+                else if(ruleDefQz) pbQuZhi = ruleDefQz;
+                else if(macroDefQz) pbQuZhi = macroDefQz;
                 // 取值维度联动（最低优先级）：未设置任何取值维度时，跟随柱状对比图按钮（全部=天干或地支任一命中，由外层按维度分别评估）
                 if(!pbQuZhi && ctxMapping.shenQzOverride) pbQuZhi = ctxMapping.shenQzOverride;
                 // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
@@ -8786,13 +8787,14 @@
                     }
                 }
 
-                // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
+                // 取值维度优先级：生克设置(最高) > 断语规则默认 > 条件宏默认 > 字段自身 > 联动
                 let biQuZhi = '';
                 const biRuleDefQz = ctxMapping.ruleDefaultQuZhi || '';
                 const biMacroDefQz = ctxMapping.macroDefaultQuZhi || '';
-                if(biRuleDefQz) biQuZhi = biRuleDefQz;
+                if(ctxMapping.shenkeQzOverride) biQuZhi = ctxMapping.shenkeQzOverride;
+                else if(biRuleDefQz) biQuZhi = biRuleDefQz;
+                else if(biMacroDefQz) biQuZhi = biMacroDefQz;
                 if(!biQuZhi && biGz !== '通用') biQuZhi = biGz;
-                if(!biQuZhi && biMacroDefQz) biQuZhi = biMacroDefQz;
                 // 取值维度联动（最低优先级）：未设置任何取值维度时，跟随柱状对比图按钮
                 if(!biQuZhi && ctxMapping.shenQzOverride) biQuZhi = ctxMapping.shenQzOverride;
                 // 实际收集取值维度：通用（未指定）时后备为天干
@@ -9707,7 +9709,8 @@
                         macroDefaultQuZhi: (macro.conditions && macro.conditions.defaultQuZhi) || '',
                         ruleDefaultMapping: ctxMapping.ruleDefaultMapping || null,
                         macroDefaultMapping: (macro.conditions && macro.conditions.defaultMapping) || null,
-                        shenQzOverride: ctxMapping.shenQzOverride || ''
+                        shenQzOverride: ctxMapping.shenQzOverride || '',
+                        shenkeQzOverride: ctxMapping.shenkeQzOverride || ''
                     };
                     return evaluateConditionGroup(macro.conditions, depth + 1, newVisited, newCtx);
                 }
@@ -9728,7 +9731,8 @@
                         macroDefaultQuZhi: ctxMapping.macroDefaultQuZhi || '',
                         ruleDefaultMapping: (refRule.conditions.defaultMapping) || ctxMapping.ruleDefaultMapping || null,
                         macroDefaultMapping: ctxMapping.macroDefaultMapping || null,
-                        shenQzOverride: ctxMapping.shenQzOverride || ''
+                        shenQzOverride: ctxMapping.shenQzOverride || '',
+                        shenkeQzOverride: ctxMapping.shenkeQzOverride || ''
                     };
                     return evaluateConditionGroup(refCond, depth + 1, newVisited, newCtx);
                 }
@@ -12748,7 +12752,7 @@
             let baseHit = hitRuleIds.has(String(rule.id)) || (rule.cloudId && hitRuleIds.has(String(rule.cloudId)));
             if (baseConds && (groupQuZhi === '天干' || groupQuZhi === '地支')) {
                 const bctx = buildGroupCtx(rule);
-                bctx.shenQzOverride = groupQuZhi;
+                bctx.shenkeQzOverride = groupQuZhi;
                 try { baseHit = evaluateConditionGroup(baseConds, 0, new Set(), bctx); } catch (e) { baseHit = false; }
             }
             if (!baseHit) return;
@@ -12780,7 +12784,7 @@
                     if (shifted) {
                         try {
                             const vctx = buildGroupCtx(rule);
-                            if (groupQuZhi === '天干' || groupQuZhi === '地支') vctx.shenQzOverride = groupQuZhi;
+                            if (groupQuZhi === '天干' || groupQuZhi === '地支') vctx.shenkeQzOverride = groupQuZhi;
                             virtualOk = evaluateConditionGroup(shifted, 0, new Set(), vctx);
                         } catch (e) { virtualOk = false; }
                     }
