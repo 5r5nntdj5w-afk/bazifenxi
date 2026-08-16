@@ -6656,7 +6656,7 @@
                 boxHtml += '<div style="border-top:1px dashed #ddd;margin:6px 0 4px;"></div>';
                 allCats.forEach(function(cat) {
                     if (!cat) return;
-                    const checked = isAll || current.some(function(g) { return g !== '*' && (g === cat || cat.indexOf(g) >= 0); });
+                    const checked = isAll || current.some(function(g) { return g !== '*' && g === cat; });
                     boxHtml += '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" value="' + esc(cat) + '" ' + (checked ? 'checked' : '') + '> ' + esc(cat) + '</label>';
                 });
             }
@@ -6753,7 +6753,7 @@
                 boxHtml += '<div style="border-top:1px dashed #ddd;margin:6px 0 4px;"></div>';
                 allCats.forEach(function(cat) {
                     if (!cat) return;
-                    const checked = isAll || current.some(function(g) { return g !== '*' && (g === cat || cat.indexOf(g) >= 0); });
+                    const checked = isAll || current.some(function(g) { return g !== '*' && g === cat; });
                     boxHtml += '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" value="' + esc(cat) + '" ' + (checked ? 'checked' : '') + '> ' + esc(cat) + '</label>';
                 });
             }
