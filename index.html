@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12798,7 +12798,17 @@
             else if (gq === '地支') { ok = diOk; dOk = diOk; }
             else { ok = tianOk || diOk; tOk = tianOk; dOk = diOk; }
             if (!ok) return;
-            rels.push({ id: def.id || '', name: display || def.name, relType: def.relType || '', shenA: def.shenA, shenB: def.shenB, tianOk: tOk, diOk: dOk, ganZhiOk: ok, mapped: !!def._mapped });
+            const nm = display || def.name;
+            // 同名关系合并维度：不同映射基准组（如原局/大运/流年版）命中同一关系时只显示一次
+            const dup = rels.find(r => r.name === nm);
+            if (dup) {
+                if (tOk && !dup.tianOk) dup.tianOk = true;
+                if (dOk && !dup.diOk) dup.diOk = true;
+                dup.ganZhiOk = dup.tianOk || dup.diOk;
+                if (ruleCat) hitCats.add(ruleCat);
+                return;
+            }
+            rels.push({ id: def.id || '', name: nm, relType: def.relType || '', shenA: def.shenA, shenB: def.shenB, tianOk: tOk, diOk: dOk, ganZhiOk: ok, mapped: !!def._mapped });
             if (ruleCat) hitCats.add(ruleCat);
         };
         // 基准断语完整条件（兼容旧线性数组 / conditionGroups）
@@ -12835,12 +12845,18 @@
             const groupQuZhi = (group.quZhi === '天干' || group.quZhi === '地支') ? group.quZhi : '自动';
             const baseConds = ruleConditionsObj(rule);
             // 基准断语命中判定（用于基准关系显示；取值维度对整组生效，含基准断语本身）
-            // 自动=沿用主流程命中（条件各自按自身维度评估）；仅天干/仅地支=带组维度覆盖重新评估基准断语条件
+            // 自动=主流程命中 或 按"自动干支分化"引擎重评估（组设置覆盖断语级默认维度）；仅天干/仅地支=带组维度覆盖重评估
             let baseHit = hitRuleIds.has(String(rule.id)) || (rule.cloudId && hitRuleIds.has(String(rule.cloudId)));
-            if (baseConds && (groupQuZhi === '天干' || groupQuZhi === '地支')) {
+            if (baseConds) {
                 const bctx = buildGroupCtx(rule);
-                bctx.shenkeQzOverride = groupQuZhi;
-                baseHit = evalConds(baseConds, bctx);
+                if (groupQuZhi === '天干' || groupQuZhi === '地支') {
+                    bctx.shenkeQzOverride = groupQuZhi;
+                } else {
+                    // 组取值维度=自动：组设置覆盖断语级默认取值维度，基准断语按"自动干支分化"评估，
+                    // 与断语区匹配口径一致（否则断语级 defaultQuZhi 强制单一维度，另一维度的同关系会漏显示）
+                    delete bctx.ruleDefaultQuZhi;
+                }
+                baseHit = baseHit || evalConds(baseConds, bctx);
             }
             // 基准关系：仅在基准断语命中时显示（展示文字：配置覆盖优先）
             if (baseHit) {
@@ -12876,6 +12892,7 @@
                         // 断语级 defaultMapping 不再参与评估，否则会覆盖合成结果造成二次映射
                         delete vctx.ruleDefaultMapping;
                         if (groupQuZhi === '天干' || groupQuZhi === '地支') vctx.shenkeQzOverride = groupQuZhi;
+                        else delete vctx.ruleDefaultQuZhi; // 组取值维度=自动：按自动干支分化评估（组设置覆盖断语级默认取值维度）
                         virtualOk = evalConds(shifted, vctx);
                     }
                     if (!virtualOk) return; // 未满足匹配条件 → 不显示
