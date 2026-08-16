@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12774,7 +12774,6 @@
     function analyzeShengKe() {
         const cfg = getGlobalDisplayConfig();
         const skCfg = cfg.shengkeCfg || null;
-        const stats = getShengKeScopeStats();
         const rels = [];
         const hitCats = new Set();
         const mappingNames = [];
@@ -12794,16 +12793,14 @@
         });
         const rulesAll = (typeof cache !== 'undefined' && cache.rules) || [];
         const mappingRulesAll = (typeof getMappingRules === 'function') ? getMappingRules() : [];
-        // 判定单个关系并加入结果（按组取值维度决定 tianOk/diOk/ganZhiOk）
-        const pushRel = (def, display, ruleCat, groupQuZhi) => {
+        // 判定单个关系并加入结果：tianOk/diOk 由调用方传入的维度评估结果决定
+        // （天干维度独立评估、地支维度独立评估，互不影响：天干满足→天干行显示，地支满足→地支行显示）
+        const pushRel = (def, display, ruleCat, dims) => {
             if (!def || !def.shenA || !def.shenB) return;
-            const gq = (groupQuZhi === '天干' || groupQuZhi === '地支') ? groupQuZhi : '自动';
-            const tianOk = (stats.groupTian[def.shenA] || 0) > 0 && (stats.groupTian[def.shenB] || 0) > 0;
-            const diOk = (stats.groupDi[def.shenA] || 0) > 0 && (stats.groupDi[def.shenB] || 0) > 0;
+            const tianOk = !!dims.tian, diOk = !!dims.di;
             let ok = false, tOk = false, dOk = false;
-            if (gq === '天干') { ok = tianOk; tOk = tianOk; }
-            else if (gq === '地支') { ok = diOk; dOk = diOk; }
-            else { ok = tianOk || diOk; tOk = tianOk; dOk = diOk; }
+            if (tianOk) { ok = true; tOk = true; }
+            if (diOk) { ok = true; dOk = true; }
             if (!ok) return;
             const nm = display || def.name;
             // 同名关系合并维度：不同映射基准组（如原局/大运/流年版）命中同一关系时只显示一次
@@ -12850,6 +12847,29 @@
             } else if (window._lastCalcData && eng.data !== window._lastCalcData) return false; // 主引擎数据守卫
             try { return eng.evaluateConditionGroup(conds, 0, new Set(), vctx); } catch (e) { return false; }
         };
+        // 天干/地支双维度独立评估：分别用 shenkeQzOverride='天干'/'地支' 各评估一次，
+        // 天干满足→天干行显示、地支满足→地支行显示，两维度互不影响（不再使用"自动=任一命中"的口径）。
+        // hitByApi=服务端命中断语：按其 defaultQuZhi 归属维度（无默认维度视为干支皆可）；
+        // 非服务端命中（变体/补判）：严格按两个维度分别评估决定各自显示与否
+        const evalDims = (conds, baseVctx, groupQuZhi, hitByApi, ruleDefQz) => {
+            const dims = { tian: false, di: false };
+            const gq = (groupQuZhi === '天干' || groupQuZhi === '地支') ? groupQuZhi : '自动';
+            if (gq === '天干') {
+                dims.tian = hitByApi || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
+            } else if (gq === '地支') {
+                dims.di = hitByApi || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
+            } else {
+                if (hitByApi) {
+                    if (ruleDefQz === '天干') dims.tian = true;
+                    else if (ruleDefQz === '地支') dims.di = true;
+                    else { dims.tian = true; dims.di = true; }
+                } else {
+                    dims.tian = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
+                    dims.di = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
+                }
+            }
+            return dims;
+        };
         skCfg.groups.forEach(group => {
             // 仅支持断语作为映射基准（旧配置中的条件宏基准组忽略）
             if (group.source === 'macro') return;
@@ -12860,24 +12880,17 @@
             if (!baseDef) return;
             const groupQuZhi = (group.quZhi === '天干' || group.quZhi === '地支') ? group.quZhi : '自动';
             const baseConds = ruleConditionsObj(rule);
-            // 基准断语命中判定（用于基准关系显示；取值维度对整组生效，含基准断语本身）
-            // 自动=主流程命中 或 按"自动干支分化"引擎重评估（组设置覆盖断语级默认维度）；仅天干/仅地支=带组维度覆盖重评估
-            let baseHit = hitRuleIds.has(String(rule.id)) || (rule.cloudId && hitRuleIds.has(String(rule.cloudId)));
+            // 基准断语命中判定：服务端命中（hitRuleIds）按断语 defaultQuZhi 归属维度；
+            // 未命中则按组取值维度（仅天干/仅地支/自动=双维度独立）用本地引擎补判
+            const baseHit = hitRuleIds.has(String(rule.id)) || (rule.cloudId && hitRuleIds.has(String(rule.cloudId)));
+            let baseDims = { tian: false, di: false };
             if (baseConds) {
                 const bctx = buildGroupCtx(rule);
-                if (groupQuZhi === '天干' || groupQuZhi === '地支') {
-                    bctx.shenkeQzOverride = groupQuZhi;
-                } else {
-                    // 组取值维度=自动：组设置覆盖断语级默认取值维度，按"自动干支分化"评估，
-                    // 与断语区匹配口径一致（否则断语级 defaultQuZhi 强制单一维度，另一维度的同关系会漏显示；
-                    // 也不能删除该值——通用模式叶子取值维度为空时引擎 fail-closed 不匹配）
-                    bctx.ruleDefaultQuZhi = '自动';
-                }
-                baseHit = baseHit || evalConds(baseConds, bctx);
+                baseDims = evalDims(baseConds, bctx, groupQuZhi, baseHit, (rule.conditions || {}).defaultQuZhi);
             }
             // 基准关系：仅在基准断语命中时显示（展示文字：配置覆盖优先）
-            if (baseHit) {
-                pushRel(baseDef, group.display || baseDef.name, cat, groupQuZhi);
+            if (baseDims.tian || baseDims.di) {
+                pushRel(baseDef, group.display || baseDef.name, cat, baseDims);
             }
             // 映射引用规则变体：作为"虚拟独立断语"各自评估（走与断语完全相同的条件引擎），
             // 满足其（偏移后的）匹配条件才显示——不受基准断语命中与否影响，避免漏显示本可匹配的变体
@@ -12902,23 +12915,23 @@
                 // 虚拟断语评估：基准断语命中后，变体须同样满足其（偏移后的）匹配条件
                 if (mapRule && baseConds) {
                     const shifted = shiftShenkeConditions(baseConds, mapRule, {});
-                    let virtualOk = false;
+                    let vDims = { tian: false, di: false };
                     if (shifted) {
                         const vctx = buildGroupCtx(rule);
                         // 变体映射已合成进叶子（mapping=/mappingType=/mappingOffset=/customMap=），
                         // 断语级 defaultMapping 不再参与评估，否则会覆盖合成结果造成二次映射
                         delete vctx.ruleDefaultMapping;
-                        if (groupQuZhi === '天干' || groupQuZhi === '地支') vctx.shenkeQzOverride = groupQuZhi;
-                        else vctx.ruleDefaultQuZhi = '自动'; // 组取值维度=自动：按自动干支分化评估（组设置覆盖断语级默认取值维度；不能删除——通用叶子空维度时引擎 fail-closed）
-                        virtualOk = evalConds(shifted, vctx);
+                        // 变体为虚拟断语（无服务端命中）：严格按天干/地支双维度独立评估，各自决定显示
+                        vDims = evalDims(shifted, vctx, groupQuZhi, false, null);
                     }
-                    if (!virtualOk) return; // 未满足匹配条件 → 不显示
+                    if (!vDims.tian && !vDims.di) return; // 未满足匹配条件 → 不显示
+                    if (mapRule && mapRule.name && mappingNames.indexOf(mapRule.name) < 0) mappingNames.push(mapRule.name);
+                    pushRel(mDef, m.display || mDef.name, cat, vDims);
                 } else if (!mapRule) {
                     return; // 无映射规则（无法推导变体条件）→ 不显示，避免假阳性
+                } else {
+                    pushRel(mDef, m.display || mDef.name, cat, { tian: true, di: true });
                 }
-                if (mapRule && mapRule.name && mappingNames.indexOf(mapRule.name) < 0) mappingNames.push(mapRule.name);
-                pushRel(mDef, m.display || mDef.name, cat, groupQuZhi);
-            });
         });
         // 组取值维度汇总：全部一致时显示该维度，否则显示"按组设置"
         const qzs = skCfg.groups.map(g => (g.quZhi === '天干' || g.quZhi === '地支') ? g.quZhi : '自动');
