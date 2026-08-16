@@ -28360,9 +28360,12 @@ async function saveGlobalDisplayConfig(config) {
         if (selErr) throw selErr;
         const value = JSON.stringify(config || _defaultDisplayConfig());
         if (existing && existing.length > 0) {
+            // .select('id') 强制 PostgREST 返回变更行（return=representation），
+            // 否则 update 默认返回 204 无 body（data 为 null），无法判断成败
             const { data: updData, error: updErr } = await supabaseClient.from('site_settings')
                 .update({ setting_value: value, updated_at: new Date().toISOString() })
-                .eq('id', existing[0].id);
+                .eq('id', existing[0].id)
+                .select('id');
             if (updErr) throw updErr;
             // 未登录/权限不足时 RLS 静默拦截，PostgREST 返回 200 + 空数组（affected rows=0），
             // supabase-js 不会抛错，必须显式检查，否则会误报"保存成功"
@@ -28376,7 +28379,7 @@ async function saveGlobalDisplayConfig(config) {
                 description: '断语匹配结果显示全局配置（前缀合并/分类顺序/分类开关）',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
-            });
+            }).select('id');
             if (insErr) throw insErr;
             if (!insData || insData.length === 0) {
                 throw new Error('写入被数据库拒绝（未登录或权限不足），未保存成功');
