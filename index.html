@@ -8452,10 +8452,15 @@
     function matchRules(data, opts) {
         opts = opts || {};
         // 暴露本地条件引擎供生克关系识别（analyzeShengKe）评估基准断语/映射变体：
-        // 捕获「主数据调用」的引擎闭包（scopeIdx 未定义），与生克面板评估使用同一八字数据，保证口径一致；
-        // 柱状图分范围调用（scopeIdx>=0）不覆盖，避免数据错位。
+        // 主数据调用（scopeIdx 未定义）→ __shengkeCondEngine（完整主数据，含流月）；
+        // 分范围调用（scopeIdx>=0）→ __shengkeCondEngineByScope[i]（仅原局/原局+大运/原局+大运+流年，
+        // 与断语区 API 的 applyEvalScope 口径一致：均不含流月），供面板按评估范围补判基准断语条件，
+        // 避免用含大运/流年的主数据误判「存在大运/存在流年/存在流月」类限制字段导致与断语区不一致。
         if (opts.scopeIdx === undefined) {
             window.__shengkeCondEngine = { data: data, evaluateConditionGroup: evaluateConditionGroup };
+        } else {
+            if (!window.__shengkeCondEngineByScope) window.__shengkeCondEngineByScope = [];
+            window.__shengkeCondEngineByScope[opts.scopeIdx] = { data: data, evaluateConditionGroup: evaluateConditionGroup };
         }
         let matchedByCategory = {};
         // 参考值规则收集（十神柱状对比图使用）
@@ -10818,6 +10823,8 @@
             const baseStats = (cache.statsByScope && cache.statsByScope.scope0) || null;
             matchRules(data, { collectRefOnly: true, shenQz: mode, baseStats: baseStats });
             const scopeData = buildScopeData(data);
+            // 缓存三范围数据供生克面板分范围引擎的数据守卫校验（eng.data === cache.shengkeScopeData[scopeIdx]）
+            cache.shengkeScopeData = scopeData;
             cache.shenRefRulesByScope = [];
             cache.shenRelBindingsByScope = [];
             cache.shenTplPrefsByScope = [];
@@ -12827,11 +12834,20 @@
             if (rule.conditions && rule.conditions.defaultMapping) vctx.ruleDefaultMapping = rule.conditions.defaultMapping;
             return vctx;
         };
-        // 本地条件引擎评估（matchRules 主数据调用时捕获同一引擎+同一八字数据，与断语匹配口径一致；不可用或数据不一致时 fail-closed 不显示）
+        // 本地条件引擎评估：优先用「当前评估范围」的分范围引擎（与断语区 API 的 applyEvalScope 口径一致——
+        // 仅原局不带大运、原局+大运不带流年、各范围均不带流月），避免用含大运/流年的主数据误判「存在大运/存在流年/存在流月」类限制字段；
+        // 分范围引擎缺失时回退主引擎（主数据）；引擎不可用或数据不一致时 fail-closed 不显示
         const evalConds = (conds, vctx) => {
-            const eng = window.__shengkeCondEngine;
+            const es = getEvalScope();
+            const scopeIdx = es === 'bazi' ? 0 : es === 'dayun' ? 1 : 2;
+            const scEng = (window.__shengkeCondEngineByScope && window.__shengkeCondEngineByScope[scopeIdx]) || null;
+            const eng = scEng || window.__shengkeCondEngine;
             if (!eng || typeof eng.evaluateConditionGroup !== 'function') return false;
-            if (window._lastCalcData && eng.data !== window._lastCalcData) return false; // 数据已切换但引擎未刷新：防止旧数据误判
+            if (scEng) {
+                // 分范围数据已切换但引擎未刷新：防止旧数据误判（fail-closed）
+                const sd = (cache.shengkeScopeData && cache.shengkeScopeData[scopeIdx]) || null;
+                if (sd && eng.data !== sd) return false;
+            } else if (window._lastCalcData && eng.data !== window._lastCalcData) return false; // 主引擎数据守卫
             try { return eng.evaluateConditionGroup(conds, 0, new Set(), vctx); } catch (e) { return false; }
         };
         skCfg.groups.forEach(group => {
