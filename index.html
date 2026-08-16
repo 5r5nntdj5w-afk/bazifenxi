@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8451,6 +8451,12 @@
     // 规则匹配（新增大运/流年 五行+十神匹配逻辑）
     function matchRules(data, opts) {
         opts = opts || {};
+        // 暴露本地条件引擎供生克关系识别（analyzeShengKe）评估基准断语/映射变体：
+        // 捕获「主数据调用」的引擎闭包（scopeIdx 未定义），与生克面板评估使用同一八字数据，保证口径一致；
+        // 柱状图分范围调用（scopeIdx>=0）不覆盖，避免数据错位。
+        if (opts.scopeIdx === undefined) {
+            window.__shengkeCondEngine = { data: data, evaluateConditionGroup: evaluateConditionGroup };
+        }
         let matchedByCategory = {};
         // 参考值规则收集（十神柱状对比图使用）
         const matchedRefRules = [];
@@ -12737,6 +12743,13 @@
             if (rule.conditions && rule.conditions.defaultMapping) vctx.ruleDefaultMapping = rule.conditions.defaultMapping;
             return vctx;
         };
+        // 本地条件引擎评估（matchRules 主数据调用时捕获同一引擎+同一八字数据，与断语匹配口径一致；不可用或数据不一致时 fail-closed 不显示）
+        const evalConds = (conds, vctx) => {
+            const eng = window.__shengkeCondEngine;
+            if (!eng || typeof eng.evaluateConditionGroup !== 'function') return false;
+            if (window._lastCalcData && eng.data !== window._lastCalcData) return false; // 数据已切换但引擎未刷新：防止旧数据误判
+            try { return eng.evaluateConditionGroup(conds, 0, new Set(), vctx); } catch (e) { return false; }
+        };
         skCfg.groups.forEach(group => {
             // 仅支持断语作为映射基准（旧配置中的条件宏基准组忽略）
             if (group.source === 'macro') return;
@@ -12753,7 +12766,7 @@
             if (baseConds && (groupQuZhi === '天干' || groupQuZhi === '地支')) {
                 const bctx = buildGroupCtx(rule);
                 bctx.shenkeQzOverride = groupQuZhi;
-                try { baseHit = evaluateConditionGroup(baseConds, 0, new Set(), bctx); } catch (e) { baseHit = false; }
+                baseHit = evalConds(baseConds, bctx);
             }
             if (!baseHit) return;
             // 基准关系（展示文字：配置覆盖优先）
@@ -12782,11 +12795,9 @@
                     const shifted = shiftShenkeConditions(baseConds, mapRule, {});
                     let virtualOk = false;
                     if (shifted) {
-                        try {
-                            const vctx = buildGroupCtx(rule);
-                            if (groupQuZhi === '天干' || groupQuZhi === '地支') vctx.shenkeQzOverride = groupQuZhi;
-                            virtualOk = evaluateConditionGroup(shifted, 0, new Set(), vctx);
-                        } catch (e) { virtualOk = false; }
+                        const vctx = buildGroupCtx(rule);
+                        if (groupQuZhi === '天干' || groupQuZhi === '地支') vctx.shenkeQzOverride = groupQuZhi;
+                        virtualOk = evalConds(shifted, vctx);
                     }
                     if (!virtualOk) return; // 未满足匹配条件 → 不显示
                 } else if (!mapRule) {
