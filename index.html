@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12932,6 +12932,7 @@
                 } else {
                     pushRel(mDef, m.display || mDef.name, cat, { tian: true, di: true });
                 }
+            });
         });
         // 组取值维度汇总：全部一致时显示该维度，否则显示"按组设置"
         const qzs = skCfg.groups.map(g => (g.quZhi === '天干' || g.quZhi === '地支') ? g.quZhi : '自动');
