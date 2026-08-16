@@ -12244,27 +12244,20 @@
                 <div class="text-gray-600 text-sm">参与识别的分类下有断语命中，但未绑定任何生克关系。请为相关断语在「🔗 关联生克关系」中绑定相生/相克关系后，即可在此面板识别。</div>
             </div>`;
         }
-        const chips = (def) => {
-            const t = def.tianOk
-                ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">天干 ✓</span>`
-                : `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200">天干 ✗</span>`;
-            const d = def.diOk
-                ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">地支 ✓</span>`
-                : `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200">地支 ✗</span>`;
-            return `<span class="flex items-center gap-1.5 flex-shrink-0">${t}${d}</span>`;
-        };
         const typeBadge = (def) => def.relType === 'ke'
             ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-red-600 bg-red-50 border border-red-200">相克</span>`
             : def.relType === 'sheng'
                 ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-green-600 bg-green-50 border border-green-200">相生</span>`
                 : '';
-        const listHtml = shengke.rels.map(def => `
-            <div class="flex items-center justify-between gap-2 py-1">
-                <span class="flex items-center gap-1.5 min-w-0">
-                    <span class="font-bold text-gray-800 text-sm truncate">${escapeHtml(def.name)}</span>${typeBadge(def)}
-                </span>
-                ${chips(def)}
-            </div>`).join('');
+        // 以干支维度为行展示：左列固定「天干/地支」标签，右列展示该维度识别到的所有生克关系
+        const relChip = (def) => `<span class="inline-flex items-center gap-1 bg-white rounded px-1.5 py-0.5 border border-gray-200 text-sm">${escapeHtml(def.name)}${typeBadge(def)}</span>`;
+        const tianRels = shengke.rels.filter(def => def.tianOk);
+        const diRels = shengke.rels.filter(def => def.diOk);
+        const dimRow = (label, rels, colorCls) => `<div class="flex items-start gap-2 py-1.5">
+            <span class="flex-shrink-0 w-10 text-sm font-bold ${colorCls} leading-6">${label}</span>
+            <span class="flex flex-wrap gap-1.5 flex-1 min-w-0">${rels.length ? rels.map(relChip).join('') : '<span class="text-gray-300 text-sm leading-6">—</span>'}</span>
+        </div>`;
+        const listHtml = dimRow('天干', tianRels, 'text-amber-600') + dimRow('地支', diRels, 'text-stone-500');
         const catTxt = (shengke.cats && shengke.cats.length)
             ? `<span class="text-[11px] text-gray-400">命中分类：${escapeHtml(shengke.cats.join('、'))}</span>`
             : '';
@@ -12273,9 +12266,9 @@
                 <span class="font-bold text-gray-700">⚡ 生克关系识别</span>${scopeBadge}${setBtn}
                 <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-pink-700 bg-pink-50 border-pink-200">命中 ${shengke.rels.length} 组关系</span>
             </div>
-            <div class="mt-1.5 space-y-0.5">${listHtml}</div>
+            <div class="mt-1.5 divide-y divide-pink-100">${listHtml}</div>
             ${catTxt ? `<div class="mt-1.5 pt-1.5 border-t border-pink-100">${catTxt}</div>` : ''}
-            <div class="mt-1 text-xs text-gray-400">判定基于当前评估范围的天干/地支十神分组：关系双方（如「比劫」与「财星」）在该维度均存在 → ✓。天干/地支可独立成立，也可双维度同时成立。</div>
+            <div class="mt-1 text-xs text-gray-400">按维度识别：天干/地支两行分别列出当前评估范围下该维度成立的所有生克关系（关系双方在该维度均存在即成立）。</div>
         </div>`;
     }
 
