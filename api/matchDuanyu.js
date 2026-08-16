@@ -791,33 +791,40 @@ function evaluateBatchPositions(data, positions, pbType, pbGanZhi, pbQuZhi) {
   }
   if (validKeys.length === 0) return false; // 没有任何合法位置→不匹配
 
-  // 通用模式：按取值维度只判断对应维度
+  // 通用模式：按取值维度只判断对应维度；'自动'=天干/地支双维度判定，任一满足即真（干支自动分化）
   if (pbGanZhi === '通用') {
     // 模板模式（未选取值维度）不应直接用于匹配，只通过 inherit 引用
     if (!pbQuZhi) return false;
-    var targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
-    var checkedCount = 0; // 实际参与目标维度判断的位置数（防止跳过所有后 return true）
-    for (var vi = 0; vi < validKeys.length; vi++) {
-      var posName = validKeys[vi];
-      var posCfg = positions[posName];
-      var colPaths = PB_COLUMN_PATH_MAP[posName];
-      if (!colPaths) {
-        // 可能是天干/地支命名的位置（兼容混用），按名称后缀判断
-        var directPath = pbPathMap[posName];
-        if (!directPath) return false;
-        if (directPath.indexOf(targetSuffix) < 0) continue; // 非目标维度→跳过
-        checkedCount++;
-        if (!checkSinglePosition(data, directPath, posCfg, pbType, posName, rg)) return false;
-      } else {
-        // 柱名：取目标维度路径
-        var targetPath = (pbQuZhi === '地支') ? colPaths[1] : colPaths[0];
-        checkedCount++;
-        if (!checkSinglePosition(data, targetPath, posCfg, pbType, posName, rg)) return false;
+    // 判断单个维度是否满足（dimSuffix='.t'天干 / '.d'地支）
+    var _evalGzDim = function(dimSuffix) {
+      var checkedCount = 0; // 实际参与目标维度判断的位置数（防止跳过所有后 return true）
+      for (var vi = 0; vi < validKeys.length; vi++) {
+        var posName = validKeys[vi];
+        var posCfg = positions[posName];
+        var colPaths = PB_COLUMN_PATH_MAP[posName];
+        if (!colPaths) {
+          // 可能是天干/地支命名的位置（兼容混用），按名称后缀判断
+          var directPath = pbPathMap[posName];
+          if (!directPath) return false;
+          if (directPath.indexOf(dimSuffix) < 0) continue; // 非目标维度→跳过
+          checkedCount++;
+          if (!checkSinglePosition(data, directPath, posCfg, pbType, posName, rg)) return false;
+        } else {
+          // 柱名：取目标维度路径
+          var targetPath = (dimSuffix === '.d') ? colPaths[1] : colPaths[0];
+          checkedCount++;
+          if (!checkSinglePosition(data, targetPath, posCfg, pbType, posName, rg)) return false;
+        }
       }
+      // 如果没有任何位置落入目标维度，视为不匹配（条件不完整）
+      return checkedCount > 0;
+    };
+    if (pbQuZhi === '自动') {
+      // 干支自动分化：天干或地支任一维度满足即匹配
+      return _evalGzDim('.t') || _evalGzDim('.d');
     }
-    // 如果没有任何位置落入目标维度，视为不匹配（条件不完整）
-    if (checkedCount === 0) return false;
-    return true;
+    var targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
+    return _evalGzDim(targetSuffix);
   }
 
   // 天干/地支模式（现有逻辑）
@@ -1301,9 +1308,9 @@ function evaluateLeafCondition(data, cond, context) {
         var bcRule = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
         for (var bci = 0; bci < biConfigs.length; bci++) {
           var bc = biConfigs[bci];
-          // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
+          // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）、或与最终收集维度一致、或最终收集维度为"自动"（干支自动分化=双维度全覆盖）时均可合并，
           // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
-          var bcGzOk = bc.ganZhi === '通用' || bc.ganZhi === biActualGzFinal;
+          var bcGzOk = bc.ganZhi === '通用' || bc.ganZhi === biActualGzFinal || biActualGzFinal === '自动';
           // scope 兼容：字段与基准配置的"评估范围"均解析为实际范围后比较
           var cfgScEval = (bc.scope === '评估范围') ? ((data.liunian && data.liunian.t) ? '原局+大运+流年' : (data.dayun && data.dayun.t) ? '原局+大运' : '原局') : bc.scope;
           var biScEval = (biScope === '评估范围') ? ((data.liunian && data.liunian.t) ? '原局+大运+流年' : (data.dayun && data.dayun.t) ? '原局+大运' : '原局') : biScope;
@@ -1330,7 +1337,7 @@ function evaluateLeafCondition(data, cond, context) {
       actual = val;
       biDbg('  判定: ❌ 不匹配（无任何包含/排除配置可判定 fail-closed）');
     } else {
-      // 确定实际取值维度
+      // 确定实际取值维度（'自动'=干支自动分化：天干/地支双维度判定，任一满足即匹配）
       var actualBiGz = biActualGzFinal;
 
       // 确定要收集的柱位（scope=评估范围 → 数据驱动解析：有流年=12字/有大运=10字/仅原局=8字）
@@ -1344,71 +1351,84 @@ function evaluateLeafCondition(data, cond, context) {
       else if (biEvalSc === '原局+大运+流年') biPillars = ['nian','yue','ri','shi','dayun','liunian'];
       else biPillars = ['nian','yue','ri','shi'];
 
-      // 收集实际值
-      var biActualVals = [];
       var biRg = data.ri ? data.ri.t : '';
-      for (var bpi = 0; bpi < biPillars.length; bpi++) {
-        var biPillar = data[biPillars[bpi]];
-        if (!biPillar) continue;
-        var biNode = (actualBiGz === '地支') ? biPillar.d : biPillar.t;
-        if (!biNode) continue;
-        var biVal = '';
-        if (biType === '五行') {
-          biVal = WU_XING[biNode] || '';
-        } else if (biType === '十神') {
-          biVal = (actualBiGz === '地支') ? getDiShen(biNode, biRg) : getExactShen(biNode, biRg);
-        } else if (biType === '十神组') {
-          var biShenTmp = (actualBiGz === '地支') ? getDiShen(biNode, biRg) : getExactShen(biNode, biRg);
-          biVal = SHEN_TO_GROUP[biShenTmp] || '';
+      // 收集+判断单个维度（dim='天干'/'地支'），返回 {ok, vals, fail}
+      var _biEvalDim = function(dim) {
+        var vals = [];
+        for (var bpi = 0; bpi < biPillars.length; bpi++) {
+          var biPillar = data[biPillars[bpi]];
+          if (!biPillar) continue;
+          var biNode = (dim === '地支') ? biPillar.d : biPillar.t;
+          if (!biNode) continue;
+          var biVal = '';
+          if (biType === '五行') {
+            biVal = WU_XING[biNode] || '';
+          } else if (biType === '十神') {
+            biVal = (dim === '地支') ? getDiShen(biNode, biRg) : getExactShen(biNode, biRg);
+          } else if (biType === '十神组') {
+            var biShenTmp = (dim === '地支') ? getDiShen(biNode, biRg) : getExactShen(biNode, biRg);
+            biVal = SHEN_TO_GROUP[biShenTmp] || '';
+          }
+          if (biVal && vals.indexOf(biVal) < 0) vals.push(biVal);
         }
-        if (biVal && biActualVals.indexOf(biVal) < 0) biActualVals.push(biVal);
-      }
-
-      // 字段自身直接包含/排除（映射模式下一般为空）：全部满足
-      var biDirectOk = true;
-      for (var bdi = 0; bdi < biInclude.length; bdi++) {
-        if (biActualVals.indexOf(biInclude[bdi]) < 0) { biDirectOk = false; break; }
-      }
-      if (biDirectOk) {
-        for (var bde = 0; bde < biExclude.length; bde++) {
-          if (biActualVals.indexOf(biExclude[bde]) >= 0) { biDirectOk = false; break; }
+        // 字段自身直接包含/排除（映射模式下一般为空）：全部满足
+        var biDirectOk = true;
+        for (var bdi = 0; bdi < biInclude.length; bdi++) {
+          if (vals.indexOf(biInclude[bdi]) < 0) { biDirectOk = false; break; }
         }
-      }
-      // 基准宏候选：每条配置为"或"关系，任一满足即通过
-      // （修复：多值不匹配——原实现把全部配置合并成一个大集合后 AND 判断，
-      //   产生"须出现与不许出现"互相矛盾的约束，导致基准宏含多字段时恒不匹配）
-      var biCandidateOk = biCandidates.length === 0;
-      for (var bci2 = 0; bci2 < biCandidates.length; bci2++) {
-        var biCand = biCandidates[bci2];
-        var biCandInOk = true;
-        for (var bci3 = 0; bci3 < biCand.include.length; bci3++) {
-          if (biActualVals.indexOf(biCand.include[bci3]) < 0) { biCandInOk = false; break; }
-        }
-        var biCandExOk = true;
-        if (biCandInOk) {
-          for (var bci4 = 0; bci4 < biCand.exclude.length; bci4++) {
-            if (biActualVals.indexOf(biCand.exclude[bci4]) >= 0) { biCandExOk = false; break; }
+        if (biDirectOk) {
+          for (var bde = 0; bde < biExclude.length; bde++) {
+            if (vals.indexOf(biExclude[bde]) >= 0) { biDirectOk = false; break; }
           }
         }
-        if (biCandInOk && biCandExOk) { biCandidateOk = true; break; }
-      }
-      // 增量包含/排除（inc包含/inc排除）：全部满足（与合并前行为一致）
-      var biIncOk = true;
-      for (var bij = 0; bij < biInc2.length; bij++) {
-        if (biActualVals.indexOf(biInc2[bij]) < 0) { biIncOk = false; break; }
-      }
-      if (biIncOk) {
-        for (var bij2 = 0; bij2 < biExc2.length; bij2++) {
-          if (biActualVals.indexOf(biExc2[bij2]) >= 0) { biIncOk = false; break; }
+        // 基准宏候选：每条配置为"或"关系，任一满足即通过
+        // （修复：多值不匹配——原实现把全部配置合并成一个大集合后 AND 判断，
+        //   产生"须出现与不许出现"互相矛盾的约束，导致基准宏含多字段时恒不匹配）
+        var biCandidateOk = biCandidates.length === 0;
+        for (var bci2 = 0; bci2 < biCandidates.length; bci2++) {
+          var biCand = biCandidates[bci2];
+          var biCandInOk = true;
+          for (var bci3 = 0; bci3 < biCand.include.length; bci3++) {
+            if (vals.indexOf(biCand.include[bci3]) < 0) { biCandInOk = false; break; }
+          }
+          var biCandExOk = true;
+          if (biCandInOk) {
+            for (var bci4 = 0; bci4 < biCand.exclude.length; bci4++) {
+              if (vals.indexOf(biCand.exclude[bci4]) >= 0) { biCandExOk = false; break; }
+            }
+          }
+          if (biCandInOk && biCandExOk) { biCandidateOk = true; break; }
         }
+        // 增量包含/排除（inc包含/inc排除）：全部满足（与合并前行为一致）
+        var biIncOk = true;
+        for (var bij = 0; bij < biInc2.length; bij++) {
+          if (vals.indexOf(biInc2[bij]) < 0) { biIncOk = false; break; }
+        }
+        if (biIncOk) {
+          for (var bij2 = 0; bij2 < biExc2.length; bij2++) {
+            if (vals.indexOf(biExc2[bij2]) >= 0) { biIncOk = false; break; }
+          }
+        }
+        var failParts = [];
+        if (!biDirectOk) failParts.push('字段值未满足');
+        if (!biCandidateOk) failParts.push('基准宏候选未满足');
+        if (!biIncOk) failParts.push('增量未满足');
+        return { ok: biDirectOk && biCandidateOk && biIncOk, vals: vals, fail: failParts.join('; ') };
+      };
+
+      if (actualBiGz === '自动') {
+        // 干支自动分化：天干/地支任一维度满足即匹配
+        var rT = _biEvalDim('天干');
+        var rD = _biEvalDim('地支');
+        res = rT.ok || rD.ok;
+        actual = val;
+        biDbg('  干支自动分化: 天干[' + rT.vals.join(',') + ']=' + (rT.ok ? '✅' : '❌(' + rT.fail + ')') + ' 地支[' + rD.vals.join(',') + ']=' + (rD.ok ? '✅' : '❌(' + rD.fail + ')') + ' → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配'));
+      } else {
+        var r1 = _biEvalDim(actualBiGz);
+        res = r1.ok;
+        actual = val;
+        biDbg('  八字实际值(' + actualBiGz + ',' + biScope + ')=[' + r1.vals.join(',') + '] → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配（' + r1.fail + '）'));
       }
-      res = biDirectOk && biCandidateOk && biIncOk;
-      actual = val;
-      var biFailReason = '';
-      if (!biDirectOk) biFailReason += '字段值未满足';
-      if (!biCandidateOk) biFailReason += (biFailReason ? '; ' : '') + '基准宏候选未满足';
-      if (!biIncOk) biFailReason += (biFailReason ? '; ' : '') + '增量未满足';
-      biDbg('  八字实际值(' + actualBiGz + ',' + biScope + ')=[' + biActualVals.join(',') + '] → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配（' + biFailReason + '）'));
     }
   }
 

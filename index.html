@@ -1654,6 +1654,7 @@
                     <option value="">--不设置（使用字段或条件宏的设置）--</option>
                     <option value="天干">天干</option>
                     <option value="地支">地支</option>
+                    <option value="自动">自动（干支分化）</option>
                 </select>
             </div>
             <div class="mb-3 p-2 border border-emerald-200 rounded bg-emerald-50">
@@ -6705,10 +6706,10 @@
     }
     window.openGeJuLevelSettings = openGeJuLevelSettings;
 
-    /** 生克关系识别设置窗口：手动勾选参与生克关系识别的分类（可多选，存 site_settings） */
+    /** 生克关系识别设置窗口：按需勾选参与识别的断语（自动带出生克关系可覆盖）+ 映射引用规则 + 取值维度（默认干支自动分化） */
     function openShengKeSettings() {
         if (!currentUser || !isAdmin(currentUser.email)) {
-            alert('⚠️ 仅管理员可设置生克关系识别分类');
+            alert('⚠️ 仅管理员可设置生克关系识别');
             return;
         }
         const cfg = getGlobalDisplayConfig();
@@ -6718,20 +6719,34 @@
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
 
         const modal = document.createElement('div');
-        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:420px;max-width:560px;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
+        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:640px;max-width:780px;max-height:86vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
 
         modal.innerHTML = `
             <h3 style="margin:0 0 6px;font-size:16px;font-weight:600;">⚡ 生克关系识别设置</h3>
             <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.6;">
-                选择参与生克关系识别的分类。识别面板只展示勾选分类中命中的断语所绑定的生克关系，<br>
-                并分别按<strong>天干 / 地支</strong>两个维度判定关系是否成立。保存后全局生效。
+                按需勾选参与识别的<strong>断语或条件宏</strong>（仅列出已绑定生克关系的条目），可为每条指定<strong>生克关系</strong>与<strong>面板展示文字</strong>（覆盖原内容）。<br>
+                可选<strong>映射引用规则</strong>：基于勾选条目的关系应用映射偏移生成变体关系一并识别；<strong>取值维度</strong>默认干支自动分化（天干/地支/干支合并三行展示）。
             </p>
-            <div style="margin-bottom:16px;">
-                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">参与生克关系识别的分类（可多选，默认勾选"生克"相关）</div>
-                <div id="shengke-categories-box" style="max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:13px;line-height:1.9;">
-                </div>
-                <div style="font-size:12px;color:#999;margin-top:4px;">只在勾选的分类中寻找生克关系。勾选"<strong>全部</strong>"则所有分类参与识别。</div>
+
+            <div style="margin-bottom:14px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">① 参与识别的断语（可多选）</div>
+                <div id="shengke-rules-box" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:13px;line-height:1.9;"></div>
+                <div style="font-size:12px;color:#999;margin-top:4px;">只勾选明确对应生克关系的断语或条件宏；条目需匹配命中后其生克关系才会在面板展示。</div>
             </div>
+
+            <div style="margin-bottom:14px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">② 映射引用规则（统一一条）</div>
+                <select id="shengke-mapping-rule" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:13px;"></select>
+                <div id="shengke-map-hint" style="font-size:12px;color:#999;margin-top:4px;">不映射时直接用勾选断语的基准关系。可选规则按勾选断语的种类（十神组/五行）过滤。</div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">③ 取值维度</div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="shengke-quzhi" value="自动"> 干支自动分化（默认：天干/地支独立判定，另有干支合并行）</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="shengke-quzhi" value="天干"> 仅天干</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="shengke-quzhi" value="地支"> 仅地支</label>
+            </div>
+
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button id="shengke-cats-save" style="padding:8px 20px;border:none;border-radius:6px;background:#db2777;color:#fff;cursor:pointer;font-size:14px;">保存</button>
                 <button id="shengke-cats-close" style="padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;">取消</button>
@@ -6741,47 +6756,179 @@
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 
-        // 动态填充参与识别的分类多选（来自现有断语分类）
-        const skCatBox = document.getElementById('shengke-categories-box');
-        if (skCatBox) {
-            const allCats = (typeof getAllRuleCategories === 'function') ? getAllRuleCategories() : [];
-            const current = cfg.shengkeCategories || ['生克'];
-            const isAll = current.indexOf('*') >= 0;
-            const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-            let boxHtml = '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" value="*" ' + (isAll ? 'checked' : '') + '> <strong>全部</strong>（所有分类参与识别）</label>';
-            if (allCats.length > 0) {
-                boxHtml += '<div style="border-top:1px dashed #ddd;margin:6px 0 4px;"></div>';
-                allCats.forEach(function(cat) {
-                    if (!cat) return;
-                    const checked = isAll || current.some(function(g) { return g !== '*' && g === cat; });
-                    boxHtml += '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" value="' + esc(cat) + '" ' + (checked ? 'checked' : '') + '> ' + esc(cat) + '</label>';
+        const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const defs = getRelationDefs();
+        const mappingRules = (typeof getMappingRules === 'function') ? getMappingRules() : [];
+        const SHEN_CYCLE = ['比劫','食伤','财星','官杀','印星'];
+        const WX_CYCLE = ['金','水','木','火','土'];
+        // 推断关系种类（十神组/五行），用于过滤映射规则
+        const inferRelKind = (shenA, shenB) => {
+            if (SHEN_CYCLE.indexOf(shenA) >= 0 && SHEN_CYCLE.indexOf(shenB) >= 0) return '十神组';
+            if (WX_CYCLE.indexOf(shenA) >= 0 && WX_CYCLE.indexOf(shenB) >= 0) return '五行';
+            return '';
+        };
+        const relOptionsHtml = (selId) => defs.map(d => `<option value="${esc(d.id)}" ${String(d.id) === String(selId) ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
+
+        // 当前配置（新结构 shengkeCfg；旧 shengkeCategories 已废弃）
+        const skCfg = cfg.shengkeCfg || { items: [], mappingRuleId: '', quZhi: '自动' };
+        const checkedMap = {};
+        (skCfg.items || []).forEach(it => { checkedMap[(it.source === 'macro' ? 'macro:' : 'rule:') + String(it.ruleId)] = it; });
+
+        // 渲染断语树（按分类分组，仅展示已绑定生克关系的断语）
+        const rules = (typeof cache !== 'undefined' && cache.rules) || [];
+        const boundRules = rules.filter(r => r && r.conditions && Array.isArray(r.conditions.relationBindings) && r.conditions.relationBindings.length);
+        const byCat = {};
+        boundRules.forEach(r => {
+            const c = r.category || '未分类';
+            (byCat[c] = byCat[c] || []).push(r);
+        });
+        const ruleTreeBox = document.getElementById('shengke-rules-box');
+        if (ruleTreeBox) {
+            let treeHtml = '';
+            const catKeys = Object.keys(byCat).sort();
+            // 条件宏分区（仅列出已绑定生克关系的宏）
+            const allMacros = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
+            const boundMacros = allMacros.filter(m => m && m.conditions && Array.isArray(m.conditions.relationBindings) && m.conditions.relationBindings.length);
+            if (catKeys.length === 0 && boundMacros.length === 0) {
+                treeHtml = '<div style="color:#999;font-size:12px;padding:6px;">暂无可选断语/条件宏：请先在断语或条件宏编辑中「🔗 关联生克关系」绑定生克关系。</div>';
+            }
+            catKeys.forEach(cat => {
+                treeHtml += `<div style="font-weight:600;color:#475569;margin:6px 0 2px;">${esc(cat)}</div>`;
+                byCat[cat].forEach(r => {
+                    const rid = String(r.cloudId || r.id);
+                    const saved = checkedMap['rule:' + rid] || null;
+                    const defId = saved ? saved.relId : String((r.conditions.relationBindings || [])[0]);
+                    const display = saved ? (saved.display || '') : '';
+                    const checked = saved ? 'checked' : '';
+                    const dTitle = (r.duanyu || '').replace(/<[^>]*>/g, '');
+                    const dText = dTitle.length > 46 ? dTitle.slice(0, 46) + '…' : dTitle;
+                    treeHtml += `
+                        <div class="sk-rule-row" style="border:1px solid #eee;border-radius:6px;padding:6px 8px;margin:4px 0;">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                <input type="checkbox" class="sk-rule-check" data-source="rule" data-rule-id="${esc(rid)}" ${checked}>
+                                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(dTitle)}">${esc(dText)}</span>
+                            </label>
+                            <div class="sk-rule-rel" style="${checked ? '' : 'display:none;'}margin:4px 0 0 22px;font-size:12px;color:#666;">
+                                生克关系：<select class="sk-rel-select" style="padding:2px 4px;border:1px solid #ddd;border-radius:4px;font-size:12px;">${relOptionsHtml(defId)}</select>
+                                <span style="margin-left:8px;">展示文字：</span><input class="sk-display-input" type="text" placeholder="覆盖断语原文（可留空）" value="${esc(display)}" style="padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:210px;">
+                            </div>
+                        </div>`;
+                });
+            });
+            if (boundMacros.length) {
+                treeHtml += `<div style="font-weight:600;color:#7c3aed;margin:8px 0 2px;">条件宏</div>`;
+                boundMacros.forEach(m => {
+                    const mid = String(m.cloudId || m.id);
+                    const saved = checkedMap['macro:' + mid] || null;
+                    const defId = saved ? saved.relId : String((m.conditions.relationBindings || [])[0]);
+                    const display = saved ? (saved.display || '') : '';
+                    const checked = saved ? 'checked' : '';
+                    const dTitle = m.name || '';
+                    const dText = dTitle.length > 46 ? dTitle.slice(0, 46) + '…' : dTitle;
+                    treeHtml += `
+                        <div class="sk-rule-row" style="border:1px solid #eee;border-radius:6px;padding:6px 8px;margin:4px 0;">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                <input type="checkbox" class="sk-rule-check" data-source="macro" data-rule-id="${esc(mid)}" ${checked}>
+                                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(dTitle)}">🔗 ${esc(dText)}</span>
+                            </label>
+                            <div class="sk-rule-rel" style="${checked ? '' : 'display:none;'}margin:4px 0 0 22px;font-size:12px;color:#666;">
+                                生克关系：<select class="sk-rel-select" style="padding:2px 4px;border:1px solid #ddd;border-radius:4px;font-size:12px;">${relOptionsHtml(defId)}</select>
+                                <span style="margin-left:8px;">展示文字：</span><input class="sk-display-input" type="text" placeholder="覆盖宏内容（可留空）" value="${esc(display)}" style="padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:210px;">
+                            </div>
+                        </div>`;
                 });
             }
-            skCatBox.innerHTML = boxHtml;
+            ruleTreeBox.innerHTML = treeHtml;
+            // 勾选联动：显示/隐藏关系行，并刷新映射规则下拉
+            ruleTreeBox.querySelectorAll('.sk-rule-check').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const row = this.closest('.sk-rule-row');
+                    row.querySelector('.sk-rule-rel').style.display = this.checked ? '' : 'none';
+                    refreshMappingSelect();
+                });
+            });
+        }
+
+        // 按勾选断语的种类过滤映射规则下拉
+        const refreshMappingSelect = () => {
+            const mapSel = document.getElementById('shengke-mapping-rule');
+            const hint = document.getElementById('shengke-map-hint');
+            if (!mapSel) return;
+            const kinds = new Set();
+            document.querySelectorAll('.sk-rule-check:checked').forEach(cb => {
+                const row = cb.closest('.sk-rule-row');
+                const sel = row.querySelector('.sk-rel-select');
+                const def = defs.find(d => String(d.id) === String(sel.value));
+                if (def) { const k = inferRelKind(def.shenA, def.shenB); if (k) kinds.add(k); }
+            });
+            const kindsArr = Array.from(kinds);
+            const gSz = mappingRules.filter(r => r.type === '十神组');
+            const gWx = mappingRules.filter(r => r.type === '五行');
+            const optOf = (g) => g.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+            const prevVal = mapSel.value;
+            if (kindsArr.length === 1) {
+                const k = kindsArr[0];
+                mapSel.disabled = false;
+                mapSel.innerHTML = '<option value="">不映射（直接用基准关系）</option>'
+                    + (k === '十神组' ? `<optgroup label="十神组">${optOf(gSz)}</optgroup>` : `<optgroup label="五行">${optOf(gWx)}</optgroup>`);
+                hint.textContent = '勾选条目种类：' + k + '。映射后基于勾选条目的基准关系生成变体生克关系参与识别。';
+            } else if (kindsArr.length === 0) {
+                mapSel.disabled = false;
+                mapSel.innerHTML = '<option value="">不映射（直接用基准关系）</option>'
+                    + (gSz.length ? `<optgroup label="十神组">${optOf(gSz)}</optgroup>` : '')
+                    + (gWx.length ? `<optgroup label="五行">${optOf(gWx)}</optgroup>` : '');
+                hint.textContent = '勾选条目后，可选映射规则将按条目种类（十神组/五行）自动过滤。';
+            } else {
+                // 混合种类：禁用映射（避免映射类型错位）
+                mapSel.disabled = true;
+                mapSel.innerHTML = '<option value="">混合种类（十神组+五行）时不可用映射</option>';
+                hint.textContent = '勾选条目包含多种种类，映射规则无法统一应用，请仅勾选同一种类（全十神组或全五行）的条目后使用映射。';
+            }
+            if (prevVal && Array.from(mapSel.options).some(o => o.value === prevVal)) mapSel.value = prevVal;
+        };
+
+        // 回填取值维度
+        const quZhiInit = (skCfg.quZhi === '天干' || skCfg.quZhi === '地支') ? skCfg.quZhi : '自动';
+        document.querySelectorAll('input[name="shengke-quzhi"]').forEach(r => { if (r.value === quZhiInit) r.checked = true; });
+
+        // 回填并刷新映射下拉
+        refreshMappingSelect();
+        const mapSel2 = document.getElementById('shengke-mapping-rule');
+        if (mapSel2 && skCfg.mappingRuleId && !mapSel2.disabled) {
+            if (Array.from(mapSel2.options).some(o => o.value === String(skCfg.mappingRuleId))) mapSel2.value = String(skCfg.mappingRuleId);
         }
 
         const closeModal = () => { document.body.removeChild(overlay); };
         overlay.querySelector('#shengke-cats-close').onclick = closeModal;
         overlay.querySelector('#shengke-cats-save').onclick = async function() {
-            const checkedCats = [];
-            document.querySelectorAll('#shengke-categories-box input[type="checkbox"]:checked').forEach(function(cb) {
-                checkedCats.push(cb.value);
+            const items = [];
+            document.querySelectorAll('.sk-rule-check:checked').forEach(cb => {
+                const row = cb.closest('.sk-rule-row');
+                const relId = row.querySelector('.sk-rel-select').value;
+                const display = row.querySelector('.sk-display-input').value.trim();
+                items.push({ source: cb.dataset.source === 'macro' ? 'macro' : 'rule', ruleId: cb.dataset.ruleId, relId: relId, display: display || '' });
             });
-            if (checkedCats.length === 0) {
-                alert('⚠️ 请至少勾选一个参与识别的分类');
+            if (items.length === 0) {
+                alert('⚠️ 请至少勾选一条参与识别的断语或条件宏');
                 return;
             }
+            const quZhi = (document.querySelector('input[name="shengke-quzhi"]:checked') || {}).value || '自动';
+            const mappingRuleId = (document.getElementById('shengke-mapping-rule').disabled)
+                ? ''
+                : (document.getElementById('shengke-mapping-rule').value || '');
             const cfg2 = getGlobalDisplayConfig();
-            cfg2.shengkeCategories = checkedCats.indexOf('*') >= 0 ? ['*'] : checkedCats;
+            cfg2.shengkeCfg = { items: items, mappingRuleId: mappingRuleId, quZhi: quZhi };
+            // 直接废弃旧"按分类"配置（shengkeCategories 不再使用）
+            delete cfg2.shengkeCategories;
             const saved = await saveGlobalDisplayConfig(cfg2);
             if (!saved || !saved.ok) {
                 alert('⚠️ 保存生克关系识别设置失败：' + ((saved && saved.error) || '未知错误') + '\n请确认管理员权限后重试');
                 return;
             }
             closeModal();
-            // 重新匹配并渲染结果（识别面板实时应用新分类）
+            // 重新匹配并渲染结果（识别面板实时应用新配置）
             await refreshApiDuanyu();
-            alert('✅ 生克关系识别分类已保存（全局生效）');
+            alert('✅ 生克关系识别设置已保存（全局生效）');
         };
         overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
     }
@@ -8252,25 +8399,32 @@
                     if(pbGanZhi === '通用'){
                         // 模板模式（未选取值维度）不应直接用于匹配
                         if(!pbQuZhi) return false;
-                        const targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
-                        let checkedCount = 0;
-                        for(const posName of validKeys){
-                            const posCfg = positions[posName];
-                            const colPaths = pbColumnPathMap[posName];
-                            if(!colPaths){
-                                const directPath = pbPathMap[posName];
-                                if(!directPath) return false;
-                                if(directPath.indexOf(targetSuffix) < 0) continue;
-                                checkedCount++;
-                                if(!checkPos(directPath, posCfg, posName)) return false;
-                            } else {
-                                const targetPath = (pbQuZhi === '地支') ? colPaths[1] : colPaths[0];
-                                checkedCount++;
-                                if(!checkPos(targetPath, posCfg, posName)) return false;
+                        // 判断单个维度是否满足（dimSuffix='.t'天干 / '.d'地支）
+                        const evalOneDim = (dimSuffix) => {
+                            let checkedCount = 0;
+                            for(const posName of validKeys){
+                                const posCfg = positions[posName];
+                                const colPaths = pbColumnPathMap[posName];
+                                if(!colPaths){
+                                    const directPath = pbPathMap[posName];
+                                    if(!directPath) return false;
+                                    if(directPath.indexOf(dimSuffix) < 0) continue;
+                                    checkedCount++;
+                                    if(!checkPos(directPath, posCfg, posName)) return false;
+                                } else {
+                                    const targetPath = (dimSuffix === '.d') ? colPaths[1] : colPaths[0];
+                                    checkedCount++;
+                                    if(!checkPos(targetPath, posCfg, posName)) return false;
+                                }
                             }
+                            return checkedCount > 0;
+                        };
+                        // 干支自动分化：天干或地支任一维度满足即匹配
+                        if(pbQuZhi === '自动'){
+                            return evalOneDim('.t') || evalOneDim('.d');
                         }
-                        if(checkedCount === 0) return false;
-                        return true;
+                        const targetSuffix = (pbQuZhi === '地支') ? '.d' : '.t';
+                        return evalOneDim(targetSuffix);
                     }
                     // 天干/地支模式
                     for(const posName of validKeys){
@@ -8476,9 +8630,9 @@
                         const configs = extractBiConfigsFromMacro(baseMacro, biType);
                         const ruleObj = { type: biMappingType, offset: biMappingOffset, customMap: biCustomMap };
                         configs.forEach(cfg => {
-                            // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
+                            // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）、或与最终收集维度一致、或最终收集维度为"自动"（干支自动分化=双维度全覆盖）时均可合并，
                             // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
-                            const cfgGzOk = cfg.ganZhi === '通用' || cfg.ganZhi === biActualGzFinal;
+                            const cfgGzOk = cfg.ganZhi === '通用' || cfg.ganZhi === biActualGzFinal || biActualGzFinal === '自动';
                             // scope 兼容：字段与基准配置的"评估范围"均解析为实际范围后比较
                             const cfgScEval = (cfg.scope === '评估范围')
                                 ? ((data && data.liunian && data.liunian.t) ? '原局+大运+流年' : (data && data.dayun && data.dayun.t) ? '原局+大运' : '原局')
@@ -8516,31 +8670,40 @@
                         : biEvalSc === '原局+大运+流年' ? ['nian','yue','ri','shi','dayun','liunian']
                         : ['nian','yue','ri','shi'];
                     const biRg = data.ri?.t || '';
-                    const biActual = [];
-                    biPillars.forEach(k => {
-                        const pillar = data[k];
-                        if(!pillar) return;
-                        const node = (actualBiGz === '地支') ? pillar.d : pillar.t;
-                        if(!node) return;
-                        let v = '';
-                        if(biType === '五行') v = WU_XING[node] || '';
-                        else if(biType === '十神') v = (actualBiGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg);
-                        else if(biType === '十神组') { const s = (actualBiGz === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg); v = SHEN_TO_GROUP[s] || ''; }
-                        if(v && !biActual.includes(v)) biActual.push(v);
-                    });
-                    // 字段自身直接包含/排除（映射模式下一般为空）：全部满足
-                    const directOk = biInc.every(v => biActual.includes(v)) && biExc.every(v => !biActual.includes(v));
-                    // 基准宏候选：每条配置为"或"关系，任一满足即通过
-                    // （修复：多值不匹配——原实现把全部配置合并成一个大集合后 AND 判断，
-                    //   产生"须出现与不许出现"互相矛盾的约束，导致基准宏含多字段时恒不匹配）
-                    let candOk = biCandidates.length === 0;
-                    for(const cand of biCandidates){
-                        const cOk = cand.include.every(v => biActual.includes(v)) && cand.exclude.every(v => !biActual.includes(v));
-                        if(cOk){ candOk = true; break; }
+                    // 收集+判断单个维度（dim='天干'/'地支'）
+                    const evalBiDim = (dim) => {
+                        const vals = [];
+                        biPillars.forEach(k => {
+                            const pillar = data[k];
+                            if(!pillar) return;
+                            const node = (dim === '地支') ? pillar.d : pillar.t;
+                            if(!node) return;
+                            let v = '';
+                            if(biType === '五行') v = WU_XING[node] || '';
+                            else if(biType === '十神') v = (dim === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg);
+                            else if(biType === '十神组') { const s = (dim === '地支') ? getDiShen(node, biRg) : getExactShen(node, biRg); v = SHEN_TO_GROUP[s] || ''; }
+                            if(v && !vals.includes(v)) vals.push(v);
+                        });
+                        // 字段自身直接包含/排除（映射模式下一般为空）：全部满足
+                        const directOk = biInc.every(v => vals.includes(v)) && biExc.every(v => !vals.includes(v));
+                        // 基准宏候选：每条配置为"或"关系，任一满足即通过
+                        // （修复：多值不匹配——原实现把全部配置合并成一个大集合后 AND 判断，
+                        //   产生"须出现与不许出现"互相矛盾的约束，导致基准宏含多字段时恒不匹配）
+                        let candOk = biCandidates.length === 0;
+                        for(const cand of biCandidates){
+                            const cOk = cand.include.every(v => vals.includes(v)) && cand.exclude.every(v => !vals.includes(v));
+                            if(cOk){ candOk = true; break; }
+                        }
+                        // 增量包含/排除（inc包含/inc排除）：全部满足（与合并前行为一致）
+                        const incOk = biInc2.every(v => vals.includes(v)) && biExc2.every(v => !vals.includes(v));
+                        return directOk && candOk && incOk;
+                    };
+                    if(actualBiGz === '自动'){
+                        // 干支自动分化：天干/地支任一维度满足即匹配
+                        res = evalBiDim('天干') || evalBiDim('地支');
+                    } else {
+                        res = evalBiDim(actualBiGz);
                     }
-                    // 增量包含/排除（inc包含/inc排除）：全部满足（与合并前行为一致）
-                    const incOk = biInc2.every(v => biActual.includes(v)) && biExc2.every(v => !biActual.includes(v));
-                    res = directOk && candOk && incOk;
                 }
                 actual = c.val;
             }
@@ -9667,6 +9830,18 @@
                     }
                     if (hasRel) {
                         boundRelations.push.apply(boundRelations, mac.conditions.relationBindings);
+                        // 生克关系识别：无维度独立评估宏命中（与 shenQz 维度联动无关，与断语命中判定口径一致），按评估范围缓存供 analyzeShengKe 使用
+                        try {
+                            const ndOk = evaluateConditionGroup(mac.conditions, 0, new Set(), macroCtx);
+                            if (ndOk) {
+                                const mid = String(mac.cloudId || mac.id);
+                                if (opts.scopeIdx !== undefined) {
+                                    if (!cache.shenMatchedMacrosByScope) cache.shenMatchedMacrosByScope = [];
+                                    if (!cache.shenMatchedMacrosByScope[opts.scopeIdx]) cache.shenMatchedMacrosByScope[opts.scopeIdx] = new Set();
+                                    cache.shenMatchedMacrosByScope[opts.scopeIdx].add(mid);
+                                }
+                            }
+                        } catch (e2) { console.warn('生克宏命中评估失败:', mac.name, e2); }
                     }
                 }
             } catch (e) { console.warn('参考值规则收集失败:', mac.name, e); }
@@ -10447,6 +10622,7 @@
             cache.shenRefRulesByScope = [];
             cache.shenRelBindingsByScope = [];
             cache.shenTplPrefsByScope = [];
+            cache.shenMatchedMacrosByScope = [];
             for (let i = 0; i < scopeData.length; i++) {
                 // 继承出生信息/有效年龄，保证年龄类条件在范围评估中与主评估一致
                 if (data.hasBirthData !== undefined) scopeData[i].hasBirthData = data.hasBirthData;
@@ -12189,43 +12365,90 @@
         return st || { groupTian: {}, groupDi: {} };
     }
 
-    /** 生克关系识别：扫描参与分类中命中断语/宏绑定的生克关系，干/支独立判定是否成立 */
+    /** 生克关系识别：按断语配置（shengkeCfg.items）收集命中断语的关系，应用映射规则生成变体，按取值维度（自动/天干/地支）判定三态成立 */
     function analyzeShengKe() {
-        const catMap = cache.matchedByCategory || {};
-        const skCats = (getGlobalDisplayConfig().shengkeCategories) || ['生克'];
-        const relIds = new Set();
-        const hitCats = new Set();
-        for (const key of Object.keys(catMap)) {
-            if (!(skCats.indexOf('*') >= 0 || skCats.some(g => g && key.indexOf(g) >= 0))) continue;
-            const entries = catMap[key] || [];
-            for (const entry of entries) {
-                const rels = entry.relationBindings || [];
-                rels.forEach(rid => relIds.add(rid));
-                if (rels.length) hitCats.add(key);
-            }
-        }
-        const defs = getRelationDefs();
-        const resolved = [];
-        relIds.forEach(rid => {
-            const def = defs.find(d => String(d.id) === String(rid)) || null;
-            resolved.push(def || { id: rid, name: String(rid), relType: '', shenA: '', shenB: '' });
-        });
-        // 干/支独立判定：关系双方（shenA/shenB）在当前范围的天干/地支维度均存在 → 成立
+        const cfg = getGlobalDisplayConfig();
+        const skCfg = cfg.shengkeCfg || null;
         const stats = getShengKeScopeStats();
-        resolved.forEach(def => {
-            def.tianOk = !!(def.shenA && def.shenB && (stats.groupTian[def.shenA] || 0) > 0 && (stats.groupTian[def.shenB] || 0) > 0);
-            def.diOk = !!(def.shenA && def.shenB && (stats.groupDi[def.shenA] || 0) > 0 && (stats.groupDi[def.shenB] || 0) > 0);
+        const rels = [];
+        const hitCats = new Set();
+        if (!skCfg || !skCfg.items || !skCfg.items.length) {
+            return { hasRels: false, rels: rels, cats: [], quZhi: '自动', mappingName: '' };
+        }
+        const quZhi = (skCfg.quZhi === '天干' || skCfg.quZhi === '地支') ? skCfg.quZhi : '自动';
+        const mappingRuleId = skCfg.mappingRuleId || '';
+        const mappingRule = mappingRuleId
+            ? (((typeof getMappingRules === 'function') ? getMappingRules() : []) || []).find(r => String(r.id) === String(mappingRuleId))
+            : null;
+        // 命中断语集合（matchedByCategory 中的 rule）
+        const catMap = cache.matchedByCategory || {};
+        const hitRuleIds = new Set();
+        Object.keys(catMap).forEach(key => {
+            (catMap[key] || []).forEach(entry => {
+                if (entry.rule) {
+                    if (entry.rule.id) hitRuleIds.add(String(entry.rule.id));
+                    if (entry.rule.cloudId) hitRuleIds.add(String(entry.rule.cloudId));
+                }
+            });
         });
-        return { hasRels: relIds.size > 0, rels: resolved, cats: Array.from(hitCats) };
+        const rulesAll = (typeof cache !== 'undefined' && cache.rules) || [];
+        // 判定单个关系并加入结果（按取值维度决定 tianOk/diOk/ganZhiOk）
+        const pushRel = (def, display, ruleCat) => {
+            if (!def || !def.shenA || !def.shenB) return;
+            const tianOk = (stats.groupTian[def.shenA] || 0) > 0 && (stats.groupTian[def.shenB] || 0) > 0;
+            const diOk = (stats.groupDi[def.shenA] || 0) > 0 && (stats.groupDi[def.shenB] || 0) > 0;
+            let ok = false, tOk = false, dOk = false;
+            if (quZhi === '天干') { ok = tianOk; tOk = tianOk; }
+            else if (quZhi === '地支') { ok = diOk; dOk = diOk; }
+            else { ok = tianOk || diOk; tOk = tianOk; dOk = diOk; }
+            if (!ok) return;
+            rels.push({ id: def.id || '', name: display || def.name, relType: def.relType || '', shenA: def.shenA, shenB: def.shenB, tianOk: tOk, diOk: dOk, ganZhiOk: ok, mapped: !!def._mapped });
+            if (ruleCat) hitCats.add(ruleCat);
+        };
+        // 条件宏命中集合：按当前评估范围取（与 getShengKeScopeStats 同一索引口径）
+        const shengkeScopeIdx = getEvalScope() === 'bazi' ? 0 : getEvalScope() === 'dayun' ? 1 : 2;
+        const matchedMacroIds = (cache.shenMatchedMacrosByScope && cache.shenMatchedMacrosByScope[shengkeScopeIdx]) || new Set();
+        const macrosAll = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
+        skCfg.items.forEach(item => {
+            const src = item.source === 'macro' ? 'macro' : 'rule';
+            let cat = '';
+            let hit = false;
+            if (src === 'macro') {
+                const mac = macrosAll.find(m => String(m.cloudId || m.id) === String(item.ruleId));
+                if (!mac) return;
+                hit = matchedMacroIds.has(String(item.ruleId));
+                cat = '条件宏';
+            } else {
+                const rule = rulesAll.find(r => String(r.cloudId || r.id) === String(item.ruleId));
+                if (!rule) return;
+                hit = hitRuleIds.has(String(rule.id)) || (rule.cloudId && hitRuleIds.has(String(rule.cloudId)));
+                cat = rule.category || '未分类';
+            }
+            if (!hit) return;
+            const def = getRelationDefById(item.relId);
+            if (!def) return;
+            // 基准关系（展示文字：配置覆盖优先，覆盖断语原文）
+            pushRel(def, item.display || def.name, cat);
+            // 映射变体（无角标，展示文字按映射后的关系自动生成）
+            if (mappingRule) {
+                const mA = applyMappingValue(def.shenA, mappingRule);
+                const mB = applyMappingValue(def.shenB, mappingRule);
+                if (mA && mB && (mA !== def.shenA || mB !== def.shenB)) {
+                    const mDef = { id: '', relType: def.relType, shenA: mA, shenB: mB, name: mA + (def.relType === 'ke' ? '克' : '生') + mB, _mapped: true };
+                    pushRel(mDef, mDef.name, cat);
+                }
+            }
+        });
+        return { hasRels: rels.length > 0, rels: rels, cats: Array.from(hitCats), quZhi: quZhi, mappingName: mappingRule ? (mappingRule.name || '') : '' };
     }
 
-    /** 生克关系识别面板 HTML */
+    /** 生克关系识别面板 HTML（天干/地支/干支合并三行展示，同维度内相克在前、相生在后） */
     function buildShengKePanelHtml(shengke) {
         if (!shengke) return '';
         const scopeBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-pink-700 bg-pink-50 border-pink-200">评估范围：${evalScopeLabel()}</span>`;
-        const setBtn = `<button onclick="window.openShengKeSettings()" title="设置参与生克关系识别的分类（可多选）" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">⚙ 分类</button>`;
+        const setBtn = `<button onclick="window.openShengKeSettings()" title="设置参与生克关系识别的断语、映射引用规则与取值维度" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">⚙ 设置</button>`;
         if (!shengke.hasRels) {
-            // 无命中：区分「无匹配内容」与「未绑定任何生克关系」
+            // 无命中：区分「无匹配内容」与「未配置/未绑定」
             const isEmpty = !cache.matchedByCategory || Object.keys(cache.matchedByCategory).length === 0;
             if (isEmpty) {
                 return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
@@ -12239,9 +12462,9 @@
             return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="font-bold text-gray-700">⚡ 生克关系识别</span>${scopeBadge}${setBtn}
-                    <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">无绑定</span>
+                    <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">无命中</span>
                 </div>
-                <div class="text-gray-600 text-sm">参与识别的分类下有断语命中，但未绑定任何生克关系。请为相关断语在「🔗 关联生克关系」中绑定相生/相克关系后，即可在此面板识别。</div>
+                <div class="text-gray-600 text-sm">已配置参与识别的断语均未命中，或尚未配置。请点击「⚙ 设置」勾选对应生克关系的断语（需断语在「🔗 关联生克关系」中绑定相生/相克关系）。</div>
             </div>`;
         }
         const typeBadge = (def) => def.relType === 'ke'
@@ -12249,19 +12472,22 @@
             : def.relType === 'sheng'
                 ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-green-600 bg-green-50 border border-green-200">相生</span>`
                 : '';
-        // 以干支维度为行展示：左列固定「天干/地支」标签，右列展示该维度识别到的所有生克关系（相克在前、相生在后）
+        // 以干支维度为行展示：左列固定「天干/地支/干支」标签，右列展示该维度识别到的所有生克关系（相克在前、相生在后）
         const relChip = (def) => `<span class="inline-flex items-center gap-1 bg-white rounded px-1.5 py-0.5 border border-gray-200 text-sm">${escapeHtml(def.name)}${typeBadge(def)}</span>`;
         const sortByRelType = (rels) => rels.slice().sort((a, b) => (a.relType === 'ke' ? 0 : 1) - (b.relType === 'ke' ? 0 : 1));
-        const tianRels = sortByRelType(shengke.rels.filter(def => def.tianOk));
-        const diRels = sortByRelType(shengke.rels.filter(def => def.diOk));
+        const tianRels = sortByRelType(shengke.rels.filter(r => r.tianOk));
+        const diRels = sortByRelType(shengke.rels.filter(r => r.diOk));
+        const gzRels = sortByRelType(shengke.rels.filter(r => r.ganZhiOk));
         const dimRow = (label, rels, colorCls) => `<div class="flex items-center gap-2 py-1.5">
             <span class="inline-flex items-center flex-shrink-0 w-10 text-sm font-bold ${colorCls}">${label}</span>
             <span class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">${rels.length ? rels.map(relChip).join('') : '<span class="text-gray-300 text-sm">—</span>'}</span>
         </div>`;
-        const listHtml = dimRow('天干', tianRels, 'text-amber-600') + dimRow('地支', diRels, 'text-stone-500');
+        const listHtml = dimRow('天干', tianRels, 'text-amber-600') + dimRow('地支', diRels, 'text-stone-500') + dimRow('干支', gzRels, 'text-pink-600');
         const catTxt = (shengke.cats && shengke.cats.length)
             ? `<span class="text-[11px] text-gray-400">命中分类：${escapeHtml(shengke.cats.join('、'))}</span>`
             : '';
+        const qzTxt = shengke.quZhi === '天干' ? '仅天干' : shengke.quZhi === '地支' ? '仅地支' : '干支自动分化';
+        const cfgTxt = `取值维度：${qzTxt}${shengke.mappingName ? ' · 映射：' + escapeHtml(shengke.mappingName) : ''}`;
         return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-pink-50 to-rose-50 border-l-4 border-pink-300">
             <div class="flex items-center gap-2 mb-1">
                 <span class="font-bold text-gray-700">⚡ 生克关系识别</span>${scopeBadge}${setBtn}
@@ -12269,7 +12495,7 @@
             </div>
             <div class="mt-1.5 divide-y divide-pink-100">${listHtml}</div>
             ${catTxt ? `<div class="mt-1.5 pt-1.5 border-t border-pink-100">${catTxt}</div>` : ''}
-            <div class="mt-1 text-xs text-gray-400">按维度识别：天干/地支两行分别列出当前评估范围下该维度成立的所有生克关系（关系双方在该维度均存在即成立）。</div>
+            <div class="mt-1 text-xs text-gray-400">${cfgTxt} · 干支行为天干或地支任一维度成立的关系。</div>
         </div>`;
     }
 
@@ -28313,7 +28539,7 @@ function _defaultDisplayConfig() {
         categoryOrder: [], categorySwitch: {},
         gejuLevels: { top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' },
         gejuCategories: ['格局'],
-        shengkeCategories: ['生克']
+        shengkeCfg: { items: [], mappingRuleId: '', quZhi: '自动' }
     };
 }
 
@@ -28338,7 +28564,9 @@ async function loadGlobalDisplayConfig() {
                 categorySwitch: parsed.categorySwitch && typeof parsed.categorySwitch === 'object' ? parsed.categorySwitch : {},
                 gejuLevels: Object.assign({ top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' }, parsed.gejuLevels || {}),
                 gejuCategories: Array.isArray(parsed.gejuCategories) && parsed.gejuCategories.length > 0 ? parsed.gejuCategories : ['格局'],
-                shengkeCategories: Array.isArray(parsed.shengkeCategories) && parsed.shengkeCategories.length > 0 ? parsed.shengkeCategories : ['生克']
+                shengkeCfg: parsed.shengkeCfg && typeof parsed.shengkeCfg === 'object'
+                    ? { items: Array.isArray(parsed.shengkeCfg.items) ? parsed.shengkeCfg.items : [], mappingRuleId: parsed.shengkeCfg.mappingRuleId || '', quZhi: parsed.shengkeCfg.quZhi || '自动' }
+                    : { items: [], mappingRuleId: '', quZhi: '自动' }
             };
         } else {
             _globalDisplayConfig = _defaultDisplayConfig();
@@ -33418,6 +33646,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="">--不设置（各字段单独配置）--</option>
                     <option value="天干">天干</option>
                     <option value="地支">地支</option>
+                    <option value="自动">自动（干支分化）</option>
                 </select>
             </div>
             <div class="mb-3 p-2 border border-blue-200 rounded bg-blue-50">
@@ -33568,6 +33797,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <select id="bc-qz-val" class="w-full p-2 border rounded text-sm">
                         <option value="天干">天干</option>
                         <option value="地支">地支</option>
+                        <option value="自动">自动（干支分化）</option>
                     </select>
                 </div>
             </div>
@@ -33787,6 +34017,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <option value="">--不指定（模板）--</option>
                         <option value="天干">天干</option>
                         <option value="地支">地支</option>
+                        <option value="自动">自动（干支分化）</option>
                     </select>
                 </div>
                 <div id="pb-scope-cell">
