@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12595,7 +12595,17 @@
         }
         if (!exists) {
           var fitItem = (item.fit && item.fit.enabled) ? item.fit : undefined;
-          matchedByCategory[cat].push({ text: text, rule: null, fit: fitItem, relationBindings: (item.relationBindings || []) });
+          // 生产路径 API 返回的 rule 可能缺失 id/cloudId：优先用返回的完整 rule，
+          // 否则按 分类+断语文本 反查本地断语库补全，保证生克识别（analyzeShengKe 按 entry.rule 收集命中断语 ID）可用
+          var fullRule = (item.rule && (item.rule.id || item.rule.cloudId)) ? item.rule : null;
+          if (!fullRule) {
+            var rulesList = (typeof cache !== 'undefined' && cache.rules) || [];
+            for (var ri = 0; ri < rulesList.length; ri++) {
+              var rr = rulesList[ri];
+              if (rr && rr.category === cat && String(rr.duanyu || '') === text) { fullRule = rr; break; }
+            }
+          }
+          matchedByCategory[cat].push({ text: text, rule: fullRule, fit: fitItem, relationBindings: (item.relationBindings || []) });
         }
       }
 
