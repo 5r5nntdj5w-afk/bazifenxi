@@ -2271,12 +2271,15 @@
                         <option value="批量包含-五行">批量包含-五行</option>
                         <option value="批量包含-五行(原局+大运)">批量包含-五行(原局+大运)</option>
                         <option value="批量包含-五行(原局+大运+流年)">批量包含-五行(原局+大运+流年)</option>
+                        <option value="批量包含-五行(评估范围)">批量包含-五行(评估范围)（跟随评估范围开关）</option>
                         <option value="批量包含-十神">批量包含-十神</option>
                         <option value="批量包含-十神(原局+大运)">批量包含-十神(原局+大运)</option>
                         <option value="批量包含-十神(原局+大运+流年)">批量包含-十神(原局+大运+流年)</option>
+                        <option value="批量包含-十神(评估范围)">批量包含-十神(评估范围)（跟随评估范围开关）</option>
                         <option value="批量包含-十神组">批量包含-十神组</option>
                         <option value="批量包含-十神组(原局+大运)">批量包含-十神组(原局+大运)</option>
                         <option value="批量包含-十神组(原局+大运+流年)">批量包含-十神组(原局+大运+流年)</option>
+                        <option value="批量包含-十神组(评估范围)">批量包含-十神组(评估范围)（跟随评估范围开关）</option>
                         </optgroup>
                     </select>
                         <div class="custom-field-trigger" tabindex="0" role="combobox" aria-haspopup="listbox">
@@ -6701,6 +6704,88 @@
         overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
     }
     window.openGeJuLevelSettings = openGeJuLevelSettings;
+
+    /** 生克关系识别设置窗口：手动勾选参与生克关系识别的分类（可多选，存 site_settings） */
+    function openShengKeSettings() {
+        if (!currentUser || !isAdmin(currentUser.email)) {
+            alert('⚠️ 仅管理员可设置生克关系识别分类');
+            return;
+        }
+        const cfg = getGlobalDisplayConfig();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'shengke-cats-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+
+        const modal = document.createElement('div');
+        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:420px;max-width:560px;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
+
+        modal.innerHTML = `
+            <h3 style="margin:0 0 6px;font-size:16px;font-weight:600;">⚡ 生克关系识别设置</h3>
+            <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.6;">
+                选择参与生克关系识别的分类。识别面板只展示勾选分类中命中的断语所绑定的生克关系，<br>
+                并分别按<strong>天干 / 地支</strong>两个维度判定关系是否成立。保存后全局生效。
+            </p>
+            <div style="margin-bottom:16px;">
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">参与生克关系识别的分类（可多选，默认勾选"生克"相关）</div>
+                <div id="shengke-categories-box" style="max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:13px;line-height:1.9;">
+                </div>
+                <div style="font-size:12px;color:#999;margin-top:4px;">只在勾选的分类中寻找生克关系。勾选"<strong>全部</strong>"则所有分类参与识别。</div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button id="shengke-cats-save" style="padding:8px 20px;border:none;border-radius:6px;background:#db2777;color:#fff;cursor:pointer;font-size:14px;">保存</button>
+                <button id="shengke-cats-close" style="padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;">取消</button>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        // 动态填充参与识别的分类多选（来自现有断语分类）
+        const skCatBox = document.getElementById('shengke-categories-box');
+        if (skCatBox) {
+            const allCats = (typeof getAllRuleCategories === 'function') ? getAllRuleCategories() : [];
+            const current = cfg.shengkeCategories || ['生克'];
+            const isAll = current.indexOf('*') >= 0;
+            const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            let boxHtml = '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" value="*" ' + (isAll ? 'checked' : '') + '> <strong>全部</strong>（所有分类参与识别）</label>';
+            if (allCats.length > 0) {
+                boxHtml += '<div style="border-top:1px dashed #ddd;margin:6px 0 4px;"></div>';
+                allCats.forEach(function(cat) {
+                    if (!cat) return;
+                    const checked = isAll || current.some(function(g) { return g !== '*' && (g === cat || cat.indexOf(g) >= 0); });
+                    boxHtml += '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" value="' + esc(cat) + '" ' + (checked ? 'checked' : '') + '> ' + esc(cat) + '</label>';
+                });
+            }
+            skCatBox.innerHTML = boxHtml;
+        }
+
+        const closeModal = () => { document.body.removeChild(overlay); };
+        overlay.querySelector('#shengke-cats-close').onclick = closeModal;
+        overlay.querySelector('#shengke-cats-save').onclick = async function() {
+            const checkedCats = [];
+            document.querySelectorAll('#shengke-categories-box input[type="checkbox"]:checked').forEach(function(cb) {
+                checkedCats.push(cb.value);
+            });
+            if (checkedCats.length === 0) {
+                alert('⚠️ 请至少勾选一个参与识别的分类');
+                return;
+            }
+            const cfg2 = getGlobalDisplayConfig();
+            cfg2.shengkeCategories = checkedCats.indexOf('*') >= 0 ? ['*'] : checkedCats;
+            const saved = await saveGlobalDisplayConfig(cfg2);
+            if (!saved || !saved.ok) {
+                alert('⚠️ 保存生克关系识别设置失败：' + ((saved && saved.error) || '未知错误') + '\n请确认管理员权限后重试');
+                return;
+            }
+            closeModal();
+            // 重新匹配并渲染结果（识别面板实时应用新分类）
+            await refreshApiDuanyu();
+            alert('✅ 生克关系识别分类已保存（全局生效）');
+        };
+        overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+    }
+    window.openShengKeSettings = openShengKeSettings;
     window.getCurrentUserAllowedCategories = function() {
         // 管理员全部可见
         if (currentUser && isAdmin(currentUser.email)) return getAllRuleCategories();
@@ -8394,7 +8479,14 @@
                             // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
                             // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
                             const cfgGzOk = cfg.ganZhi === '通用' || cfg.ganZhi === biActualGzFinal;
-                            if(cfgGzOk && cfg.scope === biSc){
+                            // scope 兼容：字段与基准配置的"评估范围"均解析为实际范围后比较
+                            const cfgScEval = (cfg.scope === '评估范围')
+                                ? ((data && data.liunian && data.liunian.t) ? '原局+大运+流年' : (data && data.dayun && data.dayun.t) ? '原局+大运' : '原局')
+                                : cfg.scope;
+                            const biScEval = (biSc === '评估范围')
+                                ? ((data && data.liunian && data.liunian.t) ? '原局+大运+流年' : (data && data.dayun && data.dayun.t) ? '原局+大运' : '原局')
+                                : biSc;
+                            if(cfgGzOk && cfgScEval === biScEval){
                                 const mapped = mapBiConfigValues(cfg, ruleObj);
                                 biCandidates.push({ include: mapped.include || [], exclude: mapped.exclude || [] });
                             }
@@ -8412,9 +8504,16 @@
                     res = false;
                 } else {
                     const actualBiGz = biActualGzFinal;
-                    const biPillars = biSc === '原局' ? ['nian','yue','ri','shi']
-                        : biSc === '原局+大运' ? ['nian','yue','ri','shi','dayun']
-                        : biSc === '原局+大运+流年' ? ['nian','yue','ri','shi','dayun','liunian']
+                    // scope=评估范围 → 数据驱动解析为实际统计范围（有流年=12字/有大运=10字/仅原局=8字）
+                    let biEvalSc = biSc;
+                    if(biEvalSc === '评估范围'){
+                        biEvalSc = (data && data.liunian && data.liunian.t) ? '原局+大运+流年'
+                            : (data && data.dayun && data.dayun.t) ? '原局+大运'
+                            : '原局';
+                    }
+                    const biPillars = biEvalSc === '原局' ? ['nian','yue','ri','shi']
+                        : biEvalSc === '原局+大运' ? ['nian','yue','ri','shi','dayun']
+                        : biEvalSc === '原局+大运+流年' ? ['nian','yue','ri','shi','dayun','liunian']
                         : ['nian','yue','ri','shi'];
                     const biRg = data.ri?.t || '';
                     const biActual = [];
@@ -9533,10 +9632,10 @@
                     try { fit = evaluateRuleFitScore(rule, ruleCtx); } catch (e) { fit = null; }
                     if (fit && fit.enabled) {
                         if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
-                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, fit: fit });
+                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, fit: fit, relationBindings: (rule.conditions && rule.conditions.relationBindings) || [] });
                     } else {
                         if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
-                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule });
+                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, relationBindings: (rule.conditions && rule.conditions.relationBindings) || [] });
                     }
                 }
             }
@@ -12080,6 +12179,106 @@
         </div>`;
     }
 
+    /** 获取当前评估范围对应的十神分组统计（干/支维度判定数据源） */
+    function getShengKeScopeStats() {
+        const sc = cache.statsByScope || null;
+        if (!sc) return { groupTian: {}, groupDi: {} };
+        const s = getEvalScope();
+        const idx = s === 'bazi' ? 0 : s === 'dayun' ? 1 : 2;
+        const st = idx === 0 ? (sc.scope0 || null) : idx === 1 ? (sc.scope1 || null) : (sc.scope2 || null);
+        return st || { groupTian: {}, groupDi: {} };
+    }
+
+    /** 生克关系识别：扫描参与分类中命中断语/宏绑定的生克关系，干/支独立判定是否成立 */
+    function analyzeShengKe() {
+        const catMap = cache.matchedByCategory || {};
+        const skCats = (getGlobalDisplayConfig().shengkeCategories) || ['生克'];
+        const relIds = new Set();
+        const hitCats = new Set();
+        for (const key of Object.keys(catMap)) {
+            if (!(skCats.indexOf('*') >= 0 || skCats.some(g => g && key.indexOf(g) >= 0))) continue;
+            const entries = catMap[key] || [];
+            for (const entry of entries) {
+                const rels = entry.relationBindings || [];
+                rels.forEach(rid => relIds.add(rid));
+                if (rels.length) hitCats.add(key);
+            }
+        }
+        const defs = getRelationDefs();
+        const resolved = [];
+        relIds.forEach(rid => {
+            const def = defs.find(d => String(d.id) === String(rid)) || null;
+            resolved.push(def || { id: rid, name: String(rid), relType: '', shenA: '', shenB: '' });
+        });
+        // 干/支独立判定：关系双方（shenA/shenB）在当前范围的天干/地支维度均存在 → 成立
+        const stats = getShengKeScopeStats();
+        resolved.forEach(def => {
+            def.tianOk = !!(def.shenA && def.shenB && (stats.groupTian[def.shenA] || 0) > 0 && (stats.groupTian[def.shenB] || 0) > 0);
+            def.diOk = !!(def.shenA && def.shenB && (stats.groupDi[def.shenA] || 0) > 0 && (stats.groupDi[def.shenB] || 0) > 0);
+        });
+        return { hasRels: relIds.size > 0, rels: resolved, cats: Array.from(hitCats) };
+    }
+
+    /** 生克关系识别面板 HTML */
+    function buildShengKePanelHtml(shengke) {
+        if (!shengke) return '';
+        const scopeBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-pink-700 bg-pink-50 border-pink-200">评估范围：${evalScopeLabel()}</span>`;
+        const setBtn = `<button onclick="window.openShengKeSettings()" title="设置参与生克关系识别的分类（可多选）" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">⚙ 分类</button>`;
+        if (!shengke.hasRels) {
+            // 无命中：区分「无匹配内容」与「未绑定任何生克关系」
+            const isEmpty = !cache.matchedByCategory || Object.keys(cache.matchedByCategory).length === 0;
+            if (isEmpty) {
+                return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-gray-700">⚡ 生克关系识别</span>${scopeBadge}${setBtn}
+                        <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">无结果</span>
+                    </div>
+                    <div class="text-gray-600 text-sm">当前没有断语匹配结果，无法识别生克关系。请确认断语匹配服务正常后再查看。</div>
+                </div>`;
+            }
+            return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="font-bold text-gray-700">⚡ 生克关系识别</span>${scopeBadge}${setBtn}
+                    <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">无绑定</span>
+                </div>
+                <div class="text-gray-600 text-sm">参与识别的分类下有断语命中，但未绑定任何生克关系。请为相关断语在「🔗 关联生克关系」中绑定相生/相克关系后，即可在此面板识别。</div>
+            </div>`;
+        }
+        const chips = (def) => {
+            const t = def.tianOk
+                ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">天干 ✓</span>`
+                : `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200">天干 ✗</span>`;
+            const d = def.diOk
+                ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">地支 ✓</span>`
+                : `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200">地支 ✗</span>`;
+            return `<span class="flex items-center gap-1.5 flex-shrink-0">${t}${d}</span>`;
+        };
+        const typeBadge = (def) => def.relType === 'ke'
+            ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-red-600 bg-red-50 border border-red-200">相克</span>`
+            : def.relType === 'sheng'
+                ? `<span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold text-green-600 bg-green-50 border border-green-200">相生</span>`
+                : '';
+        const listHtml = shengke.rels.map(def => `
+            <div class="flex items-center justify-between gap-2 py-1">
+                <span class="flex items-center gap-1.5 min-w-0">
+                    <span class="font-bold text-gray-800 text-sm truncate">${escapeHtml(def.name)}</span>${typeBadge(def)}
+                </span>
+                ${chips(def)}
+            </div>`).join('');
+        const catTxt = (shengke.cats && shengke.cats.length)
+            ? `<span class="text-[11px] text-gray-400">命中分类：${escapeHtml(shengke.cats.join('、'))}</span>`
+            : '';
+        return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-pink-50 to-rose-50 border-l-4 border-pink-300">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="font-bold text-gray-700">⚡ 生克关系识别</span>${scopeBadge}${setBtn}
+                <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-pink-700 bg-pink-50 border-pink-200">命中 ${shengke.rels.length} 组关系</span>
+            </div>
+            <div class="mt-1.5 space-y-0.5">${listHtml}</div>
+            ${catTxt ? `<div class="mt-1.5 pt-1.5 border-t border-pink-100">${catTxt}</div>` : ''}
+            <div class="mt-1 text-xs text-gray-400">判定基于当前评估范围的天干/地支十神分组：关系双方（如「比劫」与「财星」）在该维度均存在 → ✓。天干/地支可独立成立，也可双维度同时成立。</div>
+        </div>`;
+    }
+
     function displayDuanyuResult() {
         const resultFilter = DOM.resultFilterCategory ? DOM.resultFilterCategory.value : 'all';
         const matchedByCategory = cache.matchedByCategory || {};
@@ -12148,7 +12347,9 @@
         
         // 主格局识别面板（置于结果区顶部）
         const gejuPanelHtml = buildGeJuPanelHtml(analyzeGeJu());
-        DOM.duanyuResult.innerHTML = gejuPanelHtml ? gejuPanelHtml + html : html;
+        // 生克关系识别面板（主格局面板下方，同构设计）
+        const shengkePanelHtml = buildShengKePanelHtml(analyzeShengKe());
+        DOM.duanyuResult.innerHTML = (gejuPanelHtml ? gejuPanelHtml + shengkePanelHtml : shengkePanelHtml) + html;
     }
 
     /** 从 API 断语缓存渲染断语结果 */
@@ -12174,7 +12375,7 @@
         }
         if (!exists) {
           var fitItem = (item.fit && item.fit.enabled) ? item.fit : undefined;
-          matchedByCategory[cat].push({ text: text, rule: null, fit: fitItem });
+          matchedByCategory[cat].push({ text: text, rule: null, fit: fitItem, relationBindings: (item.relationBindings || []) });
         }
       }
 
@@ -28117,7 +28318,8 @@ function _defaultDisplayConfig() {
         prefixMerge: { mergePrefixes: [], excludePrefixes: [] },
         categoryOrder: [], categorySwitch: {},
         gejuLevels: { top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' },
-        gejuCategories: ['格局']
+        gejuCategories: ['格局'],
+        shengkeCategories: ['生克']
     };
 }
 
@@ -28141,7 +28343,8 @@ async function loadGlobalDisplayConfig() {
                 categoryOrder: Array.isArray(parsed.categoryOrder) ? parsed.categoryOrder : [],
                 categorySwitch: parsed.categorySwitch && typeof parsed.categorySwitch === 'object' ? parsed.categorySwitch : {},
                 gejuLevels: Object.assign({ top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' }, parsed.gejuLevels || {}),
-                gejuCategories: Array.isArray(parsed.gejuCategories) && parsed.gejuCategories.length > 0 ? parsed.gejuCategories : ['格局']
+                gejuCategories: Array.isArray(parsed.gejuCategories) && parsed.gejuCategories.length > 0 ? parsed.gejuCategories : ['格局'],
+                shengkeCategories: Array.isArray(parsed.shengkeCategories) && parsed.shengkeCategories.length > 0 ? parsed.shengkeCategories : ['生克']
             };
         } else {
             _globalDisplayConfig = _defaultDisplayConfig();
@@ -35485,8 +35688,18 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             scope = '原局+大运+流年';
         } else if(field.includes('(原局+大运)')){
             scope = '原局+大运';
+        } else if(field.includes('(评估范围)')){
+            scope = '评估范围';
         }
         return { type, scope };
+    }
+
+    // 将"评估范围"scope 解析为当前实际统计范围（数据驱动：有流年=12字/有大运=10字/仅原局=8字）
+    function resolveEvalScopeToActual(scope, data){
+        if(scope !== '评估范围') return scope;
+        if(data && data.liunian && data.liunian.t) return '原局+大运+流年';
+        if(data && data.dayun && data.dayun.t) return '原局+大运';
+        return '原局';
     }
 
     // 获取值选项列表

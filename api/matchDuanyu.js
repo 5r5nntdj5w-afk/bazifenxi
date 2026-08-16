@@ -1304,8 +1304,11 @@ function evaluateLeafCondition(data, cond, context) {
           // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）或与最终收集维度一致时均可合并，
           // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
           var bcGzOk = bc.ganZhi === '通用' || bc.ganZhi === biActualGzFinal;
-          biDbg('    config[' + bci + ']: type=' + bc.type + ' ganZhi=' + bc.ganZhi + ' scope=' + bc.scope + ' include=[' + (bc.include||[]).join(',') + '] exclude=[' + (bc.exclude||[]).join(',') + '] 维度兼容=' + bcGzOk + ' scope一致=' + (bc.scope === biScope));
-          if (bcGzOk && bc.scope === biScope) {
+          // scope 兼容：字段与基准配置的"评估范围"均解析为实际范围后比较
+          var cfgScEval = (bc.scope === '评估范围') ? ((data.liunian && data.liunian.t) ? '原局+大运+流年' : (data.dayun && data.dayun.t) ? '原局+大运' : '原局') : bc.scope;
+          var biScEval = (biScope === '评估范围') ? ((data.liunian && data.liunian.t) ? '原局+大运+流年' : (data.dayun && data.dayun.t) ? '原局+大运' : '原局') : biScope;
+          biDbg('    config[' + bci + ']: type=' + bc.type + ' ganZhi=' + bc.ganZhi + ' scope=' + bc.scope + ' include=[' + (bc.include||[]).join(',') + '] exclude=[' + (bc.exclude||[]).join(',') + '] 维度兼容=' + bcGzOk + ' scope一致=' + (cfgScEval === biScEval));
+          if (bcGzOk && cfgScEval === biScEval) {
             var bcMapped = _mapBiConfigValues(bc, bcRule);
             biCandidates.push({ include: bcMapped.include || [], exclude: bcMapped.exclude || [] });
           }
@@ -1330,11 +1333,15 @@ function evaluateLeafCondition(data, cond, context) {
       // 确定实际取值维度
       var actualBiGz = biActualGzFinal;
 
-      // 确定要收集的柱位
+      // 确定要收集的柱位（scope=评估范围 → 数据驱动解析：有流年=12字/有大运=10字/仅原局=8字）
+      var biEvalSc = biScope;
+      if (biEvalSc === '评估范围') {
+        biEvalSc = (data.liunian && data.liunian.t) ? '原局+大运+流年' : (data.dayun && data.dayun.t) ? '原局+大运' : '原局';
+      }
       var biPillars = [];
-      if (biScope === '原局') biPillars = ['nian','yue','ri','shi'];
-      else if (biScope === '原局+大运') biPillars = ['nian','yue','ri','shi','dayun'];
-      else if (biScope === '原局+大运+流年') biPillars = ['nian','yue','ri','shi','dayun','liunian'];
+      if (biEvalSc === '原局') biPillars = ['nian','yue','ri','shi'];
+      else if (biEvalSc === '原局+大运') biPillars = ['nian','yue','ri','shi','dayun'];
+      else if (biEvalSc === '原局+大运+流年') biPillars = ['nian','yue','ri','shi','dayun','liunian'];
       else biPillars = ['nian','yue','ri','shi'];
 
       // 收集实际值
@@ -2656,6 +2663,7 @@ module.exports = async (req, res) => {
         group_key: r.group_key || '',
         priority: r.priority || 0,
         rule: { category: r.category, duanyu: r.duanyu_text, group_key: r.group_key || '', priority: r.priority || 0 },
+        relationBindings: (r.conditions && Array.isArray(r.conditions.relationBindings)) ? r.conditions.relationBindings : [],
         fit: (r.fit && r.fit.enabled) ? r.fit : undefined
       };
     });
