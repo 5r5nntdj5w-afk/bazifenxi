@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12852,9 +12852,10 @@
                 if (groupQuZhi === '天干' || groupQuZhi === '地支') {
                     bctx.shenkeQzOverride = groupQuZhi;
                 } else {
-                    // 组取值维度=自动：组设置覆盖断语级默认取值维度，基准断语按"自动干支分化"评估，
-                    // 与断语区匹配口径一致（否则断语级 defaultQuZhi 强制单一维度，另一维度的同关系会漏显示）
-                    delete bctx.ruleDefaultQuZhi;
+                    // 组取值维度=自动：组设置覆盖断语级默认取值维度，按"自动干支分化"评估，
+                    // 与断语区匹配口径一致（否则断语级 defaultQuZhi 强制单一维度，另一维度的同关系会漏显示；
+                    // 也不能删除该值——通用模式叶子取值维度为空时引擎 fail-closed 不匹配）
+                    bctx.ruleDefaultQuZhi = '自动';
                 }
                 baseHit = baseHit || evalConds(baseConds, bctx);
             }
@@ -12892,7 +12893,7 @@
                         // 断语级 defaultMapping 不再参与评估，否则会覆盖合成结果造成二次映射
                         delete vctx.ruleDefaultMapping;
                         if (groupQuZhi === '天干' || groupQuZhi === '地支') vctx.shenkeQzOverride = groupQuZhi;
-                        else delete vctx.ruleDefaultQuZhi; // 组取值维度=自动：按自动干支分化评估（组设置覆盖断语级默认取值维度）
+                        else vctx.ruleDefaultQuZhi = '自动'; // 组取值维度=自动：按自动干支分化评估（组设置覆盖断语级默认取值维度；不能删除——通用叶子空维度时引擎 fail-closed）
                         virtualOk = evalConds(shifted, vctx);
                     }
                     if (!virtualOk) return; // 未满足匹配条件 → 不显示
