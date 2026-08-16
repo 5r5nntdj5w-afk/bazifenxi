@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12860,9 +12860,18 @@
                 dims.di = hitByApi || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
             } else {
                 if (hitByApi) {
-                    if (ruleDefQz === '天干') dims.tian = true;
-                    else if (ruleDefQz === '地支') dims.di = true;
-                    else { dims.tian = true; dims.di = true; }
+                    // 服务端命中维度权威显示；另一维度仍独立评估（天干/地支互不影响），
+                    // 避免"断语区在天干/地支维度显示了该关系、面板却因基准断语只有单一 defaultQuZhi 而漏显示"
+                    if (ruleDefQz === '天干') {
+                        dims.tian = true;
+                        dims.di = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
+                    } else if (ruleDefQz === '地支') {
+                        dims.di = true;
+                        dims.tian = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
+                    } else {
+                        dims.tian = true;
+                        dims.di = true;
+                    }
                 } else {
                     dims.tian = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
                     dims.di = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
