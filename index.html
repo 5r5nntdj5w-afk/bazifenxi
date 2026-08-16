@@ -1,4 +1,4 @@
-﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -6719,25 +6719,24 @@
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
 
         const modal = document.createElement('div');
-        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:640px;max-width:780px;max-height:86vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
+        modal.style.cssText = 'background:#fff;border-radius:12px;padding:24px;min-width:720px;max-width:880px;max-height:88vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
 
         modal.innerHTML = `
             <h3 style="margin:0 0 6px;font-size:16px;font-weight:600;">⚡ 生克关系识别设置</h3>
             <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.6;">
-                按需勾选参与识别的<strong>断语或条件宏</strong>（仅列出已绑定生克关系的条目），可为每条指定<strong>生克关系</strong>与<strong>面板展示文字</strong>（覆盖原内容）。<br>
-                可选<strong>映射引用规则</strong>：基于勾选条目的关系应用映射偏移生成变体关系一并识别；<strong>取值维度</strong>默认干支自动分化（天干/地支/干支合并三行展示）。
+                选择一条或多条<strong>断语或条件宏</strong>作为<strong>映射基准</strong>，每个基准形成一个<strong>独立组</strong>；组内可添加多条<strong>映射引用规则</strong>，每条规则可选择映射后的<strong>生克关系</strong>并填写<strong>展示文字</strong>。多个组都参与识别与展示（写好一条相生/相克关系即可自动带出其他关系）。
             </p>
 
             <div style="margin-bottom:14px;">
-                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">① 参与识别的断语（可多选）</div>
-                <div id="shengke-rules-box" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:13px;line-height:1.9;"></div>
-                <div style="font-size:12px;color:#999;margin-top:4px;">只勾选明确对应生克关系的断语或条件宏；条目需匹配命中后其生克关系才会在面板展示。</div>
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">① 选择映射基准（断语 / 条件宏，可多选）</div>
+                <div id="shengke-rules-box" style="max-height:240px;overflow-y:auto;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:13px;line-height:1.9;"></div>
+                <div style="font-size:12px;color:#999;margin-top:4px;">勾选后在②中生成一个组；条目需匹配命中后其生克关系才会在面板展示。</div>
             </div>
 
             <div style="margin-bottom:14px;">
-                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">② 映射引用规则（统一一条）</div>
-                <select id="shengke-mapping-rule" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:13px;"></select>
-                <div id="shengke-map-hint" style="font-size:12px;color:#999;margin-top:4px;">不映射时直接用勾选断语的基准关系。可选规则按勾选断语的种类（十神组/五行）过滤。</div>
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px;">② 映射基准组（每个勾选条目一组，组内可添加多条映射引用规则）</div>
+                <div id="shengke-groups-box" style="max-height:360px;overflow-y:auto;"></div>
+                <div id="shengke-groups-empty" style="font-size:12px;color:#999;border:1px dashed #ddd;border-radius:6px;padding:12px;text-align:center;">尚未选择映射基准：请在①中勾选断语或条件宏。</div>
             </div>
 
             <div style="margin-bottom:16px;">
@@ -6761,20 +6760,50 @@
         const mappingRules = (typeof getMappingRules === 'function') ? getMappingRules() : [];
         const SHEN_CYCLE = ['比劫','食伤','财星','官杀','印星'];
         const WX_CYCLE = ['金','水','木','火','土'];
-        // 推断关系种类（十神组/五行），用于过滤映射规则
+        // 推断关系种类（十神组/五行），用于过滤映射规则与关系选项
         const inferRelKind = (shenA, shenB) => {
             if (SHEN_CYCLE.indexOf(shenA) >= 0 && SHEN_CYCLE.indexOf(shenB) >= 0) return '十神组';
             if (WX_CYCLE.indexOf(shenA) >= 0 && WX_CYCLE.indexOf(shenB) >= 0) return '五行';
             return '';
         };
-        const relOptionsHtml = (selId) => defs.map(d => `<option value="${esc(d.id)}" ${String(d.id) === String(selId) ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
+        // 某种类的映射规则选项
+        const mappingOptsHtml = (kind) => (mappingRules || [])
+            .filter(r => r && r.type === kind)
+            .map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+        // 某种类的关系定义选项（含合成关系兜底）
+        const relOptsHtml = (kind, synthDef) => {
+            const list = defs.filter(d => d && inferRelKind(d.shenA, d.shenB) === kind);
+            let html = list.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('');
+            if (synthDef) html += `<option value="__synth:${synthDef.relType}:${synthDef.shenA}:${synthDef.shenB}">${esc(synthDef.name)}（自动生成）</option>`;
+            return html;
+        };
+        // 计算映射后的关系（映射后无变化返回 null）
+        const computeMappedDef = (baseDef, mappingRule) => {
+            if (!baseDef || !mappingRule) return null;
+            const mA = applyMappingValue(baseDef.shenA, mappingRule);
+            const mB = applyMappingValue(baseDef.shenB, mappingRule);
+            if (!mA || !mB || (mA === baseDef.shenA && mB === baseDef.shenB)) return null;
+            const found = defs.find(d => d.relType === baseDef.relType && d.shenA === mA && d.shenB === mB);
+            if (found) return found;
+            return { id: '', relType: baseDef.relType, shenA: mA, shenB: mB, name: mA + (baseDef.relType === 'ke' ? '克' : '生') + mB, _synth: true };
+        };
+        const mappedDefOptionValue = (d) => d ? (d._synth ? '__synth:' + d.relType + ':' + d.shenA + ':' + d.shenB : String(d.id)) : '';
+        // 在关系下拉中选中（不存在则追加合成选项）「自动带出结果，可覆盖」
+        const selectOrAppendRel = (rs, mDef) => {
+            if (!mDef) return;
+            const val = mappedDefOptionValue(mDef);
+            if (Array.from(rs.options).some(o => o.value === val)) { rs.value = val; return; }
+            rs.insertAdjacentHTML('beforeend', `<option value="${esc(val)}">${esc(mDef.name)}（自动生成）</option>`);
+            rs.value = val;
+        };
 
-        // 当前配置（新结构 shengkeCfg；旧 shengkeCategories 已废弃）
-        const skCfg = cfg.shengkeCfg || { items: [], mappingRuleId: '', quZhi: '自动' };
-        const checkedMap = {};
-        (skCfg.items || []).forEach(it => { checkedMap[(it.source === 'macro' ? 'macro:' : 'rule:') + String(it.ruleId)] = it; });
+        // 当前配置（新结构 shengkeCfg.groups；旧 items/mappingRuleId 已在加载时迁移）
+        const skCfg = cfg.shengkeCfg || { groups: [], quZhi: '自动' };
+        const savedGroups = skCfg.groups || [];
+        const savedMap = {};
+        savedGroups.forEach(g => { savedMap[(g.source === 'macro' ? 'macro:' : 'rule:') + String(g.ruleId)] = g; });
 
-        // 渲染断语树（按分类分组，仅展示已绑定生克关系的断语）
+        // ---- ① 渲染可选断语/条件宏列表（仅展示已绑定生克关系的条目） ----
         const rules = (typeof cache !== 'undefined' && cache.rules) || [];
         const boundRules = rules.filter(r => r && r.conditions && Array.isArray(r.conditions.relationBindings) && r.conditions.relationBindings.length);
         const byCat = {};
@@ -6782,6 +6811,134 @@
             const c = r.category || '未分类';
             (byCat[c] = byCat[c] || []).push(r);
         });
+        const groupsBox = document.getElementById('shengke-groups-box');
+        const groupsEmpty = document.getElementById('shengke-groups-empty');
+
+        const refreshGroupsEmpty = () => {
+            if (!groupsBox || !groupsEmpty) return;
+            groupsEmpty.style.display = groupsBox.querySelectorAll('.sk-group').length ? 'none' : '';
+        };
+
+        // 刷新某组的映射行（基准关系种类变化时调用）
+        const refreshGroupRows = (groupEl) => {
+            const baseDef = getRelationDefById(groupEl.querySelector('.sk-base-rel').value);
+            const kind = baseDef ? inferRelKind(baseDef.shenA, baseDef.shenB) : '';
+            const addBtn = groupEl.querySelector('.sk-map-add');
+            const hint = groupEl.querySelector('.sk-group-kind-hint');
+            addBtn.style.display = kind ? '' : 'none';
+            hint.style.display = kind ? 'none' : '';
+            groupEl.querySelectorAll('.sk-map-row').forEach(row => {
+                const prevMap = row.querySelector('.sk-map-rule').value;
+                const prevRel = row.querySelector('.sk-map-rel').value;
+                const prevDis = row.querySelector('.sk-map-display').value;
+                const ms = row.querySelector('.sk-map-rule');
+                const rs = row.querySelector('.sk-map-rel');
+                ms.innerHTML = mappingOptsHtml(kind);
+                if (Array.from(ms.options).some(o => o.value === prevMap)) ms.value = prevMap; else ms.selectedIndex = 0;
+                rs.innerHTML = relOptsHtml(kind, null);
+                if (Array.from(rs.options).some(o => o.value === prevRel)) rs.value = prevRel;
+                else {
+                    const rule = (mappingRules || []).find(r => String(r.id) === String(ms.value));
+                    selectOrAppendRel(rs, computeMappedDef(baseDef, rule));
+                }
+                // 映射规则变化 → 自动带出结果关系
+                ms.onchange = () => {
+                    const curBase = getRelationDefById(groupEl.querySelector('.sk-base-rel').value);
+                    const rule = (mappingRules || []).find(r => String(r.id) === String(ms.value));
+                    selectOrAppendRel(rs, computeMappedDef(curBase, rule));
+                };
+            });
+        };
+
+        // 添加一条映射引用规则行（自动带出映射结果关系，可覆盖）
+        const addMappingRow = (groupEl, savedM) => {
+            const baseDef = getRelationDefById(groupEl.querySelector('.sk-base-rel').value);
+            const kind = baseDef ? inferRelKind(baseDef.shenA, baseDef.shenB) : '';
+            if (!kind) return;
+            const rowsBox = groupEl.querySelector('.sk-map-rows');
+            const row = document.createElement('div');
+            row.className = 'sk-map-row';
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;color:#666;flex-wrap:wrap;';
+            const mapSelVal = (savedM && savedM.mappingId) ? savedM.mappingId : (((mappingRules || []).find(r => r.type === kind) || {}).id) || '';
+            row.innerHTML = `
+                <span style="flex-shrink:0;color:#9ca3af;">#${rowsBox.children.length + 1}</span>
+                <select class="sk-map-rule" style="padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:12px;min-width:150px;">${mappingOptsHtml(kind)}</select>
+                <span style="flex-shrink:0;">→</span>
+                <select class="sk-map-rel" style="padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:12px;min-width:160px;">${relOptsHtml(kind, null)}</select>
+                <span style="flex-shrink:0;">展示文字</span>
+                <input class="sk-map-display" type="text" placeholder="映射后的展示文字（可留空）" value="${esc((savedM && savedM.display) || '')}" style="padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:12px;flex:1;min-width:140px;">
+                <button class="sk-map-del" title="删除该映射引用规则" style="padding:2px 7px;border:1px solid #fca5a5;color:#dc2626;background:#fff;border-radius:5px;font-size:12px;cursor:pointer;">✕</button>
+            `;
+            rowsBox.appendChild(row);
+            const ms = row.querySelector('.sk-map-rule');
+            if (mapSelVal && Array.from(ms.options).some(o => o.value === mapSelVal)) ms.value = mapSelVal;
+            const rs = row.querySelector('.sk-map-rel');
+            if (savedM && savedM.relId) {
+                if (Array.from(rs.options).some(o => o.value === String(savedM.relId))) rs.value = String(savedM.relId);
+            } else if (savedM && savedM.shenA && savedM.shenB) {
+                selectOrAppendRel(rs, { id: '', relType: savedM.relType || 'ke', shenA: savedM.shenA, shenB: savedM.shenB, name: savedM.shenA + ((savedM.relType === 'ke') ? '克' : '生') + savedM.shenB, _synth: true });
+            } else {
+                const rule = (mappingRules || []).find(r => String(r.id) === String(ms.value));
+                selectOrAppendRel(rs, computeMappedDef(baseDef, rule));
+            }
+            ms.onchange = () => {
+                const curBase = getRelationDefById(groupEl.querySelector('.sk-base-rel').value);
+                const rule = (mappingRules || []).find(r => String(r.id) === String(ms.value));
+                selectOrAppendRel(rs, computeMappedDef(curBase, rule));
+            };
+            row.querySelector('.sk-map-del').onclick = () => { if (rowsBox.contains(row)) rowsBox.removeChild(row); };
+            return row;
+        };
+
+        // ② 为勾选的基准添加一个组
+        const addGroupCard = (source, ruleId) => {
+            const saved = savedMap[(source === 'macro' ? 'macro:' : 'rule:') + String(ruleId)] || null;
+            let label = '', bindings = [];
+            if (source === 'macro') {
+                const m = ((typeof cache !== 'undefined' && cache.conditionMacros) || []).find(x => String(x.cloudId || x.id) === String(ruleId));
+                if (!m) return;
+                label = m.name || '';
+                bindings = (m.conditions && m.conditions.relationBindings) || [];
+            } else {
+                const r = rules.find(x => String(x.cloudId || x.id) === String(ruleId));
+                if (!r) return;
+                label = (r.duanyu || '').replace(/<[^>]*>/g, '');
+                bindings = (r.conditions && r.conditions.relationBindings) || [];
+            }
+            const baseRelId = (saved && saved.relId) ? saved.relId : String(bindings[0] || '');
+            const baseDisplay = (saved && saved.display) || '';
+            const gid = 'skg_' + source + '_' + String(ruleId).replace(/[^a-zA-Z0-9_-]/g, '_');
+            if (document.getElementById(gid)) return; // 已存在同组
+            const card = document.createElement('div');
+            card.id = gid;
+            card.className = 'sk-group';
+            card.dataset.source = source;
+            card.dataset.ruleId = ruleId;
+            card.style.cssText = 'border:1px solid #e2e8f0;border-left:3px solid #db2777;border-radius:8px;padding:10px 12px;margin:8px 0;background:#fafafa;';
+            card.innerHTML = `
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="font-weight:600;color:#333;font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(label)}">${source === 'macro' ? '🔗' : '📜'} ${esc(label)}</span>
+                    <span style="font-size:11px;color:#db2777;font-weight:600;flex-shrink:0;">组</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#666;">
+                    <span style="flex-shrink:0;">基准关系</span>
+                    <select class="sk-base-rel" style="padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:12px;min-width:140px;">${defs.map(d => `<option value="${esc(d.id)}" ${String(d.id) === String(baseRelId) ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>
+                    <span style="flex-shrink:0;">展示文字</span>
+                    <input class="sk-base-display" type="text" placeholder="覆盖基准原文（可留空）" value="${esc(baseDisplay)}" style="padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:12px;flex:1;min-width:140px;">
+                </div>
+                <div style="font-size:12px;color:#999;margin:8px 0 4px;">— 映射引用规则 —</div>
+                <div class="sk-map-rows" style="margin-bottom:6px;"></div>
+                <div class="sk-group-kind-hint" style="display:none;font-size:12px;color:#b45309;margin-bottom:6px;">该基准关系的种类无法识别（非十神组/五行），不可添加映射引用规则。</div>
+                <button class="sk-map-add" style="padding:3px 10px;border:1px solid #db2777;color:#db2777;background:#fff;border-radius:5px;font-size:12px;cursor:pointer;">＋ 添加映射引用规则</button>
+            `;
+            groupsBox.appendChild(card);
+            card.querySelector('.sk-base-rel').onchange = () => refreshGroupRows(card);
+            card.querySelector('.sk-map-add').onclick = () => addMappingRow(card);
+            (saved && saved.mappings || []).forEach(m => addMappingRow(card, m));
+            refreshGroupRows(card);
+            refreshGroupsEmpty();
+        };
+
         const ruleTreeBox = document.getElementById('shengke-rules-box');
         if (ruleTreeBox) {
             let treeHtml = '';
@@ -6796,22 +6953,17 @@
                 treeHtml += `<div style="font-weight:600;color:#475569;margin:6px 0 2px;">${esc(cat)}</div>`;
                 byCat[cat].forEach(r => {
                     const rid = String(r.cloudId || r.id);
-                    const saved = checkedMap['rule:' + rid] || null;
-                    const defId = saved ? saved.relId : String((r.conditions.relationBindings || [])[0]);
-                    const display = saved ? (saved.display || '') : '';
-                    const checked = saved ? 'checked' : '';
+                    const checked = savedMap['rule:' + rid] ? 'checked' : '';
                     const dTitle = (r.duanyu || '').replace(/<[^>]*>/g, '');
-                    const dText = dTitle.length > 46 ? dTitle.slice(0, 46) + '…' : dTitle;
+                    const dText = dTitle.length > 40 ? dTitle.slice(0, 40) + '…' : dTitle;
+                    const relNames = (r.conditions.relationBindings || []).map(b => resolveRelationDisplayName(b)).filter(Boolean).join('、');
                     treeHtml += `
-                        <div class="sk-rule-row" style="border:1px solid #eee;border-radius:6px;padding:6px 8px;margin:4px 0;">
+                        <div class="sk-rule-row" style="border:1px solid #eee;border-radius:6px;padding:4px 8px;margin:3px 0;">
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                                 <input type="checkbox" class="sk-rule-check" data-source="rule" data-rule-id="${esc(rid)}" ${checked}>
                                 <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(dTitle)}">${esc(dText)}</span>
                             </label>
-                            <div class="sk-rule-rel" style="${checked ? '' : 'display:none;'}margin:4px 0 0 22px;font-size:12px;color:#666;">
-                                生克关系：<select class="sk-rel-select" style="padding:2px 4px;border:1px solid #ddd;border-radius:4px;font-size:12px;">${relOptionsHtml(defId)}</select>
-                                <span style="margin-left:8px;">展示文字：</span><input class="sk-display-input" type="text" placeholder="覆盖断语原文（可留空）" value="${esc(display)}" style="padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:210px;">
-                            </div>
+                            ${relNames ? `<div style="margin:1px 0 0 22px;font-size:11px;color:#9ca3af;">绑定：${esc(relNames)}</div>` : ''}
                         </div>`;
                 });
             });
@@ -6819,105 +6971,86 @@
                 treeHtml += `<div style="font-weight:600;color:#7c3aed;margin:8px 0 2px;">条件宏</div>`;
                 boundMacros.forEach(m => {
                     const mid = String(m.cloudId || m.id);
-                    const saved = checkedMap['macro:' + mid] || null;
-                    const defId = saved ? saved.relId : String((m.conditions.relationBindings || [])[0]);
-                    const display = saved ? (saved.display || '') : '';
-                    const checked = saved ? 'checked' : '';
+                    const checked = savedMap['macro:' + mid] ? 'checked' : '';
                     const dTitle = m.name || '';
-                    const dText = dTitle.length > 46 ? dTitle.slice(0, 46) + '…' : dTitle;
+                    const dText = dTitle.length > 40 ? dTitle.slice(0, 40) + '…' : dTitle;
+                    const relNames = (m.conditions.relationBindings || []).map(b => resolveRelationDisplayName(b)).filter(Boolean).join('、');
                     treeHtml += `
-                        <div class="sk-rule-row" style="border:1px solid #eee;border-radius:6px;padding:6px 8px;margin:4px 0;">
+                        <div class="sk-rule-row" style="border:1px solid #eee;border-radius:6px;padding:4px 8px;margin:3px 0;">
                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                                 <input type="checkbox" class="sk-rule-check" data-source="macro" data-rule-id="${esc(mid)}" ${checked}>
                                 <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(dTitle)}">🔗 ${esc(dText)}</span>
                             </label>
-                            <div class="sk-rule-rel" style="${checked ? '' : 'display:none;'}margin:4px 0 0 22px;font-size:12px;color:#666;">
-                                生克关系：<select class="sk-rel-select" style="padding:2px 4px;border:1px solid #ddd;border-radius:4px;font-size:12px;">${relOptionsHtml(defId)}</select>
-                                <span style="margin-left:8px;">展示文字：</span><input class="sk-display-input" type="text" placeholder="覆盖宏内容（可留空）" value="${esc(display)}" style="padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:210px;">
-                            </div>
+                            ${relNames ? `<div style="margin:1px 0 0 22px;font-size:11px;color:#9ca3af;">绑定：${esc(relNames)}</div>` : ''}
                         </div>`;
                 });
             }
             ruleTreeBox.innerHTML = treeHtml;
-            // 勾选联动：显示/隐藏关系行，并刷新映射规则下拉
             ruleTreeBox.querySelectorAll('.sk-rule-check').forEach(cb => {
                 cb.addEventListener('change', function() {
-                    const row = this.closest('.sk-rule-row');
-                    row.querySelector('.sk-rule-rel').style.display = this.checked ? '' : 'none';
-                    refreshMappingSelect();
+                    const source = this.dataset.source;
+                    const ruleId = this.dataset.ruleId;
+                    if (this.checked) {
+                        addGroupCard(source, ruleId);
+                    } else {
+                        const gid = 'skg_' + source + '_' + String(ruleId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                        const card = document.getElementById(gid);
+                        if (card && card.parentNode) card.parentNode.removeChild(card);
+                        refreshGroupsEmpty();
+                    }
                 });
             });
         }
 
-        // 按勾选断语的种类过滤映射规则下拉
-        const refreshMappingSelect = () => {
-            const mapSel = document.getElementById('shengke-mapping-rule');
-            const hint = document.getElementById('shengke-map-hint');
-            if (!mapSel) return;
-            const kinds = new Set();
-            document.querySelectorAll('.sk-rule-check:checked').forEach(cb => {
-                const row = cb.closest('.sk-rule-row');
-                const sel = row.querySelector('.sk-rel-select');
-                const def = defs.find(d => String(d.id) === String(sel.value));
-                if (def) { const k = inferRelKind(def.shenA, def.shenB); if (k) kinds.add(k); }
-            });
-            const kindsArr = Array.from(kinds);
-            const gSz = mappingRules.filter(r => r.type === '十神组');
-            const gWx = mappingRules.filter(r => r.type === '五行');
-            const optOf = (g) => g.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
-            const prevVal = mapSel.value;
-            if (kindsArr.length === 1) {
-                const k = kindsArr[0];
-                mapSel.disabled = false;
-                mapSel.innerHTML = '<option value="">不映射（直接用基准关系）</option>'
-                    + (k === '十神组' ? `<optgroup label="十神组">${optOf(gSz)}</optgroup>` : `<optgroup label="五行">${optOf(gWx)}</optgroup>`);
-                hint.textContent = '勾选条目种类：' + k + '。映射后基于勾选条目的基准关系生成变体生克关系参与识别。';
-            } else if (kindsArr.length === 0) {
-                mapSel.disabled = false;
-                mapSel.innerHTML = '<option value="">不映射（直接用基准关系）</option>'
-                    + (gSz.length ? `<optgroup label="十神组">${optOf(gSz)}</optgroup>` : '')
-                    + (gWx.length ? `<optgroup label="五行">${optOf(gWx)}</optgroup>` : '');
-                hint.textContent = '勾选条目后，可选映射规则将按条目种类（十神组/五行）自动过滤。';
-            } else {
-                // 混合种类：禁用映射（避免映射类型错位）
-                mapSel.disabled = true;
-                mapSel.innerHTML = '<option value="">混合种类（十神组+五行）时不可用映射</option>';
-                hint.textContent = '勾选条目包含多种种类，映射规则无法统一应用，请仅勾选同一种类（全十神组或全五行）的条目后使用映射。';
-            }
-            if (prevVal && Array.from(mapSel.options).some(o => o.value === prevVal)) mapSel.value = prevVal;
-        };
-
-        // 回填取值维度
+        // ③ 回填取值维度
         const quZhiInit = (skCfg.quZhi === '天干' || skCfg.quZhi === '地支') ? skCfg.quZhi : '自动';
         document.querySelectorAll('input[name="shengke-quzhi"]').forEach(r => { if (r.value === quZhiInit) r.checked = true; });
 
-        // 回填并刷新映射下拉
-        refreshMappingSelect();
-        const mapSel2 = document.getElementById('shengke-mapping-rule');
-        if (mapSel2 && skCfg.mappingRuleId && !mapSel2.disabled) {
-            if (Array.from(mapSel2.options).some(o => o.value === String(skCfg.mappingRuleId))) mapSel2.value = String(skCfg.mappingRuleId);
-        }
+        // 初始化：回填已勾选基准的组
+        Object.keys(savedMap).forEach(key => {
+            const isMacro = key.indexOf('macro:') === 0;
+            addGroupCard(isMacro ? 'macro' : 'rule', key.slice(isMacro ? 6 : 5));
+        });
+        refreshGroupsEmpty();
 
         const closeModal = () => { document.body.removeChild(overlay); };
         overlay.querySelector('#shengke-cats-close').onclick = closeModal;
         overlay.querySelector('#shengke-cats-save').onclick = async function() {
-            const items = [];
-            document.querySelectorAll('.sk-rule-check:checked').forEach(cb => {
-                const row = cb.closest('.sk-rule-row');
-                const relId = row.querySelector('.sk-rel-select').value;
-                const display = row.querySelector('.sk-display-input').value.trim();
-                items.push({ source: cb.dataset.source === 'macro' ? 'macro' : 'rule', ruleId: cb.dataset.ruleId, relId: relId, display: display || '' });
+            const groups = [];
+            document.querySelectorAll('.sk-group').forEach(gEl => {
+                const baseRelId = gEl.querySelector('.sk-base-rel').value;
+                const baseDisplay = gEl.querySelector('.sk-base-display').value.trim();
+                const mappings = [];
+                gEl.querySelectorAll('.sk-map-row').forEach(row => {
+                    const mapId = row.querySelector('.sk-map-rule').value;
+                    const relVal = row.querySelector('.sk-map-rel').value;
+                    const display = row.querySelector('.sk-map-display').value.trim();
+                    let relId = '', shenA = '', shenB = '', relType = '';
+                    if (relVal.indexOf('__synth:') === 0) {
+                        const parts = relVal.split(':');
+                        relType = parts[1] || 'ke'; shenA = parts[2] || ''; shenB = parts[3] || '';
+                    } else {
+                        relId = relVal;
+                        const d = defs.find(x => String(x.id) === String(relVal));
+                        if (d) { shenA = d.shenA; shenB = d.shenB; relType = d.relType; }
+                    }
+                    mappings.push({ mappingId: mapId, relId: relId, shenA: shenA, shenB: shenB, relType: relType, display: display });
+                });
+                groups.push({
+                    source: gEl.dataset.source === 'macro' ? 'macro' : 'rule',
+                    ruleId: gEl.dataset.ruleId,
+                    relId: baseRelId,
+                    display: baseDisplay || '',
+                    mappings: mappings
+                });
             });
-            if (items.length === 0) {
+            if (groups.length === 0) {
                 alert('⚠️ 请至少勾选一条参与识别的断语或条件宏');
                 return;
             }
             const quZhi = (document.querySelector('input[name="shengke-quzhi"]:checked') || {}).value || '自动';
-            const mappingRuleId = (document.getElementById('shengke-mapping-rule').disabled)
-                ? ''
-                : (document.getElementById('shengke-mapping-rule').value || '');
             const cfg2 = getGlobalDisplayConfig();
-            cfg2.shengkeCfg = { items: items, mappingRuleId: mappingRuleId, quZhi: quZhi };
+            cfg2.shengkeCfg = { groups: groups, quZhi: quZhi };
             // 直接废弃旧"按分类"配置（shengkeCategories 不再使用）
             delete cfg2.shengkeCategories;
             const saved = await saveGlobalDisplayConfig(cfg2);
@@ -12365,21 +12498,18 @@
         return st || { groupTian: {}, groupDi: {} };
     }
 
-    /** 生克关系识别：按断语配置（shengkeCfg.items）收集命中断语的关系，应用映射规则生成变体，按取值维度（自动/天干/地支）判定三态成立 */
+    /** 生克关系识别：按断语配置（shengkeCfg.groups）遍历各映射基准组，组内基准关系 + 各映射引用规则变体，按取值维度（自动/天干/地支）判定三态成立 */
     function analyzeShengKe() {
         const cfg = getGlobalDisplayConfig();
         const skCfg = cfg.shengkeCfg || null;
         const stats = getShengKeScopeStats();
         const rels = [];
         const hitCats = new Set();
-        if (!skCfg || !skCfg.items || !skCfg.items.length) {
+        const mappingNames = [];
+        if (!skCfg || !skCfg.groups || !skCfg.groups.length) {
             return { hasRels: false, rels: rels, cats: [], quZhi: '自动', mappingName: '' };
         }
         const quZhi = (skCfg.quZhi === '天干' || skCfg.quZhi === '地支') ? skCfg.quZhi : '自动';
-        const mappingRuleId = skCfg.mappingRuleId || '';
-        const mappingRule = mappingRuleId
-            ? (((typeof getMappingRules === 'function') ? getMappingRules() : []) || []).find(r => String(r.id) === String(mappingRuleId))
-            : null;
         // 命中断语集合（matchedByCategory 中的 rule）
         const catMap = cache.matchedByCategory || {};
         const hitRuleIds = new Set();
@@ -12392,6 +12522,11 @@
             });
         });
         const rulesAll = (typeof cache !== 'undefined' && cache.rules) || [];
+        // 条件宏命中集合：按当前评估范围取（与 getShengKeScopeStats 同一索引口径）
+        const shengkeScopeIdx = getEvalScope() === 'bazi' ? 0 : getEvalScope() === 'dayun' ? 1 : 2;
+        const matchedMacroIds = (cache.shenMatchedMacrosByScope && cache.shenMatchedMacrosByScope[shengkeScopeIdx]) || new Set();
+        const macrosAll = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
+        const mappingRulesAll = (typeof getMappingRules === 'function') ? getMappingRules() : [];
         // 判定单个关系并加入结果（按取值维度决定 tianOk/diOk/ganZhiOk）
         const pushRel = (def, display, ruleCat) => {
             if (!def || !def.shenA || !def.shenB) return;
@@ -12405,41 +12540,50 @@
             rels.push({ id: def.id || '', name: display || def.name, relType: def.relType || '', shenA: def.shenA, shenB: def.shenB, tianOk: tOk, diOk: dOk, ganZhiOk: ok, mapped: !!def._mapped });
             if (ruleCat) hitCats.add(ruleCat);
         };
-        // 条件宏命中集合：按当前评估范围取（与 getShengKeScopeStats 同一索引口径）
-        const shengkeScopeIdx = getEvalScope() === 'bazi' ? 0 : getEvalScope() === 'dayun' ? 1 : 2;
-        const matchedMacroIds = (cache.shenMatchedMacrosByScope && cache.shenMatchedMacrosByScope[shengkeScopeIdx]) || new Set();
-        const macrosAll = (typeof cache !== 'undefined' && cache.conditionMacros) || [];
-        skCfg.items.forEach(item => {
-            const src = item.source === 'macro' ? 'macro' : 'rule';
+        skCfg.groups.forEach(group => {
+            const src = group.source === 'macro' ? 'macro' : 'rule';
             let cat = '';
             let hit = false;
             if (src === 'macro') {
-                const mac = macrosAll.find(m => String(m.cloudId || m.id) === String(item.ruleId));
+                const mac = macrosAll.find(m => String(m.cloudId || m.id) === String(group.ruleId));
                 if (!mac) return;
-                hit = matchedMacroIds.has(String(item.ruleId));
+                hit = matchedMacroIds.has(String(group.ruleId));
                 cat = '条件宏';
             } else {
-                const rule = rulesAll.find(r => String(r.cloudId || r.id) === String(item.ruleId));
+                const rule = rulesAll.find(r => String(r.cloudId || r.id) === String(group.ruleId));
                 if (!rule) return;
                 hit = hitRuleIds.has(String(rule.id)) || (rule.cloudId && hitRuleIds.has(String(rule.cloudId)));
                 cat = rule.category || '未分类';
             }
             if (!hit) return;
-            const def = getRelationDefById(item.relId);
-            if (!def) return;
-            // 基准关系（展示文字：配置覆盖优先，覆盖断语原文）
-            pushRel(def, item.display || def.name, cat);
-            // 映射变体（无角标，展示文字按映射后的关系自动生成）
-            if (mappingRule) {
-                const mA = applyMappingValue(def.shenA, mappingRule);
-                const mB = applyMappingValue(def.shenB, mappingRule);
-                if (mA && mB && (mA !== def.shenA || mB !== def.shenB)) {
-                    const mDef = { id: '', relType: def.relType, shenA: mA, shenB: mB, name: mA + (def.relType === 'ke' ? '克' : '生') + mB, _mapped: true };
-                    pushRel(mDef, mDef.name, cat);
+            const baseDef = getRelationDefById(group.relId);
+            if (!baseDef) return;
+            // 基准关系（展示文字：配置覆盖优先，覆盖断语/宏原文）
+            pushRel(baseDef, group.display || baseDef.name, cat);
+            // 映射引用规则变体（每条规则一个候选，按保存的关系或自动计算结果）
+            (group.mappings || []).forEach(m => {
+                let mDef = m.relId ? getRelationDefById(m.relId) : null;
+                if (!mDef && m.shenA && m.shenB) {
+                    const rType = m.relType || baseDef.relType;
+                    mDef = { id: m.relId || '', relType: rType, shenA: m.shenA, shenB: m.shenB, name: m.shenA + (rType === 'ke' ? '克' : '生') + m.shenB };
                 }
-            }
+                if (!mDef && m.mappingId) {
+                    const mapRule = mappingRulesAll.find(r => String(r.id) === String(m.mappingId));
+                    if (mapRule) {
+                        const mA = applyMappingValue(baseDef.shenA, mapRule);
+                        const mB = applyMappingValue(baseDef.shenB, mapRule);
+                        if (mA && mB && (mA !== baseDef.shenA || mB !== baseDef.shenB)) {
+                            mDef = { id: '', relType: baseDef.relType, shenA: mA, shenB: mB, name: mA + (baseDef.relType === 'ke' ? '克' : '生') + mB, _mapped: true };
+                        }
+                    }
+                }
+                if (!mDef) return;
+                const mapRule = mappingRulesAll.find(r => String(r.id) === String(m.mappingId));
+                if (mapRule && mapRule.name && mappingNames.indexOf(mapRule.name) < 0) mappingNames.push(mapRule.name);
+                pushRel(mDef, m.display || mDef.name, cat);
+            });
         });
-        return { hasRels: rels.length > 0, rels: rels, cats: Array.from(hitCats), quZhi: quZhi, mappingName: mappingRule ? (mappingRule.name || '') : '' };
+        return { hasRels: rels.length > 0, rels: rels, cats: Array.from(hitCats), quZhi: quZhi, mappingName: mappingNames.join('、') };
     }
 
     /** 生克关系识别面板 HTML（天干/地支/干支合并三行展示，同维度内相克在前、相生在后） */
@@ -28549,7 +28693,43 @@ function _defaultDisplayConfig() {
         categoryOrder: [], categorySwitch: {},
         gejuLevels: { top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' },
         gejuCategories: ['格局'],
-        shengkeCfg: { items: [], mappingRuleId: '', quZhi: '自动' }
+        shengkeCfg: { groups: [], quZhi: '自动' }
+    };
+}
+
+// 规范化生克关系识别配置（新结构 groups：多映射基准组；旧 items/mappingRuleId 结构自动迁移为 groups）
+function _normalizeShengkeCfg(sc) {
+    const normGroup = (g) => ({
+        source: (g && g.source === 'macro') ? 'macro' : 'rule',
+        ruleId: String((g && g.ruleId) || ''),
+        relId: String((g && g.relId) || ''),
+        display: (g && g.display) || '',
+        mappings: Array.isArray(g && g.mappings) ? g.mappings.map(m => ({
+            mappingId: String((m && m.mappingId) || ''),
+            relId: String((m && m.relId) || ''),
+            shenA: (m && m.shenA) || '',
+            shenB: (m && m.shenB) || '',
+            relType: (m && m.relType) || '',
+            display: (m && m.display) || ''
+        })) : []
+    });
+    let groups = [];
+    if (sc && Array.isArray(sc.groups)) {
+        groups = sc.groups.map(normGroup).filter(g => g.ruleId);
+    }
+    // 旧版 items/mappingRuleId 迁移：每条 item 转为一个基准组，旧统一映射规则追加为一条映射引用
+    if (!groups.length && sc && Array.isArray(sc.items)) {
+        groups = sc.items.map(it => ({
+            source: (it && it.source === 'macro') ? 'macro' : 'rule',
+            ruleId: String((it && it.ruleId) || ''),
+            relId: String((it && it.relId) || ''),
+            display: (it && it.display) || '',
+            mappings: (sc.mappingRuleId) ? [{ mappingId: String(sc.mappingRuleId), relId: '', shenA: '', shenB: '', relType: '', display: '' }] : []
+        })).filter(g => g.ruleId && g.relId);
+    }
+    return {
+        groups: groups,
+        quZhi: (sc && (sc.quZhi === '天干' || sc.quZhi === '地支')) ? sc.quZhi : '自动'
     };
 }
 
@@ -28575,8 +28755,8 @@ async function loadGlobalDisplayConfig() {
                 gejuLevels: Object.assign({ top: 90, mid: 70, low: 50, topName: '上等', midName: '中等', lowName: '普通', noneName: '不成格' }, parsed.gejuLevels || {}),
                 gejuCategories: Array.isArray(parsed.gejuCategories) && parsed.gejuCategories.length > 0 ? parsed.gejuCategories : ['格局'],
                 shengkeCfg: parsed.shengkeCfg && typeof parsed.shengkeCfg === 'object'
-                    ? { items: Array.isArray(parsed.shengkeCfg.items) ? parsed.shengkeCfg.items : [], mappingRuleId: parsed.shengkeCfg.mappingRuleId || '', quZhi: parsed.shengkeCfg.quZhi || '自动' }
-                    : { items: [], mappingRuleId: '', quZhi: '自动' }
+                    ? _normalizeShengkeCfg(parsed.shengkeCfg)
+                    : { groups: [], quZhi: '自动' }
             };
         } else {
             _globalDisplayConfig = _defaultDisplayConfig();
