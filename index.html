@@ -12254,9 +12254,9 @@
         const sortByRelType = (rels) => rels.slice().sort((a, b) => (a.relType === 'ke' ? 0 : 1) - (b.relType === 'ke' ? 0 : 1));
         const tianRels = sortByRelType(shengke.rels.filter(def => def.tianOk));
         const diRels = sortByRelType(shengke.rels.filter(def => def.diOk));
-        const dimRow = (label, rels, colorCls) => `<div class="flex items-start gap-2 py-1.5">
-            <span class="flex-shrink-0 w-10 text-sm font-bold ${colorCls} leading-6">${label}</span>
-            <span class="flex flex-wrap gap-1.5 flex-1 min-w-0">${rels.length ? rels.map(relChip).join('') : '<span class="text-gray-300 text-sm leading-6">—</span>'}</span>
+        const dimRow = (label, rels, colorCls) => `<div class="flex items-center gap-2 py-1.5">
+            <span class="inline-flex items-center flex-shrink-0 w-10 text-sm font-bold ${colorCls}">${label}</span>
+            <span class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">${rels.length ? rels.map(relChip).join('') : '<span class="text-gray-300 text-sm">—</span>'}</span>
         </div>`;
         const listHtml = dimRow('天干', tianRels, 'text-amber-600') + dimRow('地支', diRels, 'text-stone-500');
         const catTxt = (shengke.cats && shengke.cats.length)
