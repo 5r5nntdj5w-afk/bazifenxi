@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -10087,37 +10087,74 @@
                 // 聚合所有命中规则/宏绑定的相生/相克关系（去重），供关系表 ✓ 标记
                 cache.shenRelBindings = Array.from(new Set(boundRelations));
             }
-            // ===== 参考值模板命局直接匹配（基础匹配条件 + 生克关系喜忌） =====
-            // 模板基础匹配条件被当前命局（范围）满足即命中；命中后按其喜忌规则（触发条件满足时）动态标注喜用/忌讳关系
+            // 关系比例触发条件评估：命中规则引用模板的关系比例组行，触发条件组（and/or）满足才参与达标判断
+            // 结果挂到每条命中规则的 _relRatios（[{relation, resolved}]），供柱状图/时间轴构建 relMap
+            try {
+                const tplMap = {};
+                (typeof getRefTemplates === 'function' ? (getRefTemplates() || []) : []).forEach(function(t) { tplMap[String(t.cloudId || t.id)] = t; });
+                matchedRefRules.forEach(function(mr) {
+                    const rid = mr.refOutput && mr.refOutput.refTemplateId;
+                    if (!rid) return;
+                    const tpl = tplMap[String(rid)];
+                    if (!tpl) return;
+                    let relRefs = tpl.relationRefs || [];
+                    if (tpl.conditions && Array.isArray(tpl.conditions.children)) {
+                        try { relRefs = decompileTemplateConditions(tpl.conditions).relationRefs; } catch (e) {}
+                    }
+                    const out = [];
+                    relRefs.forEach(function(rr) {
+                        if (!rr || !rr.relation) return;
+                        let ok = true;
+                        if (rr.conds && rr.conds.children && Array.isArray(rr.conds.children) && rr.conds.children.length) {
+                            ok = false;
+                            if (shenDims.length === 0) {
+                                ok = evaluateConditionGroup(rr.conds, 0, new Set(), {});
+                            } else {
+                                for (let di = 0; di < shenDims.length; di++) {
+                                    const ctx = { shenQzOverride: shenDims[di] };
+                                    if (evaluateConditionGroup(rr.conds, 0, new Set(), ctx)) { ok = true; break; }
+                                }
+                            }
+                        }
+                        if (!ok) return;
+                        const resolved = (typeof resolveRelRatio === 'function') ? resolveRelRatio(rr) : rr;
+                        if (resolved) out.push({ relation: rr.relation, resolved: resolved });
+                    });
+                    mr._relRatios = out;
+                });
+            } catch (e) { console.warn('关系比例触发条件评估失败:', e); }
+            // ===== 参考值模板喜忌标注（生克关系喜忌） =====
+            // 标注门槛由命中断语决定：仅被命中断语/宏引用（referenceOutput）的模板参与喜忌标注；
+            // 模板内每条喜忌规则相互独立，触发条件组（and/or）满足即标注；基础匹配条件已废除
             const matchedTplPrefs = [];
             try {
+                const hitTplIds = new Set();
+                matchedRefRules.forEach(function(mr) {
+                    const rid = mr.refOutput && mr.refOutput.refTemplateId;
+                    if (rid) hitTplIds.add(String(rid));
+                });
                 const tplList = (typeof getRefTemplates === 'function') ? (getRefTemplates() || []) : [];
                 tplList.forEach(function(tpl) {
-                    const mc = tpl.matchConditions;
-                    const mcChildren = (mc && mc.children && Array.isArray(mc.children)) ? mc.children : [];
-                    if (!mcChildren.length) return;  // 无基础匹配条件 → 不参与命局直接匹配
-                    const mcGroup = { logic: 'and', children: mcChildren };
-                    let hit = false;
-                    if (shenDims.length === 0) {
-                        hit = evaluateConditionGroup(mcGroup, 0, new Set(), {});
-                    } else {
-                        for (let di = 0; di < shenDims.length; di++) {
-                            const ctx = { shenQzOverride: shenDims[di] };
-                            if (evaluateConditionGroup(mcGroup, 0, new Set(), ctx)) { hit = true; break; }
-                        }
-                    }
-                    if (!hit) return;
-                    // 基础条件命中：评估喜忌规则（触发条件为空 → 恒生效）
-                    const prefs = [];
+                    const tplId = String(tpl.cloudId || tpl.id || '');
+                    if (!tplId || !hitTplIds.has(tplId)) return;  // 无命中断语引用该模板 → 不参与标注
                     // 取值维度对应统计字段：全部/天干/地支 → groupCount/groupTian/groupDi
                     const grpName = shenQzMode === 'tian' ? 'groupTian' : (shenQzMode === 'di' ? 'groupDi' : 'groupCount');
                     const baseSt = (opts.baseStats && opts.baseStats[grpName]) || null;  // 原局统计（弱判定基准）
+                    const prefs = [];
                     ((tpl.relationPrefs) || []).forEach(function(p) {
                         if (!p) return;
                         let ok = true;
-                        const pcChildren = (p.conds && p.conds.children && Array.isArray(p.conds.children)) ? p.conds.children : [];
-                        if (pcChildren.length) {
-                            ok = evaluateConditionGroup({ logic: 'and', children: pcChildren }, 0, new Set(), {});
+                        const pc = (p.conds && p.conds.children && Array.isArray(p.conds.children) && p.conds.children.length) ? p.conds : null;
+                        if (pc) {
+                            ok = false;
+                            if (shenDims.length === 0) {
+                                ok = evaluateConditionGroup(pc, 0, new Set(), {});
+                            } else {
+                                for (let di = 0; di < shenDims.length; di++) {
+                                    const ctx = { shenQzOverride: shenDims[di] };
+                                    if (evaluateConditionGroup(pc, 0, new Set(), ctx)) { ok = true; break; }
+                                }
+                            }
                         }
                         if (!ok) return;
                         if (p.type === 'qiangruo') {
@@ -10140,7 +10177,7 @@
                         prefs.push({ type: 'shengke', relId: String(p.relId), pref: p.pref === 'ji' ? 'ji' : 'xi' });
                     });
                     if (prefs.length) {
-                        matchedTplPrefs.push({ tplId: String(tpl.cloudId || tpl.id || ''), tplName: tpl.displayName || tpl.name || '', prefs: prefs });
+                        matchedTplPrefs.push({ tplId: tplId, tplName: tpl.displayName || tpl.name || '', prefs: prefs });
                     }
                 });
             } catch (e) { console.warn('模板喜忌匹配失败:', e); }
@@ -10459,7 +10496,7 @@
         const selRef = rules[selIdx] || null;
         const mode = window.currentShenDisplayMode || 'all';
         // 解析参考值：模板引用实时解析（含缺失检测）；旧版内嵌格式兼容
-        if (selRef) selRef._resolved = resolveRefOutput(selRef.refOutput);
+        if (selRef) selRef._resolved = resolveRefOutput(selRef.refOutput, selRef.rule);
 
         // 参考值来源栏
         let refBarHtml = '';
@@ -10562,13 +10599,16 @@
     function renderShenBarTables(stats, rules, selIdx, mode) {
         const selRef = rules[selIdx] || null;
         const relMap = {};  // 默认关系名（A克B / A生B） -> 参考比例配置（参考值模板按默认名存键，重命名不受影响）
-        if (selRef && selRef._resolved && Array.isArray(selRef._resolved.relationRefs)) {
-            selRef._resolved.relationRefs.forEach(function(rr) {
+        if (selRef) {
+            // 优先使用触发条件评估后的关系比例（collectRefOnly 中按条件过滤）；回退原始 relationRefs（旧模板无触发条件）
+            const ratioList = (selRef._relRatios && selRef._relRatios.length) ? selRef._relRatios : null;
+            const refs = ratioList || ((selRef._resolved && Array.isArray(selRef._resolved.relationRefs)) ? selRef._resolved.relationRefs : []);
+            refs.forEach(function(rr) {
+                if (!rr || !rr.relation) return;
+                if (ratioList) { relMap[rr.relation] = rr.resolved; return; }
                 // 支持预设引用：实时解析预设值（修改预设后自动套用到所有复用关系）；预设缺失时忽略该条
-                if (rr && rr.relation) {
-                    const resolved = (typeof resolveRelRatio === 'function') ? resolveRelRatio(rr) : rr;
-                    if (resolved) relMap[rr.relation] = resolved;
-                }
+                const resolved = (typeof resolveRelRatio === 'function') ? resolveRelRatio(rr) : rr;
+                if (resolved) relMap[rr.relation] = resolved;
             });
         }
         // 三范围（原局 → 原局+大运 → 原局+大运+流年）：优先使用三范围统计缓存，缺失时第1列回退当前统计
@@ -10979,8 +11019,53 @@
         return vals.map(fmtRatio).join('、') + '（共' + vals.length + '个）';
     }
 
+    // 从命中断语/宏的 conditions 树递归提取"十神数量-X"参考值（十神分布 auto 模式）
+    // 同十神多条时取 weight 最低那条的 val；引用条件宏（macroRef）时递归展开（visited 防循环）
+    function extractShishenCountsFromRule(rule) {
+        const out = {};
+        const best = {};
+        const visited = new Set();
+        if (!rule || !rule.conditions) return out;
+        (function walk(node) {
+            if (!node) return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            if (node.children && Array.isArray(node.children)) { node.children.forEach(walk); return; }
+            if (node.conds && node.conds.children && Array.isArray(node.conds.children)) { walk(node.conds); return; }
+            if (node.macroRef) {
+                const mid = String(node.macroRef);
+                if (visited.has(mid)) return;
+                visited.add(mid);
+                try {
+                    const mac = (cache.conditionMacros || []).find(function(m) { return String(m.cloudId || m.id) === mid; });
+                    if (mac && mac.conditions) walk(mac.conditions);
+                } catch (e) {}
+                return;
+            }
+            const f = node.field;
+            if (typeof f === 'string' && f.indexOf('十神数量-') === 0 && node.val !== undefined && node.val !== '') {
+                const g = f.replace('十神数量-', '');
+                if (!g) return;
+                const w = (node.weight !== undefined && node.weight > 0) ? node.weight : 1;
+                if (!best[g] || w < best[g].w) best[g] = { w: w, leaf: node };
+            }
+        })(rule.conditions);
+        Object.keys(best).forEach(function(g) {
+            const leaf = best[g].leaf;
+            const v = { op: 'eq', value: 0 };
+            if (leaf.op === 'ge' || leaf.op === 'gte') { v.op = 'gte'; v.value = parseFloat(leaf.val) || 0; }
+            else if (leaf.op === 'le' || leaf.op === 'lte') { v.op = 'lte'; v.value = parseFloat(leaf.val) || 0; }
+            else if (leaf.op === 'range') {
+                const mm = String(leaf.val).match(/^(-?[\d.]+)~(-?[\d.]+)$/);
+                if (mm) { v.op = 'range'; v.min = parseFloat(mm[1]); v.max = parseFloat(mm[2]); }
+                else { v.op = 'eq'; v.value = parseFloat(leaf.val) || 0; }
+            } else { v.op = 'eq'; v.value = parseFloat(leaf.val) || 0; }
+            if (v.op === 'range' || !isNaN(v.value)) out[g] = v;
+        });
+        return out;
+    }
+
     // 解析断语/宏的 referenceOutput：模板引用实时解析；兼容旧版内嵌 values/relationRefs 格式
-    function resolveRefOutput(ro) {
+    function resolveRefOutput(ro, rule) {
         if (!ro) return null;
         if (ro.refTemplateId) {
             const tpl = getRefTemplateById(ro.refTemplateId);
@@ -10991,6 +11076,14 @@
                     const d = decompileTemplateConditions(tpl.conditions);
                     if (!Object.keys(values).length) values = d.values;
                     if (!relationRefs.length) relationRefs = d.relationRefs;
+                }
+                // 十神分布自动模式（mode='auto'）：values 仍为空时，从命中断语/宏的 conditions 树提取"十神数量-X"（取权重最低那条）
+                if (!Object.keys(values).length && tpl.conditions && Array.isArray(tpl.conditions.children)) {
+                    const sg = tpl.conditions.children.find(function(g) { return g && g.mark === 'shishen'; });
+                    if (sg && sg.mode === 'auto') {
+                        const extracted = extractShishenCountsFromRule(rule);
+                        if (Object.keys(extracted).length) values = extracted;
+                    }
                 }
                 return { displayName: tpl.displayName || tpl.name || '', values: values, relationRefs: relationRefs, templateName: tpl.name || '', missing: false };
             }
@@ -11029,15 +11122,14 @@
                 if (!v) return;
                 const leaf = { field: '十神数量-' + g, op: v.op === 'range' ? 'range' : (v.op === 'gte' ? 'ge' : v.op === 'lte' ? 'le' : 'eq') };
                 leaf.val = v.op === 'range' ? ((v.min !== undefined ? v.min : '') + '~' + (v.max !== undefined ? v.max : '')) : String(v.value !== undefined ? v.value : '');
-                leaf.weight = 1;
                 shishenLeaves.push(leaf);
             });
         }
-        if (shishenLeaves.length) children.push({ mark: 'shishen', logic: 'and', children: shishenLeaves });
+        if (shishenLeaves.length) children.push({ mark: 'shishen', mode: 'manual', logic: 'and', children: shishenLeaves });
         const ratioLeaves = [];
         (relationRefs || []).forEach(function(rr) {
             if (!rr || !rr.relation) return;
-            const leaf = { field: '关系比例-' + rr.relation, op: rr.type === 'range' ? 'range' : 'eq', weight: 1 };
+            const leaf = { field: '关系比例-' + rr.relation, op: rr.type === 'range' ? 'range' : 'eq' };
             if (rr.type === 'range' && rr.min && rr.max) {
                 leaf.val = rr.min.n + ':' + rr.min.d + '~' + rr.max.n + ':' + rr.max.d;
             } else {
@@ -11053,7 +11145,7 @@
         const xijiChildren = [];
         (relationPrefs || []).forEach(function(p) {
             if (!p) return;
-            const node = { mark: 'xiji_rule', ruleType: p.type === 'qiangruo' ? 'qiangruo' : 'shengke', pref: p.pref === 'ji' ? 'ji' : 'xi', weight: 1, children: (p.conds && p.conds.children) || [] };
+            const node = { mark: 'xiji_rule', ruleType: p.type === 'qiangruo' ? 'qiangruo' : 'shengke', pref: p.pref === 'ji' ? 'ji' : 'xi', conds: { logic: (p.conds && p.conds.logic) || 'and', children: ((p.conds && p.conds.children) || []).slice() } };
             if (node.ruleType === 'qiangruo') { node.shenA = p.shenA; node.shenB = p.shenB; node.weakOp = p.weakOp || 'lte'; node.weakVal = p.weakVal !== undefined ? p.weakVal : 1; }
             else if (p.relId) node.relId = p.relId;
             xijiChildren.push(node);
@@ -11069,6 +11161,8 @@
         children.forEach(function(grp) {
             if (!grp || !grp.mark) return;
             if (grp.mark === 'shishen') {
+                // 自动模式（auto）：values 由消费端从命中断语实时提取，不参与反编译
+                if (grp.mode === 'auto') return;
                 (grp.children || []).forEach(function(leaf) {
                     if (!leaf || leaf.field.indexOf('十神数量-') !== 0) return;
                     const g = leaf.field.replace('十神数量-', '');
@@ -11086,25 +11180,50 @@
                     if (v.op === 'range' || !isNaN(v.value)) values[g] = v;
                 });
             } else if (grp.mark === 'ratio') {
-                (grp.children || []).forEach(function(leaf) {
-                    if (!leaf || leaf.field.indexOf('关系比例-') !== 0) return;
-                    const relation = leaf.field.replace('关系比例-', '');
+                (grp.children || []).forEach(function(node) {
+                    if (!node) return;
+                    // 新结构：ratio_rule 组行（relation + 触发条件 + 比例/预设）
+                    if (node.mark === 'ratio_rule') {
+                        const relation = node.relation;
+                        if (!relation) return;
+                        let rr = null;
+                        if (node.presetId && typeof getRelRatioPresetById === 'function') {
+                            try {
+                                const preset = getRelRatioPresetById(node.presetId);
+                                if (preset) {
+                                    rr = { relation: relation, type: preset.presetType === 'range' ? 'range' : 'eq' };
+                                    if (rr.type === 'range' && preset.min && preset.max) { rr.min = preset.min; rr.max = preset.max; }
+                                    else rr.values = (preset.values || []).slice();
+                                }
+                            } catch (e) { rr = null; }
+                        } else if (node.ratio) {
+                            if (node.ratio.type === 'range' && node.ratio.min && node.ratio.max) rr = { relation: relation, type: 'range', min: node.ratio.min, max: node.ratio.max };
+                            else if (node.ratio.values && node.ratio.values.length) rr = { relation: relation, type: 'eq', values: node.ratio.values.slice() };
+                        }
+                        if (rr) {
+                            // 携带触发条件组（消费端评估满足才参与达标判断）
+                            if (node.conds && node.conds.children && Array.isArray(node.conds.children) && node.conds.children.length) rr.conds = node.conds;
+                            relationRefs.push(rr);
+                        }
+                        return;
+                    }
+                    // 旧结构：'关系比例-X' 叶子（恒生效，兼容旧模板）
+                    if (node.field.indexOf('关系比例-') !== 0) return;
+                    const relation = node.field.replace('关系比例-', '');
                     const parseRatio = function(s) { const mm = String(s).match(/^([\d.]+):([\d.]+)$/); return mm ? { n: parseFloat(mm[1]), d: parseFloat(mm[2]) } : null; };
-                    if (leaf.op === 'range' || String(leaf.val).indexOf('~') >= 0) {
-                        const rr = String(leaf.val).match(/^([\d.]+:[\d.]+)~([\d.]+:[\d.]+)$/);
+                    if (node.op === 'range' || String(node.val).indexOf('~') >= 0) {
+                        const rr = String(node.val).match(/^([\d.]+:[\d.]+)~([\d.]+:[\d.]+)$/);
                         if (rr) { const lo = parseRatio(rr[1]), hi = parseRatio(rr[2]); if (lo && hi) relationRefs.push({ relation: relation, type: 'range', min: lo, max: hi }); }
                     } else {
-                        const vals = String(leaf.val).split(',').map(parseRatio).filter(function(x) { return !!x; });
+                        const vals = String(node.val).split(',').map(parseRatio).filter(function(x) { return !!x; });
                         if (vals.length) relationRefs.push({ relation: relation, type: 'eq', values: vals });
                     }
                 });
-            } else if (grp.mark === 'base') {
-                matchConditions.logic = grp.logic || 'and';
-                matchConditions.children = (grp.children || []).slice();
             } else if (grp.mark === 'xiji') {
                 (grp.children || []).forEach(function(node) {
                     if (!node || node.mark !== 'xiji_rule') return;
-                    const conds = { logic: 'and', children: (node.children || []).slice() };
+                    // 新结构：conds={logic,children}；旧结构：children 数组（兼容旧模板）
+                    const conds = { logic: (node.conds && node.conds.logic) || 'and', children: ((node.conds && node.conds.children) || node.children || []).slice() };
                     if (node.ruleType === 'qiangruo') relationPrefs.push({ type: 'qiangruo', pref: node.pref, shenA: node.shenA, shenB: node.shenB, weakOp: node.weakOp || 'lte', weakVal: node.weakVal !== undefined ? node.weakVal : 1, conds: conds });
                     else if (node.relId) relationPrefs.push({ type: 'shengke', pref: node.pref, relId: node.relId, conds: conds });
                 });
@@ -11570,26 +11689,38 @@
         (tree.children || []).forEach(function(g) {
             if (g && g.mark) groups[g.mark] = g;
         });
-        // 十神分布区
+        // 十神分布区（auto=从命中断语提取 / manual=手动填写；旧模板 shishen 组无 mode 但带条件 → 按 manual 处理）
+        const sg = groups['shishen'] || {};
+        const sMode = sg.mode === 'manual' || (!sg.mode && sg.children && sg.children.length) ? 'manual' : 'auto';
+        const sModeSel = document.getElementById('ref-tpl-shishen-mode');
+        if (sModeSel) sModeSel.value = sMode;
+        const manualWrap = document.getElementById('ref-tpl-shishen-mode-manual');
+        if (manualWrap) manualWrap.style.display = sMode === 'manual' ? '' : 'none';
         const sBox = document.getElementById('ref-tpl-shishen-box');
         if (sBox) {
             sBox.innerHTML = '';
-            const sg = groups['shishen'];
-            ((sg && sg.children) || []).forEach(function(c) { appendRefTplCond(sBox, c); });
+            if (sMode === 'manual') {
+                (sg.children || []).forEach(function(c) { appendRefTplCond(sBox, c); });
+            }
         }
-        // 关系比例区
+        // 关系比例区（新结构：ratio_rule 组行；旧结构：'关系比例-X' 叶子自动转为恒生效组行）
         const rBox = document.getElementById('ref-tpl-ratio-box');
         if (rBox) {
             rBox.innerHTML = '';
             const rg = groups['ratio'];
-            ((rg && rg.children) || []).forEach(function(c) { appendRefTplCond(rBox, c); });
-        }
-        // 基础匹配区
-        const mBox = document.getElementById('ref-tpl-match-box');
-        if (mBox) {
-            mBox.innerHTML = '';
-            const mg = groups['base'];
-            ((mg && mg.children) || []).forEach(function(c) { appendRefTplCond(mBox, c); });
+            ((rg && rg.children) || []).forEach(function(c) {
+                if (!c) return;
+                if (c.mark === 'ratio_rule') {
+                    rBox.appendChild(createRefTplRatioRow(c));
+                    return;
+                }
+                if (c.field && c.field.indexOf('关系比例-') === 0) {
+                    const relation = c.field.replace('关系比例-', '');
+                    const ratio = parseRefRatioLeafToRatio(c);
+                    const row = createRefTplRatioRow({ relation: relation, ratio: ratio });
+                    rBox.appendChild(row);
+                }
+            });
         }
         // 喜忌区
         const pBox = document.getElementById('ref-tpl-prefs-box');
@@ -11601,6 +11732,19 @@
         initRefTplSummaryWatcher();
         renderRefTplSummary();
         switchRefTplTab('shishen');
+    }
+    // 解析旧版"关系比例-X"叶子行的 val 为 ratio 配置（'3:1,2:1' → eq values；'2:1~4:1' → range）
+    function parseRefRatioLeafToRatio(leaf) {
+        const parseOne = function(s) { const mm = String(s).match(/^([\d.]+):([\d.]+)$/); return mm ? { n: parseFloat(mm[1]), d: parseFloat(mm[2]) } : null; };
+        const raw = String(leaf.val || '');
+        if (leaf.op === 'range' || raw.indexOf('~') >= 0) {
+            const mm = raw.match(/^([\d.]+:[\d.]+)~([\d.]+:[\d.]+)$/);
+            if (mm) { const lo = parseOne(mm[1]), hi = parseOne(mm[2]); if (lo && hi) return { type: 'range', min: lo, max: hi }; }
+        } else {
+            const vals = raw.split(',').map(parseOne).filter(function(x) { return !!x; });
+            if (vals.length) return { type: 'eq', values: vals };
+        }
+        return null;
     }
     // 分区 Tab 切换
     function switchRefTplTab(tab) {
@@ -11618,13 +11762,78 @@
         const box = document.getElementById('ref-tpl-shishen-box');
         if (box) box.appendChild(createRefTplCondRow({ field: '十神数量-' + g, op: 'eq', val: '' }));
     }
-    // 关系比例区添加（基于下拉选择的关系）
-    function addRefTplRatioCond() {
+    // 十神参考值方式切换：auto（从命中断语提取，取最低权重值）/ manual（手动填写）
+    function toggleRefTplShishenMode(mode) {
+        const manual = document.getElementById('ref-tpl-shishen-mode-manual');
+        if (manual) manual.style.display = mode === 'manual' ? '' : 'none';
+        const box = document.getElementById('ref-tpl-shishen-box');
+        if (box && mode === 'auto') box.innerHTML = '';  // 自动模式下清空手动条件（保存时以 auto 为准）
+    }
+    // 关系比例组：每个关系一个独立组（触发条件组 + 比例配置）
+    function addRefTplRatioRow() {
         const sel = document.getElementById('ref-tpl-ratio-rel-select');
         const rel = sel ? sel.value : '';
         if (!rel) { alert('请先选择要配置的关系！'); return; }
         const box = document.getElementById('ref-tpl-ratio-box');
-        if (box) box.appendChild(createRefTplCondRow({ field: '关系比例-' + rel, op: 'eq', val: '3:1' }));
+        if (box) box.appendChild(createRefTplRatioRow({ relation: rel }));
+    }
+    // 创建关系比例组行：关系选择 + 比例配置（预设/精确值/区间）+ 触发条件组（and/or）
+    function createRefTplRatioRow(rr) {
+        rr = rr || {};
+        const row = document.createElement('div');
+        row.className = 'ref-tpl-ratio-row bg-white border border-amber-100 rounded p-2';
+        // 关系选择（全部相克/相生关系）
+        const rels = [];
+        SHEN_KE_LIST.forEach(function(p) { rels.push(p[0] + '克' + p[1]); });
+        SHEN_SHENG_LIST.forEach(function(p) { rels.push(p[0] + '生' + p[1]); });
+        const relOpts = rels.map(function(r) {
+            return '<option value="' + escapeHtml(r) + '"' + (r === rr.relation ? ' selected' : '') + '>' + escapeHtml(r) + '</option>';
+        }).join('');
+        // 比例配置区（预设徽章 + 精确值/区间输入项）
+        row.innerHTML =
+            '<div class="flex flex-wrap items-center gap-2 mb-1">' +
+            '<span class="text-xs font-bold text-gray-600">关系：</span>' +
+            '<select class="rtp-rel-relation flex-1 min-w-[150px] text-sm p-1 border rounded">' + relOpts + '</select>' +
+            '<button type="button" class="text-red-500 text-sm px-1 shrink-0" onclick="this.closest(\'.ref-tpl-ratio-row\').remove()">✕ 删除</button>' +
+            '</div>' +
+            '<div class="flex flex-wrap items-center gap-1.5 mb-1">' +
+            '<span class="text-xs font-bold text-gray-600">比例：</span>' +
+            '<span class="ref-rel-preset-badge hidden"></span>' +
+            '<div class="rtp-ratio-vals flex flex-wrap gap-1"></div>' +
+            '<input type="hidden" class="rtp-ratio-preset-id" value="' + escapeHtml(rr.presetId || '') + '">' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" onclick="addRefRelValue(this)">+ 精确值</button>' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" onclick="addRefRelRange(this)">+ 区间</button>' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs" onclick="openRelRatioPresetPicker(this)">📋 选预设</button>' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs" onclick="saveRowAsRelRatioPreset(this)">💾 存为预设</button>' +
+            '</div>' +
+            '<div class="text-xs text-gray-500 mb-1">触发条件组（组内条件可设"并且/或者"逻辑；不添加则恒生效）：</div>' +
+            '<div class="rtp-ratio-conds space-y-1"></div>' +
+            '<div class="flex gap-1.5 flex-wrap">' +
+            '<button type="button" onclick="addRefTplRatioCond(this)" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs mt-1">➕ 添加触发条件</button>' +
+            '<button type="button" onclick="openRefTplMacroSelector(this, \'ratio\')" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs mt-1">🧩 插入条件宏</button>' +
+            '</div>';
+        // 回填比例配置（预设引用优先；否则精确值/区间）
+        const valsBox = row.querySelector('.rtp-ratio-vals');
+        if (rr.presetId) {
+            const preset = (typeof getRelRatioPresetById === 'function') ? getRelRatioPresetById(rr.presetId) : null;
+            if (preset) applyRelRatioPresetToRow(row, preset);
+        } else if (rr.ratio) {
+            if (rr.ratio.type === 'range' && rr.ratio.min && rr.ratio.max) {
+                valsBox.appendChild(createRefRelRangeItem(rr.ratio.min.n, rr.ratio.min.d, rr.ratio.max.n, rr.ratio.max.d));
+            } else {
+                (rr.ratio.values || []).forEach(function(v) {
+                    valsBox.appendChild(createRefRelValueItem(v.n, v.d));
+                });
+            }
+        }
+        // 回填触发条件
+        const condsChildren = (rr.conds && rr.conds.children && Array.isArray(rr.conds.children)) ? rr.conds.children : [];
+        condsChildren.forEach(function(c) { appendRefTplCond(row.querySelector('.rtp-ratio-conds'), c); });
+        return row;
+    }
+    function addRefTplRatioCond(btn) {
+        const box = btn.closest('.ref-tpl-ratio-row');
+        if (box) box.querySelector('.rtp-ratio-conds').appendChild(createRefTplCondRow(null));
     }
     // 向指定容器追加条件行（十神分布区的「其他条件」）
     function addRefTplMatchCondTo(boxId) {
@@ -11636,20 +11845,20 @@
         const box = document.getElementById('ref-tpl-summary');
         if (!box) return;
         const sChildren = collectRefTplConds(document.getElementById('ref-tpl-shishen-box'));
-        const rChildren = collectRefTplConds(document.getElementById('ref-tpl-ratio-box'));
+        const sMode = document.getElementById('ref-tpl-shishen-mode');
+        const rCount = document.querySelectorAll('#ref-tpl-ratio-box .ref-tpl-ratio-row').length;
         const xCount = document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').length;
-        const mChildren = collectRefTplConds(document.getElementById('ref-tpl-match-box'));
         const parts = [];
-        if (sChildren.length) parts.push('十神' + sChildren.length + '条');
-        if (rChildren.length) parts.push('比例' + rChildren.length + '条');
+        if (sMode && sMode.value === 'auto') parts.push('十神:自动');
+        else if (sChildren.length) parts.push('十神' + sChildren.length + '条');
+        if (rCount) parts.push('比例' + rCount + '组');
         if (xCount) parts.push('喜忌' + xCount + '条');
-        if (mChildren.length) parts.push('基础' + mChildren.length + '条');
         // 【修复】ref-tpl-summary 位于 MutationObserver 观察的子树内（ref-tpl-edit-view），
         // 直接写 textContent 会再次触发 childList mutation → 无限循环卡死页面。
         // 值未变化时跳过赋值，避免自触发。
         const summaryText = parts.length ? '已配置：' + parts.join(' · ') : '';
         if (box.textContent !== summaryText) box.textContent = summaryText;
-        box.title = '各分区条件条数（保存时自动生效并参与契合度评分）';
+        box.title = '各分区配置（保存时自动生效并用于标注显示）';
     }
     let _refTplSummaryWatcherInited = false;
     function initRefTplSummaryWatcher() {
@@ -11786,6 +11995,9 @@
         }
         row.classList.add('ref-tpl-cond-row');
         row.classList.remove('condition-item');
+        // 权重功能已从标注模板移除：隐藏断语条件项模板自带的权重输入
+        const wLabel = row.querySelector('.condition-weight-label');
+        if (wLabel) wLabel.classList.add('hidden');
         // 字段下拉替换为模板字段池（标准字段 + 关系比例）
         const fSel = row.querySelector('.condition-field');
         if (fSel) {
@@ -11806,6 +12018,8 @@
             // 顺序必须在 op/值回填之前，否则区间运算符不存在、区间/比例值会写入错误的 valSel 而丢失
             applyRefTplRowEnhance(row);
             if (cond.op) { const opSel = row.querySelector('.condition-op'); if (opSel) opSel.value = cond.op; }
+            // 回填行首"并且/或者"逻辑（组内条件逻辑；缺省 and）
+            if (cond.logic) { const lSel = row.querySelector('.condition-logic'); if (lSel) lSel.value = cond.logic; }
             if (cond.val !== undefined && cond.val !== '') {
                 const valSel = row.querySelector('.condition-val-select');
                 const valInput = row.querySelector('.condition-val-input');
@@ -11825,26 +12039,20 @@
                     else valSel.value = cond.val;
                 }
             }
-            // 权重回填（缺省为1）
-            const weightInp = row.querySelector('.condition-weight');
-            if (weightInp) weightInp.value = cond.weight && cond.weight > 0 ? cond.weight : 1;
             // 回填触发字段联动后再确保区间运算符/文本输入状态正确
             applyRefTplRowEnhance(row);
         }
         return row;
     }
-    function addRefTplMatchCond() {
-        const box = document.getElementById('ref-tpl-match-box');
-        if (box) box.appendChild(createRefTplCondRow(null));
-    }
-    // 模板编辑器插入条件宏：kind='match' → 基础匹配条件容器；kind='pref' → 当前喜忌规则的触发条件容器
+    // 模板编辑器插入条件宏：kind='pref' → 当前喜忌规则的触发条件容器；kind='ratio' → 关系比例组的触发条件容器
     function openRefTplMacroSelector(btn, kind) {
         let target = null;
-        if (kind === 'match') {
-            target = document.getElementById('ref-tpl-match-box');
-        } else if (kind === 'pref') {
+        if (kind === 'pref') {
             const row = btn.closest('.ref-tpl-pref-row');
             if (row) target = row.querySelector('.rtp-conds');
+        } else if (kind === 'ratio') {
+            const row = btn.closest('.ref-tpl-ratio-row');
+            if (row) target = row.querySelector('.rtp-ratio-conds');
         }
         if (!target) return;
         window._lastGroupChildren = null;  // 防止残留的断语/宏编辑器插入位置导致错位
@@ -11873,8 +12081,6 @@
             '<option value="shengke"' + (!isStrong ? ' selected' : '') + '>生克关系</option>' +
             '<option value="qiangruo"' + (isStrong ? ' selected' : '') + '>十神强弱</option>' +
             '</select>' +
-            '<span class="text-xs font-bold text-gray-600">权重：</span>' +
-            '<input type="number" min="1" max="10" class="rtp-weight w-14 p-1 text-sm border rounded" value="' + ((p && p.weight && p.weight > 0) ? p.weight : 1) + '" title="权重：该规则的重要程度（1-10），权重越高对模板契合度影响越大">' +
             '<div class="rtp-rel-box flex items-center gap-1' + (isStrong ? ' hidden' : '') + '">' +
             '<span class="text-xs font-bold text-gray-600">关联关系：</span>' +
             '<select class="rtp-rel flex-1 min-w-[160px] text-sm p-1 border rounded">' + refTplRelOptionsHtml(!isStrong && p ? p.relId : null) + '</select>' +
@@ -11894,7 +12100,7 @@
             '</div>' +
             '<button type="button" class="text-red-500 text-sm px-1 shrink-0" onclick="this.closest(\'.ref-tpl-pref-row\').remove()">✕ 删除</button>' +
             '</div>' +
-            '<div class="text-xs text-gray-500 mb-1">触发条件（可多条，全部满足时生效；不添加则恒生效）：</div>' +
+            '<div class="text-xs text-gray-500 mb-1">触发条件组（组内条件可设"并且/或者"逻辑；不添加则恒生效）：</div>' +
             '<div class="rtp-conds space-y-1"></div>' +
             '<div class="flex gap-1.5 flex-wrap">' +
             '<button type="button" onclick="addRefTplPrefCond(this)" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs mt-1">➕ 添加触发条件</button>' +
@@ -11937,6 +12143,8 @@
             }
             const field = node.querySelector('.condition-field') ? node.querySelector('.condition-field').value.trim() : '';
             const op = node.querySelector('.condition-op') ? node.querySelector('.condition-op').value : '';
+            // 行首"并且/或者"（组内条件逻辑；与断语/宏编辑器收集口径一致）
+            const logic = node.querySelector('.condition-logic') ? node.querySelector('.condition-logic').value : 'and';
             const valSel = node.querySelector('.condition-val-select');
             const valInput = node.querySelector('.condition-val-input');
             const valCheckbox = node.querySelector('.condition-val-checkbox');
@@ -11949,58 +12157,87 @@
                 val = (valSel && !valSel.classList.contains('hidden')) ? valSel.value : (valInput ? valInput.value.trim() : '');
             }
             if (field && val !== '') {
-                const weightInput = node.querySelector('.condition-weight');
-                let weight = 1;
-                if (weightInput && weightInput.value) {
-                    const w = parseInt(weightInput.value, 10);
-                    if (!isNaN(w) && w > 0) weight = w;
-                }
-                children.push({ field: field, op: op, val: val, weight: weight !== 1 ? weight : undefined });
+                children.push({ logic: logic, field: field, op: op, val: val });
             }
         });
         return children;
     }
-    // 收集模板编辑视图的输入（保存时调用）：按 4 分区（十神分布/关系比例/喜忌/基础匹配）组装 conditions 树
+    // 收集模板编辑视图的输入（保存时调用）：按 3 分区（十神分布/关系比例/喜忌）组装 conditions 树
+    // 分区之间相互独立（无 and 逻辑）；十神分布区分自动（从命中断语提取）/手动两种方式
     function collectRefTemplateEditor() {
         const children = [];
-        // 十神分布
+        // 十神分布（自动/手动）
+        const sMode = document.getElementById('ref-tpl-shishen-mode');
+        const shishenMode = sMode && sMode.value === 'manual' ? 'manual' : 'auto';
         const sChildren = collectRefTplConds(document.getElementById('ref-tpl-shishen-box'));
-        if (sChildren.length) children.push({ mark: 'shishen', logic: 'and', children: sChildren });
-        // 关系比例
-        const rChildren = collectRefTplConds(document.getElementById('ref-tpl-ratio-box'));
-        if (rChildren.length) children.push({ mark: 'ratio', logic: 'and', children: rChildren });
-        // 基础匹配条件（AND 组合；无有效条件行时不写入，避免空组参与评分）
-        const mChildren = collectRefTplConds(document.getElementById('ref-tpl-match-box'));
-        if (mChildren.length) children.push({ mark: 'base', logic: 'and', children: mChildren });
-        // 喜忌规则（每条 = 类型 + 喜/忌 + 权重 + 关联关系 或 A/B十神与弱判定 + 触发条件）
+        const sNode = { mark: 'shishen', mode: shishenMode };
+        if (shishenMode === 'manual' && sChildren.length) sNode.children = sChildren;
+        children.push(sNode);
+        // 关系比例（每个关系一个独立组：触发条件组 + 比例配置；组间相互独立）
+        const ratioChildren = [];
+        document.querySelectorAll('#ref-tpl-ratio-box .ref-tpl-ratio-row').forEach(function(row) {
+            const relation = row.querySelector('.rtp-rel-relation') ? row.querySelector('.rtp-rel-relation').value : '';
+            if (!relation) return;
+            const ratioNode = { mark: 'ratio_rule', relation: relation };
+            // 触发条件组（行首"并且/或者"生效；无条件则恒生效）
+            const cChildren = collectRefTplConds(row.querySelector('.rtp-ratio-conds'));
+            if (cChildren.length) {
+                // 组逻辑取首条条件的行首逻辑；首条叶子保留自身 logic（回填后行首显示与组逻辑一致），其余叶子去掉
+                const gLogic = cChildren[0].logic || 'and';
+                ratioNode.conds = { logic: gLogic, children: cChildren.map(function(c, i) { var cc = Object.assign({}, c); if (i > 0) delete cc.logic; return cc; }) };
+            } else {
+                ratioNode.conds = null;
+            }
+            // 比例配置（预设引用 / 精确值集合 / 区间）
+            const presetSel = row.querySelector('.rtp-ratio-preset-id');
+            if (presetSel && presetSel.value) {
+                ratioNode.presetId = presetSel.value;
+            } else {
+                const rangeItem = row.querySelector('.rtp-ratio-vals > .ref-range-item');
+                if (rangeItem) {
+                    const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
+                    const minD = parseInt(rangeItem.querySelector('.ref-min-d').value);
+                    const maxN = parseInt(rangeItem.querySelector('.ref-max-n').value);
+                    const maxD = parseInt(rangeItem.querySelector('.ref-max-d').value);
+                    if (!isNaN(minN) && !isNaN(minD) && !isNaN(maxN) && !isNaN(maxD)) {
+                        ratioNode.ratio = { type: 'range', min: { n: minN, d: minD }, max: { n: maxN, d: maxD } };
+                    }
+                } else {
+                    const vals = [];
+                    row.querySelectorAll('.rtp-ratio-vals > div:not(.ref-range-item)').forEach(function(item) {
+                        const n = parseInt(item.querySelector('.ref-n') ? item.querySelector('.ref-n').value : '');
+                        const d = parseInt(item.querySelector('.ref-d') ? item.querySelector('.ref-d').value : '');
+                        if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) vals.push({ n: n, d: d });
+                    });
+                    if (vals.length) ratioNode.ratio = { type: 'eq', values: vals };
+                }
+            }
+            if (ratioNode.presetId || ratioNode.ratio) ratioChildren.push(ratioNode);
+        });
+        if (ratioChildren.length) children.push({ mark: 'ratio', children: ratioChildren });
+        // 喜忌规则（每条相互独立；触发条件为条件组，组内 and/or 生效）
         const xiji = [];
         document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').forEach(function(row) {
             const type = row.querySelector('.rtp-type').value === 'qiangruo' ? 'qiangruo' : 'shengke';
-            const conds = collectRefTplConds(row.querySelector('.rtp-conds'));
-            const c = conds.length ? { logic: 'and', children: conds } : { logic: 'and', children: [] };
+            const condsChildren = collectRefTplConds(row.querySelector('.rtp-conds'));
+            const condsLogic = condsChildren.length ? (condsChildren[0].logic || 'and') : 'and';
+            const conds = { logic: condsLogic, children: condsChildren.map(function(c, i) { var cc = Object.assign({}, c); if (i > 0) delete cc.logic; return cc; }) };
             const pref = row.querySelector('.rtp-pref').value === 'ji' ? 'ji' : 'xi';
-            const weightInput = row.querySelector('.rtp-weight');
-            let weight = 1;
-            if (weightInput && weightInput.value) {
-                const w = parseInt(weightInput.value, 10);
-                if (!isNaN(w) && w > 0) weight = w;
-            }
             if (type === 'qiangruo') {
                 const shenA = row.querySelector('.rtp-shen-a').value;
                 const shenB = row.querySelector('.rtp-shen-b').value;
                 if (!shenA || !shenB) return;
                 const weakOp = row.querySelector('.rtp-weak-op').value === 'lt' ? 'lt' : 'lte';
                 const weakVal = parseInt(row.querySelector('.rtp-weak-val').value);
-                xiji.push({ mark: 'xiji_rule', ruleType: 'qiangruo', pref: pref, shenA: shenA, shenB: shenB, weakOp: weakOp, weakVal: isNaN(weakVal) ? 1 : weakVal, weight: weight !== 1 ? weight : undefined, children: c.children });
+                xiji.push({ mark: 'xiji_rule', ruleType: 'qiangruo', pref: pref, shenA: shenA, shenB: shenB, weakOp: weakOp, weakVal: isNaN(weakVal) ? 1 : weakVal, conds: conds });
             } else {
                 const relId = row.querySelector('.rtp-rel').value;
                 if (!relId) return;
-                xiji.push({ mark: 'xiji_rule', ruleType: 'shengke', pref: pref, relId: relId, weight: weight !== 1 ? weight : undefined, children: c.children });
+                xiji.push({ mark: 'xiji_rule', ruleType: 'shengke', pref: pref, relId: relId, conds: conds });
             }
         });
-        if (xiji.length) children.push({ mark: 'xiji', logic: 'and', children: xiji });
-        if (!children.length) return null;
-        return { conditions: { logic: 'and', children: children } };
+        if (xiji.length) children.push({ mark: 'xiji', children: xiji });
+        return { conditions: { children: children } };
     }
     // 保存模板（新建/更新到云端）
     async function saveRefTemplate() {
@@ -12400,9 +12637,20 @@
     }
 
     // 添加一个精确比例输入项（n:d）
+    // 行容器兼容两种结构：旧 .ref-rel-row（模板列表页）/ 新 .ref-tpl-ratio-row（模板编辑器关系比例组）
+    function refRelRowOf(btn) {
+        return btn.closest('.ref-rel-row') || btn.closest('.ref-tpl-ratio-row');
+    }
+    function refRelValsOf(btn) {
+        const row = refRelRowOf(btn);
+        return row ? (row.querySelector('.ref-rel-vals') || row.querySelector('.rtp-ratio-vals')) : null;
+    }
+    function refRelValsOfRow(row) {
+        return row ? (row.querySelector('.ref-rel-vals') || row.querySelector('.rtp-ratio-vals')) : null;
+    }
     function addRefRelValue(btn) {
-        const vals = btn.closest('.ref-rel-row').querySelector('.ref-rel-vals');
-        vals.appendChild(createRefRelValueItem('', ''));
+        const vals = refRelValsOf(btn);
+        if (vals) vals.appendChild(createRefRelValueItem('', ''));
     }
 
     function createRefRelValueItem(n, d) {
@@ -12417,8 +12665,8 @@
 
     // 添加一个区间比例输入项（minN:minD ~ maxN:maxD）
     function addRefRelRange(btn) {
-        const vals = btn.closest('.ref-rel-row').querySelector('.ref-rel-vals');
-        vals.appendChild(createRefRelRangeItem('', '', '', ''));
+        const vals = refRelValsOf(btn);
+        if (vals) vals.appendChild(createRefRelRangeItem('', '', '', ''));
     }
 
     function createRefRelRangeItem(minN, minD, maxN, maxD) {
@@ -12440,7 +12688,10 @@
     // 将预设套用到某关系行：显示预设徽章 + 只读预览解析值，禁用手动添加按钮
     function applyRelRatioPresetToRow(row, preset) {
         if (!row || !preset) return;
-        row.dataset.presetId = String(preset.cloudId || preset.id);
+        const presetId = String(preset.cloudId || preset.id);
+        row.dataset.presetId = presetId;
+        const hidInp = row.querySelector('.rtp-ratio-preset-id');
+        if (hidInp) hidInp.value = presetId;
         const badge = row.querySelector('.ref-rel-preset-badge');
         if (badge) {
             badge.classList.remove('hidden');
@@ -12449,7 +12700,7 @@
                 '<button type="button" class="px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-xs" onclick="clearRelRatioPresetFromRow(this)">解除</button>';
         }
         row.querySelectorAll('.ref-rel-add-btn').forEach(function(b) { b.disabled = true; b.classList.add('opacity-50', 'cursor-not-allowed'); });
-        const valsBox = row.querySelector('.ref-rel-vals');
+        const valsBox = refRelValsOfRow(row);
         if (valsBox) {
             valsBox.innerHTML = '';
             const preview = document.createElement('div');
@@ -12461,19 +12712,21 @@
         }
     }
     function clearRelRatioPresetFromRow(btn) {
-        const row = btn.closest('.ref-rel-row');
+        const row = refRelRowOf(btn);
         if (!row) return;
         delete row.dataset.presetId;
+        const hidInp = row.querySelector('.rtp-ratio-preset-id');
+        if (hidInp) hidInp.value = '';
         const badge = row.querySelector('.ref-rel-preset-badge');
         if (badge) { badge.classList.add('hidden'); badge.classList.remove('inline-flex'); badge.innerHTML = ''; }
         row.querySelectorAll('.ref-rel-add-btn').forEach(function(b) { b.disabled = false; b.classList.remove('opacity-50', 'cursor-not-allowed'); });
-        const valsBox = row.querySelector('.ref-rel-vals');
+        const valsBox = refRelValsOfRow(row);
         if (valsBox) valsBox.innerHTML = '';
     }
     // 预设选择器
     var _refRelPresetPickerTarget = null;
     function openRelRatioPresetPicker(btn) {
-        const row = btn.closest('.ref-rel-row');
+        const row = refRelRowOf(btn);
         if (!row) return;
         _refRelPresetPickerTarget = row;
         const container = document.getElementById('rel-ratio-preset-picker-list');
@@ -12510,9 +12763,9 @@
     // 将当前关系行的值保存为新预设并自动套用
     async function saveRowAsRelRatioPreset(btn) {
         if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再保存比例预设！'); return; }
-        const row = btn.closest('.ref-rel-row');
+        const row = refRelRowOf(btn);
         if (!row) return;
-        const rangeItem = row.querySelector('.ref-rel-vals > .ref-range-item');
+        const rangeItem = row.querySelector('.ref-rel-vals > .ref-range-item, .rtp-ratio-vals > .ref-range-item');
         let presetType = 'eq', values = [], min = null, max = null;
         if (rangeItem) {
             const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
@@ -12523,7 +12776,9 @@
             presetType = 'range';
             min = { n: minN, d: minD }; max = { n: maxN, d: maxD };
         } else {
-            row.querySelectorAll('.ref-rel-vals > div:not(.ref-range-item)').forEach(function(item) {
+            const valsBox = refRelValsOfRow(row);
+            if (!valsBox) { alert('请先添加至少一个精确值比例！'); return; }
+            valsBox.querySelectorAll('div:not(.ref-range-item)').forEach(function(item) {
                 const n = parseInt(item.querySelector('.ref-n').value);
                 const d = parseInt(item.querySelector('.ref-d').value);
                 if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) values.push({ n: n, d: d });
@@ -13667,13 +13922,13 @@
         const rules = node.refRulesByScope[scopeIdx];
         const rule = rules.length ? rules[rules.length - 1] : null;
         if (rule) {
-            try { rule._resolved = resolveRefOutput(rule.refOutput); } catch (e) {}
-            const refs = (rule._resolved && Array.isArray(rule._resolved.relationRefs)) ? rule._resolved.relationRefs : [];
+            try { rule._resolved = resolveRefOutput(rule.refOutput, rule.rule); } catch (e) {}
+            const ratioList = (rule._relRatios && rule._relRatios.length) ? rule._relRatios : null;
+            const refs = ratioList || ((rule._resolved && Array.isArray(rule._resolved.relationRefs)) ? rule._resolved.relationRefs : []);
             refs.forEach(function(rr) {
-                if (rr && rr.relation) {
-                    const resolved = (typeof resolveRelRatio === 'function') ? resolveRelRatio(rr) : rr;
-                    if (resolved) relMap[rr.relation] = resolved;
-                }
+                if (!rr || !rr.relation) return;
+                const resolved = ratioList ? rr.resolved : ((typeof resolveRelRatio === 'function') ? resolveRelRatio(rr) : rr);
+                if (resolved) relMap[rr.relation] = resolved;
             });
         }
         return relMap;
@@ -13763,46 +14018,47 @@
         refreshShenBarIfVisible();
     }
 
-    // 单个数据状态列（节点+范围）的模板契合度卡片：默认显示契合度最高模板，多模板命中可下拉切换
+    // 单个数据状态列（节点+范围）的断语契合度卡片：默认显示契合度最高命中断语，多候选可下拉切换
     function renderTplFitCell(col) {
         const esc = escapeHtml;
         const label = esc(col.label);
-        const fits = (col.node && col.node.tplFitsByScope && col.node.tplFitsByScope[col.scopeIdx]) || [];
-        if (!fits.length) {
+        const g = (col.node && col.node.geju) || null;
+        if (!g || !g.hasGeJu) {
             return '<div class="flex-1 min-w-[190px] border border-gray-100 rounded p-1.5 bg-gray-50/40">' +
                 '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
-                '<span class="text-gray-400">无标注模板命中</span></div>';
+                '<span class="text-gray-400">无断语命中</span></div>';
         }
+        const candidates = g.candidates || [];
         const selKey = col.node.key + '#' + col.scopeIdx;
         let idx = 0;
-        const selId = window._tplFitSel ? window._tplFitSel[selKey] : null;
-        for (let i = 0; i < fits.length; i++) { if (String(fits[i].tplId) === String(selId)) { idx = i; break; } }
-        const top = fits[idx] || fits[0];
-        const gl = tplGejuLevelInfo(top.percent);
-        const opts = fits.map(function(f, i) {
-            return '<option value="' + esc(f.tplId) + '"' + (i === idx ? ' selected' : '') + '>' + esc(f.name) + '（' + f.percent + '%）</option>';
+        const selVal = window._tplFitSel ? window._tplFitSel[selKey] : null;
+        if (typeof selVal === 'number' && selVal >= 0 && selVal < candidates.length) idx = selVal;
+        const top = candidates[idx] || candidates[0];
+        const gl = g.levelClass ? { level: g.level, levelClass: g.levelClass } : tplGejuLevelInfo(top.percent);
+        const opts = candidates.map(function(c, i) {
+            return '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(c.text) + '（' + c.percent + '%）</option>';
         }).join('');
         return '<div class="flex-1 min-w-[190px] border border-violet-100 rounded p-1.5 bg-violet-50/40">' +
             '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
             '<div class="flex items-center gap-1 mb-1">' +
-            '<span class="text-gray-500 shrink-0">模板：</span>' +
-            '<select class="px-1 py-0.5 border rounded bg-white text-xs min-w-0 flex-1" onchange="setTimelineTplFit(\'' + esc(selKey) + '\', this.value)">' + opts + '</select>' +
+            '<span class="text-gray-500 shrink-0">断语：</span>' +
+            '<select class="px-1 py-0.5 border rounded bg-white text-xs min-w-0 flex-1" onchange="setTimelineTplFit(\'' + esc(selKey) + '\', parseInt(this.value))">' + opts + '</select>' +
             '</div>' +
-            '<div class="flex flex-wrap items-center gap-1"><span class="font-bold text-gray-800">' + esc(top.name) + '</span> ' +
+            '<div class="flex flex-wrap items-center gap-1"><span class="font-bold text-gray-800 truncate max-w-[140px]">' + esc(top.text) + '</span> ' +
             '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ' + gl.levelClass + '">' + esc(gl.level) + '</span> ' +
             '<span class="text-blue-700 font-bold">契合度 ' + top.percent + '%</span></div>' +
             '</div>';
     }
-    // 切换某列使用的参考值模板（记录选择并重绘时间轴对比内容）
-    function setTimelineTplFit(selKey, tplId) {
+    // 切换某列显示的候选断语（记录选择并重绘时间轴对比内容）
+    function setTimelineTplFit(selKey, idx) {
         window._tplFitSel = window._tplFitSel || {};
-        if (tplId) window._tplFitSel[selKey] = tplId;
+        if (idx !== undefined && idx !== null && !isNaN(idx)) window._tplFitSel[selKey] = parseInt(idx);
         else delete window._tplFitSel[selKey];
         if (typeof renderShenBar === 'function') renderShenBar();
     }
-    // 格局对比行（仅展示模板契合度数值与格局层次，不做吉凶好坏结论）
-    // 列结构与对比表一致：每种数据状态（原局/原局+大运A/原局+大运B…）分别对命中的参考值模板评分，
-    // 候选 = 命中断语/宏引用的模板（与柱状图「参考值来源」同源），默认显示契合度最高者，可独立下拉切换
+    // 格局对比行（仅展示断语契合度数值与格局层次，不做吉凶好坏结论）
+    // 列结构与对比表一致：每种数据状态（原局/原局+大运A/原局+大运B…）展示该节点快照时评估的
+    // 格局分类命中断语契合度（与主格局面板/时间轴徽章同源），默认显示契合度最高者，可独立下拉切换
     function renderGeJuCompareRow(base, target) {
         const cols = [];
         if (base.type === 'dayun' && target.type === 'dayun') {
@@ -13820,7 +14076,7 @@
         }
         return '<div class="bg-white border border-violet-200 rounded-lg p-2 mb-2 text-xs">' +
             '<div class="flex items-center gap-2 mb-1.5"><span class="font-bold text-violet-700">🔮 格局对比</span>' +
-            '<span class="text-gray-500">基于标注模板标准格局（节点 vs 模板契合度，命中多个模板可下拉切换）</span></div>' +
+            '<span class="text-gray-500">基于格局分类命中断语契合度（节点快照时评估，与主格局面板/时间轴徽章同源）</span></div>' +
             '<div class="flex flex-wrap items-start gap-2">' + cols.map(function(col) { return renderTplFitCell(col); }).join('') + '</div>' +
             '</div>';
     }
@@ -35747,45 +36003,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button type="button" class="ref-tpl-tab px-3 py-1.5 text-sm font-medium rounded-t border-b-2 border-amber-500 text-amber-700 bg-amber-50" data-tab="shishen" onclick="switchRefTplTab('shishen')">十神分布</button>
                 <button type="button" class="ref-tpl-tab px-3 py-1.5 text-sm font-medium rounded-t border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="ratio" onclick="switchRefTplTab('ratio')">关系比例</button>
                 <button type="button" class="ref-tpl-tab px-3 py-1.5 text-sm font-medium rounded-t border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="xiji" onclick="switchRefTplTab('xiji')">喜忌</button>
-                <button type="button" class="ref-tpl-tab px-3 py-1.5 text-sm font-medium rounded-t border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="base" onclick="switchRefTplTab('base')">基础匹配</button>
                 <span id="ref-tpl-summary" class="ml-auto self-center text-xs text-gray-400 truncate max-w-[320px]"></span>
             </div>
             <!-- 十神分布区 -->
             <div id="ref-tpl-tab-shishen" class="ref-tpl-tab-panel">
-                <div class="mb-1.5 text-xs text-gray-500">十神数量分层条件：同一十神可配置<b>多个区间</b>（如 1~2 高权重、3~4 中权重），首条作为柱状图参考值基准，全部参与契合度评分。</div>
-                <div id="ref-tpl-shishen-box" class="space-y-1 mb-2"></div>
-                <div class="flex gap-1.5 flex-wrap">
-                    <button type="button" onclick="addRefTplShishenCond('比劫')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 比劫</button>
-                    <button type="button" onclick="addRefTplShishenCond('食伤')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 食伤</button>
-                    <button type="button" onclick="addRefTplShishenCond('财星')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 财星</button>
-                    <button type="button" onclick="addRefTplShishenCond('官杀')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 官杀</button>
-                    <button type="button" onclick="addRefTplShishenCond('印星')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 印星</button>
-                    <button type="button" onclick="addRefTplMatchCondTo('ref-tpl-shishen-box')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">+ 其他条件</button>
+                <div class="mb-1.5 text-xs text-gray-500">十神数量参考值：<b>自动</b>=从命中的格局断语自动提取各十神数量（同一十神多条数量条件时取权重最低那条的值）；<b>手动</b>=下方手动填写各十神参考数量。</div>
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs font-bold text-gray-600">参考值方式：</span>
+                    <select id="ref-tpl-shishen-mode" class="px-2 py-1 border rounded text-sm bg-white" onchange="toggleRefTplShishenMode(this.value)">
+                        <option value="auto">自动（从命中断语提取，取最低权重值）</option>
+                        <option value="manual">手动填写</option>
+                    </select>
+                </div>
+                <div id="ref-tpl-shishen-mode-manual">
+                    <div class="mb-1.5 text-xs text-gray-500">手动参考数量：同一十神可配置<b>多个区间</b>（如 1~2、3~4），首条作为柱状图参考值基准，其余为备选标注。</div>
+                    <div id="ref-tpl-shishen-box" class="space-y-1 mb-2"></div>
+                    <div class="flex gap-1.5 flex-wrap">
+                        <button type="button" onclick="addRefTplShishenCond('比劫')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 比劫</button>
+                        <button type="button" onclick="addRefTplShishenCond('食伤')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 食伤</button>
+                        <button type="button" onclick="addRefTplShishenCond('财星')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 财星</button>
+                        <button type="button" onclick="addRefTplShishenCond('官杀')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 官杀</button>
+                        <button type="button" onclick="addRefTplShishenCond('印星')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 印星</button>
+                        <button type="button" onclick="addRefTplMatchCondTo('ref-tpl-shishen-box')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm">+ 其他条件</button>
+                    </div>
                 </div>
             </div>
             <!-- 关系比例区 -->
             <div id="ref-tpl-tab-ratio" class="ref-tpl-tab-panel hidden">
-                <div class="mb-1.5 text-xs text-gray-500">关系比例条件：同一关系可配置<b>多个比例/区间</b>（如 3:1 高权重、4:1 中权重），全部参与契合度评分与生克表标注。</div>
-                <div id="ref-tpl-ratio-box" class="space-y-1 mb-2"></div>
+                <div class="mb-1.5 text-xs text-gray-500">关系比例标注：每个关系一个<b>独立组</b>（组间互不影响），组内触发条件满足时才标注该关系比例；比例可设<b>多个精确值、区间</b>或引用<b>比例预设库</b>。</div>
+                <div id="ref-tpl-ratio-box" class="space-y-2 mb-2"></div>
                 <div class="flex gap-1.5 flex-wrap items-center">
                     <select id="ref-tpl-ratio-rel-select" class="px-2 py-1 border rounded text-sm bg-white max-w-[220px]"><option value="">选择关系…</option></select>
-                    <button type="button" onclick="addRefTplRatioCond()" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">+ 添加该关系比例</button>
+                    <button type="button" onclick="addRefTplRatioRow()" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">➕ 添加关系比例组</button>
                 </div>
             </div>
             <!-- 喜忌区 -->
             <div id="ref-tpl-tab-xiji" class="ref-tpl-tab-panel hidden">
-                <div class="mb-1.5 text-xs text-gray-500">生克喜忌规则：触发条件满足时在相克/相生表标注喜忌，并计入模板契合度权重。</div>
+                <div class="mb-1.5 text-xs text-gray-500">生克喜忌标注：每条规则<b>相互独立</b>（互不影响），触发条件满足时在相克/相生表标注喜/忌。</div>
                 <div id="ref-tpl-prefs-box" class="space-y-2 mb-2"></div>
                 <button type="button" onclick="addRefTplPrefRule()" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-sm">➕ 添加喜忌规则</button>
-            </div>
-            <!-- 基础匹配区 -->
-            <div id="ref-tpl-tab-base" class="ref-tpl-tab-panel hidden">
-                <div class="mb-1.5 text-xs text-gray-500">基础匹配条件（如 月支十神 = 食伤）：参与契合度评分，权重越高越重要。</div>
-                <div id="ref-tpl-match-box" class="space-y-1 mb-2"></div>
-                <div class="flex gap-1.5 flex-wrap">
-                    <button type="button" onclick="addRefTplMatchCond()" class="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded text-sm">➕ 添加条件</button>
-                    <button type="button" onclick="openRefTplMacroSelector(this, 'match')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-sm">🧩 插入条件宏</button>
-                </div>
             </div>
             <div class="flex gap-2 mt-4">
                 <button onclick="saveRefTemplate()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-base">💾 保存模板</button>
