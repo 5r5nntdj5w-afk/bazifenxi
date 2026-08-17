@@ -10344,7 +10344,7 @@
         wuqingColor: '#991b1b'     // 无情徽章文字色
     };
     // 有情度判定：对勾选来源（生克比例达标/绑定断语命中/喜忌）取 AND——全部为真=有情，任一为假=无情；
-    // 无判定的来源跳过不参与；无任何有效来源判定时返回 null（不显示）；
+    // 勾选的来源必须全部参与判定：无参考比例配置（ok=null）=比例不满足、无喜忌标注（pref=''）=喜忌不满足，均按"假"计；
     // 有情/无情两个开关相互独立：判定为"有情"时仅当 youqingEnabled 才返回，判定为"无情"时仅当 wuqingEnabled 才返回
     // cell: { ok: boolean|null, bound: boolean, pref: 'xi'|'ji'|'' }
     function calcYouqing(cell, ds) {
@@ -10356,12 +10356,11 @@
         sources.forEach(function(src) {
             let v = null;
             if (src === 'ratio') {
-                if (cell.ok === true || cell.ok === false) v = cell.ok;
+                v = (cell.ok === true);  // 达标为真；无配置/未达标均为假
             } else if (src === 'bound') {
-                v = !!cell.bound;
+                v = !!cell.bound;        // on 命中为真，off 未命中为假
             } else if (src === 'pref') {
-                if (cell.pref === 'xi') v = true;
-                else if (cell.pref === 'ji') v = false;
+                v = (cell.pref === 'xi');  // 仅喜为真；忌/无喜忌均为假
             }
             if (v === null) return;
             effective++;
