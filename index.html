@@ -10024,12 +10024,12 @@
             }
         });
 
-        // ===== 参考值规则收集（十神柱状对比图）：遍历条件宏 =====
+        // ===== 柱状图标注来源只认命中断语（含断语引用宏时递归展开宏条件）；条件宏自身不再直接作为标注源 =====
+        // 此处遍历条件宏仅用于收集关系绑定与生克宏命中评估（与时间轴口径统一）
         (cache.conditionMacros || []).forEach(function(mac) {
             if (!mac.conditions) return;
-            const hasRef = !!mac.conditions.referenceOutput;
             const hasRel = Array.isArray(mac.conditions.relationBindings) && mac.conditions.relationBindings.length;
-            if (!hasRef && !hasRel) return;
+            if (!hasRel) return;
             try {
                 const macroCtx = {};
                 if (mac.conditions.defaultQuZhi) macroCtx.ruleDefaultQuZhi = mac.conditions.defaultQuZhi;
@@ -10045,9 +10045,6 @@
                     }
                 }
                 if (macroOk) {
-                    if (hasRef) {
-                        matchedRefRules.push({ source: 'macro', name: mac.name || '', refOutput: mac.conditions.referenceOutput, rule: mac, priority: (mac.priority !== undefined ? mac.priority : 0) });
-                    }
                     if (hasRel) {
                         boundRelations.push.apply(boundRelations, mac.conditions.relationBindings);
                         // 生克关系识别：无维度独立评估宏命中（与 shenQz 维度联动无关，与断语命中判定口径一致），按评估范围缓存供 analyzeShengKe 使用
