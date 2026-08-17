@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -10895,7 +10895,7 @@
                 .order('update_time', { ascending: false });
             if (error) throw error;
             const list = (data || []).map(function(r) {
-                return { id: r.id, cloudId: r.id, name: r.name || '', displayName: r.display_name || '', values: r.values || {}, relationRefs: r.relation_refs || [], matchConditions: r.match_conditions || {}, relationPrefs: r.relation_prefs || [] };
+                return { id: r.id, cloudId: r.id, name: r.name || '', displayName: r.display_name || '', values: r.values || {}, relationRefs: r.relation_refs || [], matchConditions: r.match_conditions || {}, relationPrefs: r.relation_prefs || [], conditions: r.conditions || null };
             });
             cache.refTemplates = list;
             saveLocalRefTemplates(list);
@@ -11533,7 +11533,8 @@
         _editingRefTplId = tpl.cloudId || tpl.id;
         document.getElementById('ref-tpl-name').value = tpl.name || '';
         document.getElementById('ref-tpl-display-name').value = tpl.displayName || '';
-        buildRefTemplateEditor({ values: tpl.values || {}, relationRefs: tpl.relationRefs || [], matchConditions: tpl.matchConditions || {}, relationPrefs: tpl.relationPrefs || [] });
+        // 必须连同 conditions 树一并传入，否则回填走旧四字段编译、权重全部丢失为 1
+        buildRefTemplateEditor({ values: tpl.values || {}, relationRefs: tpl.relationRefs || [], matchConditions: tpl.matchConditions || {}, relationPrefs: tpl.relationPrefs || [], conditions: tpl.conditions || null });
         document.getElementById('ref-tpl-list-view').classList.add('hidden');
         document.getElementById('ref-tpl-edit-view').classList.remove('hidden');
     }
@@ -11643,7 +11644,11 @@
         if (rChildren.length) parts.push('比例' + rChildren.length + '条');
         if (xCount) parts.push('喜忌' + xCount + '条');
         if (mChildren.length) parts.push('基础' + mChildren.length + '条');
-        box.textContent = parts.length ? '已配置：' + parts.join(' · ') : '';
+        // 【修复】ref-tpl-summary 位于 MutationObserver 观察的子树内（ref-tpl-edit-view），
+        // 直接写 textContent 会再次触发 childList mutation → 无限循环卡死页面。
+        // 值未变化时跳过赋值，避免自触发。
+        const summaryText = parts.length ? '已配置：' + parts.join(' · ') : '';
+        if (box.textContent !== summaryText) box.textContent = summaryText;
         box.title = '各分区条件条数（保存时自动生效并参与契合度评分）';
     }
     let _refTplSummaryWatcherInited = false;
@@ -11742,6 +11747,9 @@
         }
         if (valInput) {
             valInput.classList.remove('hidden');
+            // 数量/关系比例字段的值支持区间/比例文本（如 1~3、3:1、2:1~4:1），
+            // type=number 无法容纳，需切换为 text 后再输入
+            if (valInput.type === 'number') valInput.type = 'text';
             valInput.placeholder = isRatio ? '如 3:1 或 2:1~4:1' : '如 2 或 1~2';
             if (valSel) valSel.classList.add('hidden');
             if (valCheckbox) valCheckbox.classList.add('hidden');
@@ -11794,6 +11802,9 @@
                 if (f2) { f2.value = cond.field; syncFieldSelectDisplay(row, cond.field); }
                 if (f2 && f2.onchange) f2.onchange();
             }
+            // 值回填前先切换数量/关系比例字段的文本输入控件并补充 range 运算符：
+            // 顺序必须在 op/值回填之前，否则区间运算符不存在、区间/比例值会写入错误的 valSel 而丢失
+            applyRefTplRowEnhance(row);
             if (cond.op) { const opSel = row.querySelector('.condition-op'); if (opSel) opSel.value = cond.op; }
             if (cond.val !== undefined && cond.val !== '') {
                 const valSel = row.querySelector('.condition-val-select');
@@ -12972,21 +12983,41 @@
       return '原局+大运+流年';
     }
 
-    /** 主格局识别（参考值模板基准）：当前评估范围内，对命中的参考值模板逐一整树加权评分，
-        取契合度最高者作为主格局；层次阈值沿用全局设置的 90/70/50 */
+    /** 主格局识别（格局分类命中断语基准）：在当前评估范围内，按"参与主格局识别的分类"过滤命中断语，
+        布尔命中为成格前提，契合度（断语权重评分）仅用于排序与分层；层次阈值沿用全局设置的 90/70/50 */
     function analyzeGeJu() {
-        const sc = cache.statsByScope || null;
-        if (!sc) return { hasGeJu: false, noMatch: true, candidates: [] };
-        const es = getEvalScope();
-        const idx = es === 'bazi' ? 0 : es === 'dayun' ? 1 : 2;
-        const stats = idx === 0 ? sc.scope0 : idx === 1 ? sc.scope1 : sc.scope2;
-        const data = (cache.shengkeScopeData && cache.shengkeScopeData[idx]) || window._lastCalcData || null;
-        let fits = [];
-        try { fits = stats ? calcTplFitForScope(idx, stats, data) : []; } catch (e) { fits = []; }
-        if (!fits.length) return { hasGeJu: false, noMatch: true, candidates: [] };
-        const top = fits[0];
+        // 主格局识别改为基于"格局分类"命中断语：断语布尔命中为成格前提，
+        // 契合度（断语权重评分）仅用于排序与分层
+        const mb = cache.matchedByCategory || {};
+        const cfg = getGlobalDisplayConfig() || {};
+        const cats = cfg.gejuCategories || ['格局'];
+        const useAll = cats.indexOf('*') >= 0;
+        const candidates = [];
+        Object.keys(mb).forEach(function(cat) {
+            if (!useAll && cats.indexOf(cat) < 0) return;
+            (mb[cat] || []).forEach(function(item) {
+                if (!item || !item.text) return;
+                candidates.push({ cat: cat, text: item.text, rule: item.rule || null, fit: item.fit || null });
+            });
+        });
+        // 去重（同文本断语只保留一条）
+        const seen = {}, dedup = [];
+        candidates.forEach(function(c) {
+            if (seen[c.text]) return;
+            seen[c.text] = true;
+            dedup.push(c);
+        });
+        if (!dedup.length) return { hasGeJu: false, noMatch: true, candidates: [] };
+        // 契合度：断语设置了权重/minFit（fit.enabled）用其评分；未配置权重视为满分（布尔命中即全成）
+        dedup.forEach(function(c) {
+            c.percent = (c.fit && c.fit.enabled) ? (typeof c.fit.percent === 'number' ? c.fit.percent : 100) : 100;
+            c.hit = (c.fit && c.fit.enabled) ? (c.fit.hit || 0) : 1;
+            c.total = (c.fit && c.fit.enabled) ? (c.fit.total || 0) : 1;
+        });
+        dedup.sort(function(a, b) { return (b.percent - a.percent) || (a.text < b.text ? -1 : a.text > b.text ? 1 : 0); });
+        const top = dedup[0];
         const gl = tplGejuLevelInfo(top.percent);
-        return { hasGeJu: true, top: top, candidates: fits, percent: top.percent, level: gl.level, levelClass: gl.levelClass };
+        return { hasGeJu: true, top: top, candidates: dedup, percent: top.percent, level: gl.level, levelClass: gl.levelClass };
     }
 
     /** 主格局识别面板 HTML */
@@ -13002,7 +13033,7 @@
                         <span class="font-bold text-gray-700">🔮 主格局识别</span><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span><button onclick="window.openGeJuLevelSettings()" title="设置主格局层次阈值（契合度≥上等阈值→上等，≥中等阈值→中等，≥普通阈值→普通，低于→不成格）" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">⚙ 阈值</button>
                         <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">无结果</span>
                     </div>
-                    <div class="text-gray-600 text-sm">当前没有参考值模板命中（可能断语匹配未就绪，或命中的断语/条件宏未引用任何参考值模板）。请确认断语匹配服务与模板引用正常后再查看格局判定。</div>
+                    <div class="text-gray-600 text-sm">当前没有命中断语（可能断语匹配未就绪，或当前命盘无任何断语命中）。请确认断语匹配服务正常后再查看格局判定。</div>
                 </div>`;
                 }
                 return `<div class="mb-4 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-300">
@@ -13010,7 +13041,7 @@
                         <span class="font-bold text-gray-700">🔮 主格局识别</span><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span><button onclick="window.openGeJuLevelSettings()" title="设置主格局层次阈值（契合度≥上等阈值→上等，≥中等阈值→中等，≥普通阈值→普通，低于→不成格）" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">⚙ 阈值</button>
                         <span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-gray-600 bg-gray-100 border-gray-300">不成格局</span>
                     </div>
-                    <div class="text-gray-600 text-sm">未命中任何参考值模板，该八字不成格局（属"差八字"范畴）。</div>
+                    <div class="text-gray-600 text-sm">参与主格局识别的分类下未命中任何断语，该八字不成格局（属"差八字"范畴）。</div>
                 </div>`;
             }
             return '';
@@ -13030,7 +13061,7 @@
         const listHtml = geju.candidates.slice(0, 5).map(c => {
             const isTop = c === geju.top;
             return `<div class="flex items-center justify-between text-sm py-0.5 ${isTop ? 'font-bold text-gray-800' : 'text-gray-500'}">
-                <span>${isTop ? '👑 ' : ''}${escapeHtml(c.name)}</span>
+                <span>${isTop ? '👑 ' : ''}${escapeHtml(c.text)}</span>
                 <span class="text-xs">${c.percent}%</span>
             </div>`;
         }).join('');
@@ -13039,7 +13070,7 @@
                 <div class="font-bold text-gray-700">🔮 主格局识别</div><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span><button onclick="window.openGeJuLevelSettings()" title="设置主格局层次阈值（契合度≥上等阈值→上等，≥中等阈值→中等，≥普通阈值→普通，低于→不成格）" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">⚙ 阈值</button>
                 <div class="flex items-center gap-2">${levelBadge}${fitBadge}</div>
             </div>
-            <div class="text-gray-800 font-bold text-base">👑 ${escapeHtml(top.name)}</div>
+            <div class="text-gray-800 font-bold text-base">👑 ${escapeHtml(top.text)}</div>
             ${listHtml ? `<div class="mt-2 pt-2 border-t border-indigo-100 space-y-0.5">${listHtml}</div>` : ''}
             <div class="mt-1 text-xs text-gray-400">层次按契合度划分：≥${L_TOP} ${escapeHtml(NM_TOP)} / ${L_MID}-${L_TOP - 1} ${escapeHtml(NM_MID)} / ${L_LOW}-${L_MID - 1} ${escapeHtml(NM_LOW)} / &lt;${L_LOW} ${escapeHtml(NM_NONE)}</div>
         </div>`;
@@ -13593,14 +13624,14 @@
                 badge.className = 'timeline-fit';
                 item.appendChild(badge);
             }
-            const fits = (snap && snap.tplFitsByScope) ? (snap.tplFitsByScope[getTimelineNodeScopeIdx(snap)] || []) : [];
-            if (fits.length) {
-                const top = fits[0];
-                badge.textContent = top.percent + '%';
-                badge.title = '模板契合度 ' + top.percent + '%（' + top.name + '）';
+            // 契合度数据源统一为断语契合度（格局分类命中断语的权重评分），与主格局面板口径一致
+            const g = (snap && snap.geju) || null;
+            if (g && g.hasGeJu && g.percent != null) {
+                badge.textContent = g.percent + '%';
+                badge.title = '格局契合度 ' + g.percent + '%（' + (g.top.text || g.top.name || '') + '）';
             } else {
                 badge.textContent = '—';
-                badge.title = '无参考值模板命中（点击该节点后自动获取）';
+                badge.title = '未命中格局断语（点击该节点后自动获取）';
             }
         };
         document.querySelectorAll('.dayun-item').forEach(function(item) {
