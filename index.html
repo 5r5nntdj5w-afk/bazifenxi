@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -13339,7 +13339,13 @@
         defList.forEach(function(def) {
             const cols = ranges.map(function(rg) {
                 const node = rg.node, si = rg.scopeIdx;
-                const st = (node.statsByScope && node.statsByScope[si]) || null;
+                // 兼容两种快照格式：新快照为 [scope0,scope1,scope2] 数组；旧快照为 {scope0,scope1,scope2} 对象
+                const st = (function() {
+                    const s = node.statsByScope;
+                    if (!s) return null;
+                    if (Array.isArray(s)) return s[si] || null;
+                    return s['scope' + si] || null;
+                })();
                 const gv = function(g) {
                     if (!st) return null;
                     if (mode === 'tian') return st.groupTian[g] || 0;
