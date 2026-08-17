@@ -208,6 +208,20 @@
             color: white;
         }
         
+        /* 时间轴节点契合度徽章（大运/流年列表项底部） */
+        .timeline-fit {
+            margin-top: 2px;
+            font-size: 10px;
+            line-height: 1.2;
+            font-weight: 700;
+            color: #7c3aed;
+            white-space: nowrap;
+        }
+        .dayun-item.active .timeline-fit,
+        .liunian-item.active .timeline-fit {
+            color: #fff;
+        }
+        
         /* 限制下拉框样式 */
         #verification-rule {
             max-width: 100%;
@@ -1458,6 +1472,8 @@
                     <div id="shen-bar-container" class="hidden w-full max-w-3xl mx-auto px-1">
                         <div id="shen-bar-ref-bar" class="mb-2"></div>
                         <div id="shen-bar-chart" class="mb-3"></div>
+                        <!-- 时间轴对比控制条（大运/流年同层级变化对比，JS 渲染） -->
+                        <div id="timeline-compare-bar" class="mb-2"></div>
                         <div id="shen-bar-tables" class="grid grid-cols-1 gap-3"></div>
                     </div>
                     
@@ -5398,7 +5414,7 @@
 
                     var div = document.createElement('div');
                     div.className = 'liunian-item' + (isCurrentYear ? ' current-year' : '');
-                    div.innerHTML = '<div class="liunian-year">' + yr + '</div><div class="liunian-age">' + currentAge + '岁</div><div class="liunian-ganzhi">' + yg.gan + yg.zhi + '</div>';
+                    div.innerHTML = '<div class="liunian-year">' + yr + '</div><div class="liunian-age">' + currentAge + '岁</div><div class="liunian-ganzhi">' + yg.gan + yg.zhi + '</div><div class="timeline-fit">—</div>';
                     
                     (function(y, g, zh, yr2, gz, d) {
                         d.onclick = function() {
@@ -5674,7 +5690,7 @@
 
                             var div = document.createElement('div');
                             div.className = 'dayun-item';
-                            div.innerHTML = '<div class="dayun-year">' + yr + '</div><div class="dayun-age">' + age + '岁起</div><div class="dayun-ganzhi">' + gz + '</div>';
+                            div.innerHTML = '<div class="dayun-year">' + yr + '</div><div class="dayun-age">' + age + '岁起</div><div class="dayun-ganzhi">' + gz + '</div><div class="timeline-fit">—</div>';
                             
                             (function(dy, gg, zzh) {
                                 div.onclick = function() {
@@ -10468,8 +10484,12 @@
 
         // 柱状图
         chartBox.innerHTML = renderShenBarChart(stats, selRef, mode);
-        // 关系表
-        tablesBox.innerHTML = renderShenBarTables(stats, rules, selIdx, mode);
+        // 时间轴对比控制条（生克关系表上方）
+        renderTimelineCompareBar();
+        // 关系表：时间轴对比开启时显示同层级对比表（大运对大运、流年对流年），否则显示原三范围表
+        tablesBox.innerHTML = window.timelineCompareOn
+            ? renderTimelineCompareContent()
+            : renderShenBarTables(stats, rules, selIdx, mode);
     }
 
     // 渲染柱状图主体
@@ -13006,6 +13026,402 @@
         </div>`;
     }
 
+    // ============ 时间轴（格局时间轴）：大运/流年节点快照 + 同层级变化对比 ============
+    // 数据方案：按需单节点 + 前端缓存。点击大运/流年节点走现有流程计算该节点，
+    // displayDuanyuResult 末尾 snapshotCurrentNode() 把当前节点完整快照存入缓存；
+    // 对比时从缓存取两个同级节点（大运 vs 大运 / 同一大运内流年 vs 流年）做 diff，不额外请求。
+    window.timelineNodeCache = window.timelineNodeCache || {};
+    window.timelinePrevDayunKey = null;      // 最近访问的大运节点 key（相邻对比基准来源）
+    window.timelinePrevLiunianKey = null;    // 最近访问的流年节点 key
+    window.timelineCompareMode = 'adjacent'; // 'adjacent' 相邻对比 | 'any' 任意对比
+    window.timelineCompareOn = false;        // 时间轴对比开关
+    window.timelineAnyBaseKey = '';          // 任意对比：基准节点 key
+    window.timelineAnyTargetKey = '';        // 任意对比：目标节点 key
+
+    // 当前选中节点的基本信息（key 结构：原局 / 大运干支 / 大运干支:流年干支）
+    function getTimelineNodeInfo() {
+        const q = function(sel) { const el = document.querySelector(sel); return el ? el.value : ''; };
+        const dyG = q('.tiangan[data-type="dayun"]'), dyZ = q('.dizhi[data-type="dayun"]');
+        const lnG = q('.tiangan[data-type="liunian"]'), lnZ = q('.dizhi[data-type="liunian"]');
+        const dayunGZ = (dyG && dyZ) ? dyG + dyZ : '';
+        const liunianGZ = (lnG && lnZ) ? lnG + lnZ : '';
+        const key = dayunGZ ? (liunianGZ ? dayunGZ + ':' + liunianGZ : dayunGZ) : '原局';
+        const type = dayunGZ ? (liunianGZ ? 'liunian' : 'dayun') : 'bazi';
+        let dayunLabel = '', liunianLabel = '';
+        const activeDy = document.querySelector('.dayun-item.active');
+        if (activeDy) {
+            const yEl = activeDy.querySelector('.dayun-year');
+            dayunLabel = (yEl ? yEl.textContent : '') + ' ' + dayunGZ;
+        }
+        const activeLn = document.querySelector('.liunian-item.active');
+        if (activeLn) {
+            const yEl = activeLn.querySelector('.liunian-year');
+            liunianLabel = (yEl ? yEl.textContent : '') + ' ' + liunianGZ;
+        }
+        return { key: key, type: type, dayun: dayunGZ || null, liunian: liunianGZ || null, dayunLabel: dayunLabel, liunianLabel: liunianLabel };
+    }
+
+    // 保存当前节点快照（断语命中渲染完成后调用）
+    function snapshotCurrentNode() {
+        try {
+            if (!window.apiDuanyuCache) return; // 断语尚未就绪不建快照
+            const info = getTimelineNodeInfo();
+            const snap = {
+                key: info.key,
+                type: info.type,
+                dayun: info.dayun,
+                liunian: info.liunian,
+                dayunLabel: info.dayunLabel,
+                liunianLabel: info.liunianLabel,
+                ts: Date.now(),
+                matchedByCategory: cache.matchedByCategory || {},
+                geju: analyzeGeJu(),
+                shengke: analyzeShengKe(),
+                statsByScope: cache.statsByScope || null,
+                prefsByScope: cache.shenTplPrefsByScope || [],
+                boundByScope: cache.shenRelBindingsByScope || [],
+                refRulesByScope: cache.shenRefRulesByScope || []
+            };
+            // 相邻对比基准：同层级的"上一次访问"节点（大运对大运、流年对流年）
+            if (info.type === 'dayun') {
+                snap.adjacentKey = (window.timelinePrevDayunKey && window.timelinePrevDayunKey !== info.key) ? window.timelinePrevDayunKey : null;
+                window.timelinePrevDayunKey = info.key;
+            } else if (info.type === 'liunian') {
+                snap.adjacentKey = (window.timelinePrevLiunianKey && window.timelinePrevLiunianKey !== info.key) ? window.timelinePrevLiunianKey : null;
+                window.timelinePrevLiunianKey = info.key;
+            } else {
+                snap.adjacentKey = null;
+            }
+            window.timelineNodeCache[info.key] = snap;
+            refreshTimelineBadges();
+            renderTimelineCompareBar();
+        } catch (e) {
+            console.warn('时间轴节点快照失败:', e);
+        }
+    }
+
+    // 刷新大运/流年列表上的契合度徽章（时间轴条）
+    function refreshTimelineBadges() {
+        const c = window.timelineNodeCache;
+        document.querySelectorAll('.dayun-item').forEach(function(item) {
+            const gzEl = item.querySelector('.dayun-ganzhi');
+            const gz = gzEl ? gzEl.textContent : '';
+            const snap = gz ? c[gz] : null;
+            let badge = item.querySelector('.timeline-fit');
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'timeline-fit';
+                item.appendChild(badge);
+            }
+            if (snap && snap.geju && snap.geju.hasGeJu) {
+                badge.textContent = snap.geju.percent + '%';
+                badge.title = '格局契合度 ' + snap.geju.percent + '%' + (snap.geju.top ? '（' + snap.geju.top.text + '）' : '');
+            } else {
+                badge.textContent = '—';
+                badge.title = '未获取数据（点击该大运后自动获取）';
+            }
+        });
+        const activeDy = document.querySelector('.dayun-item.active');
+        const dyGZ = activeDy ? (activeDy.querySelector('.dayun-ganzhi') ? activeDy.querySelector('.dayun-ganzhi').textContent : '') : '';
+        document.querySelectorAll('.liunian-item').forEach(function(item) {
+            const gzEl = item.querySelector('.liunian-ganzhi');
+            const gz = gzEl ? gzEl.textContent : '';
+            const key = dyGZ ? dyGZ + ':' + gz : gz;
+            const snap = key ? c[key] : null;
+            let badge = item.querySelector('.timeline-fit');
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'timeline-fit';
+                item.appendChild(badge);
+            }
+            if (snap && snap.geju && snap.geju.hasGeJu) {
+                badge.textContent = snap.geju.percent + '%';
+                badge.title = '格局契合度 ' + snap.geju.percent + '%' + (snap.geju.top ? '（' + snap.geju.top.text + '）' : '');
+            } else {
+                badge.textContent = '—';
+                badge.title = '未获取数据（点击该流年后自动获取）';
+            }
+        });
+    }
+
+    // 已缓存节点列表（按类型过滤，key 排序）
+    function getTimelineCachedNodes(type) {
+        const list = [];
+        Object.keys(window.timelineNodeCache).forEach(function(k) {
+            const n = window.timelineNodeCache[k];
+            if (!type || n.type === type) list.push(n);
+        });
+        list.sort(function(a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0); });
+        return list;
+    }
+
+    // 解析某节点某范围的参考比例映射：取该范围命中最适合（最后一条）的参考值规则 → relationRefs → relMap
+    function buildTimelineRelMap(node, scopeIdx) {
+        const relMap = {};
+        if (!node || !node.refRulesByScope || !node.refRulesByScope[scopeIdx]) return relMap;
+        const rules = node.refRulesByScope[scopeIdx];
+        const rule = rules.length ? rules[rules.length - 1] : null;
+        if (rule) {
+            try { rule._resolved = resolveRefOutput(rule.refOutput); } catch (e) {}
+            const refs = (rule._resolved && Array.isArray(rule._resolved.relationRefs)) ? rule._resolved.relationRefs : [];
+            refs.forEach(function(rr) {
+                if (rr && rr.relation) {
+                    const resolved = (typeof resolveRelRatio === 'function') ? resolveRelRatio(rr) : rr;
+                    if (resolved) relMap[rr.relation] = resolved;
+                }
+            });
+        }
+        return relMap;
+    }
+
+    // 当前对比对：{ base, target, reason }
+    function getTimelineComparePair() {
+        const c = window.timelineNodeCache;
+        if (window.timelineCompareMode === 'adjacent') {
+            const cur = getTimelineNodeInfo();
+            const target = c[cur.key] || null;
+            if (!target) return { base: null, target: null, reason: '当前节点数据未获取（点击节点后自动获取）' };
+            const base = target.adjacentKey ? (c[target.adjacentKey] || null) : null;
+            if (!base) return { base: null, target: target, reason: '暂无相邻基准：请依次点击两个同级节点（大运对大运、流年对流年）' };
+            return { base: base, target: target, reason: '' };
+        }
+        const base = window.timelineAnyBaseKey ? (c[window.timelineAnyBaseKey] || null) : null;
+        const target = window.timelineAnyTargetKey ? (c[window.timelineAnyTargetKey] || null) : null;
+        if (!base || !target) return { base: base, target: target, reason: '请选择基准与目标节点' };
+        return { base: base, target: target, reason: '' };
+    }
+
+    // 切换时间轴对比开关
+    function toggleTimelineCompare(on) {
+        window.timelineCompareOn = !!on;
+        renderTimelineCompareBar();
+        refreshShenBarIfVisible();
+    }
+    // 切换对比模式（相邻/任意）
+    function switchTimelineCompareMode(mode) {
+        window.timelineCompareMode = (mode === 'any') ? 'any' : 'adjacent';
+        renderTimelineCompareBar();
+        refreshShenBarIfVisible();
+    }
+    // 任意对比：选择基准/目标
+    function setTimelineAnyNode(role, key) {
+        if (role === 'base') window.timelineAnyBaseKey = key;
+        else window.timelineAnyTargetKey = key;
+        renderTimelineCompareBar();
+        refreshShenBarIfVisible();
+    }
+
+    // 渲染时间轴对比控制条（注入 #timeline-compare-bar）
+    function renderTimelineCompareBar() {
+        const box = document.getElementById('timeline-compare-bar');
+        if (!box) return;
+        const esc = escapeHtml;
+        const on = window.timelineCompareOn;
+        const mode = window.timelineCompareMode;
+        const pair = getTimelineComparePair();
+        const nodeOpt = function(selKey, role) {
+            const list = getTimelineCachedNodes(null);
+            let html = '<select class="px-1.5 py-0.5 border rounded bg-white text-xs" onchange="setTimelineAnyNode(\'' + role + '\', this.value)"><option value="">选择…</option>';
+            list.forEach(function(n) {
+                html += '<option value="' + esc(n.key) + '"' + (n.key === selKey ? ' selected' : '') + '>' + esc(n.key) + (n.type === 'dayun' ? '（大运）' : n.type === 'liunian' ? '（流年）' : '') + '</option>';
+            });
+            return html + '</select>';
+        };
+        let html = '<div class="flex flex-wrap items-center gap-2 bg-violet-50 border border-violet-200 rounded-lg px-3 py-1.5 text-xs">';
+        html += '<button onclick="toggleTimelineCompare(' + (on ? 'false' : 'true') + ')" class="px-2 py-0.5 rounded font-bold border ' + (on ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-700 border-violet-300') + '" title="开启后生克关系表切换为时间轴同层级对比（大运对大运、流年对流年）">⏱ 时间轴对比：' + (on ? '开' : '关') + '</button>';
+        if (on) {
+            html += '<span class="text-violet-700 font-medium">对比方式：</span>';
+            html += '<button onclick="switchTimelineCompareMode(\'adjacent\')" class="px-2 py-0.5 rounded font-bold border ' + (mode === 'adjacent' ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-700 border-violet-300') + '" title="自动与上一个访问的同级节点对比">相邻</button>';
+            html += '<button onclick="switchTimelineCompareMode(\'any\')" class="px-2 py-0.5 rounded font-bold border ' + (mode === 'any' ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-700 border-violet-300') + '">任意</button>';
+            if (mode === 'any') {
+                html += '<span class="text-violet-700">基准：</span>' + nodeOpt(window.timelineAnyBaseKey, 'base');
+                html += '<span class="text-violet-700">目标：</span>' + nodeOpt(window.timelineAnyTargetKey, 'target');
+            }
+            const label = pair.target ? (pair.base ? pair.base.key + ' → ' + pair.target.key : '… → ' + pair.target.key) : '';
+            if (label) html += '<span class="font-bold text-violet-800">' + esc(label) + '</span>';
+            if (pair.reason) html += '<span class="text-amber-600">' + esc(pair.reason) + '</span>';
+            html += '<button onclick="clearTimelineNodeCache()" class="ml-auto px-2 py-0.5 rounded border bg-white text-gray-500" title="清空已缓存的节点数据（大运/流年列表契合度徽章同步清空）">🗑 清空缓存</button>';
+        }
+        html += '</div>';
+        box.innerHTML = html;
+    }
+
+    // 清空节点缓存（调试/重置用）
+    function clearTimelineNodeCache() {
+        window.timelineNodeCache = {};
+        window.timelinePrevDayunKey = null;
+        window.timelinePrevLiunianKey = null;
+        window.timelineAnyBaseKey = '';
+        window.timelineAnyTargetKey = '';
+        renderTimelineCompareBar();
+        refreshTimelineBadges();
+        refreshShenBarIfVisible();
+    }
+
+    // 格局对比行（仅展示契合度数值与格局层次，不做吉凶好坏结论）
+    function renderGeJuCompareRow(base, target) {
+        const fmt = function(n) {
+            if (!n || !n.geju) return '<span class="text-gray-500">—</span>';
+            if (!n.geju.hasGeJu) return '<span class="text-gray-500">不成格</span>';
+            return '<span class="font-bold text-gray-800">' + escapeHtml(n.geju.top.text) + '</span> ' +
+                '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ' + n.geju.levelClass + '">' + escapeHtml(n.geju.level) + '</span> ' +
+                '<span class="text-blue-700 font-bold">契合度 ' + n.geju.percent + '%</span>';
+        };
+        return '<div class="bg-white border border-violet-200 rounded-lg p-2 mb-2 flex flex-wrap items-center gap-2 text-xs">' +
+            '<span class="font-bold text-violet-700">🔮 格局对比</span>' +
+            '<span class="text-gray-600">' + escapeHtml(base.key || '原局') + '：</span>' + fmt(base) +
+            '<span class="text-gray-400">⟶</span>' +
+            '<span class="text-gray-600">' + escapeHtml(target.key || '') + '：</span>' + fmt(target) +
+            '</div>';
+    }
+
+    // 构建对比表列结构（大运对比 / 流年对比）
+    function buildCompareRanges(base, target, kind) {
+        if (kind === 'dayun') {
+            return {
+                ranges: [
+                    { label: '原局', node: base, scopeIdx: 0 },
+                    { label: '原局+' + base.dayun, node: base, scopeIdx: 1 },
+                    { label: '原局+' + target.dayun, node: target, scopeIdx: 1 }
+                ],
+                changes: [
+                    { label: '原局→大运', from: 0, to: 1 },
+                    { label: '大运→大运', from: 1, to: 2 }
+                ]
+            };
+        }
+        return {
+            ranges: [
+                { label: '原局', node: base, scopeIdx: 0 },
+                { label: '原局+' + base.dayun, node: base, scopeIdx: 1 },
+                { label: '原局+' + base.dayun + '+' + base.liunian, node: base, scopeIdx: 2 },
+                { label: '原局+' + target.dayun + '+' + target.liunian, node: target, scopeIdx: 2 }
+            ],
+            changes: [
+                { label: '原局→大运', from: 0, to: 1 },
+                { label: '大运→流年', from: 1, to: 2 },
+                { label: '流年→流年', from: 2, to: 3 }
+            ]
+        };
+    }
+
+    // 变化徽章组（比例/达标/绑定/喜忌 变化）
+    function buildCompareChangeChips(fromCol, toCol, ds) {
+        const chips = [];
+        if (fromCol.a !== null && toCol.a !== null && (fromCol.a !== toCol.a || fromCol.b !== toCol.b)) {
+            chips.push('<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:rgba(0,0,0,0.05);color:#6b7280">' + fromCol.a + ':' + fromCol.b + '→' + toCol.a + ':' + toCol.b + '</span>');
+        }
+        if (fromCol.ok !== null && toCol.ok !== null && fromCol.ok !== toCol.ok) {
+            chips.push('<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + (toCol.ok ? ds.okBg : ds.failBg) + '">' + (toCol.ok ? '达标' : '未达标') + '</span>');
+        }
+        if (fromCol.bound !== toCol.bound) {
+            const col = toCol.bound ? ds.bindColor : ds.unbindColor;
+            const sym = toCol.bound ? (ds.bindSym || '↗') : (ds.unbindSym || '↘');
+            const txt = toCol.bound ? (ds.bindText || '') : (ds.unbindText || '');
+            chips.push('<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:rgba(0,0,0,0.05);color:' + col + '">' + sym + (txt ? ' ' + txt : '') + '</span>');
+        }
+        if (fromCol.pref && toCol.pref && fromCol.pref !== toCol.pref) {
+            const isXi = toCol.pref === 'xi';
+            chips.push('<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + (isXi ? ds.xiBg : ds.jiBg) + ';color:' + (isXi ? ds.xiColor : ds.jiColor) + '">' + (isXi ? (ds.xiText || '喜') : (ds.jiText || '忌')) + '</span>');
+        }
+        return chips.join('');
+    }
+
+    // 单张对比表（范围列 + 变化列交错）
+    function renderCompareRelationTable(title, defList, ranges, changes, mode, titleColor, showMark, ds) {
+        const isKe = title.indexOf('相克') >= 0;
+        const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
+        let rows = '';
+        defList.forEach(function(def) {
+            const cols = ranges.map(function(rg) {
+                const node = rg.node, si = rg.scopeIdx;
+                const st = (node.statsByScope && node.statsByScope[si]) || null;
+                const gv = function(g) {
+                    if (!st) return null;
+                    if (mode === 'tian') return st.groupTian[g] || 0;
+                    if (mode === 'di') return st.groupDi[g] || 0;
+                    return st.groupCount[g] || 0;
+                };
+                const a = gv(def.shenA), b = gv(def.shenB);
+                const relMap = buildTimelineRelMap(node, si);
+                const rr = relMap[def.shenA + (isKe ? '克' : '生') + def.shenB] || relMap[def.name] || null;
+                let ok = null;
+                if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
+                const boundList = (node.boundByScope && node.boundByScope[si]) || [];
+                const bound = boundList.indexOf(String(def.id)) >= 0 || boundList.indexOf(def.name) >= 0;
+                let pref = '';
+                const prefList = (node.prefsByScope && node.prefsByScope[si]) || [];
+                prefList.forEach(function(tp) {
+                    (tp.prefs || []).forEach(function(p) {
+                        if (!p) return;
+                        if (p.relId && String(p.relId) === String(def.id)) pref = p.pref === 'ji' ? 'ji' : 'xi';
+                        else if (p.shenB && (p.shenB === def.shenA || p.shenB === def.shenB) && !pref) pref = p.pref === 'ji' ? 'ji' : 'xi';
+                    });
+                });
+                return { label: rg.label, a: a, b: b, ok: ok, bound: bound, pref: pref };
+            });
+            let rowHasXi = false, rowHasJi = false;
+            cols.forEach(function(c) { if (c.pref === 'xi') rowHasXi = true; else if (c.pref === 'ji') rowHasJi = true; });
+            const rowBg = (rowHasXi && !rowHasJi) ? ' bg-emerald-50' : (rowHasJi && !rowHasXi) ? ' bg-rose-50' : '';
+            let midHtml = '';
+            for (let ci = 0; ci < cols.length; ci++) {
+                const c = cols[ci];
+                const cellBg = (c.ok !== null) ? ' style="background-color:' + (c.ok ? ds.okBg : ds.failBg) + '"' : '';
+                const hitHtml = c.a !== null ? (c.bound
+                    ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + '</span>'
+                    : '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitFailColor + '">' + (ds.hitFailSym || '✗') + '</span>') : '';
+                const prefMark = c.pref ? (c.pref === 'xi'
+                    ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">' + (ds.xiText || '喜') + '</span>'
+                    : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">' + (ds.jiText || '忌') + '</span>') : '';
+                midHtml += '<td class="py-1.5 px-1 text-center"' + cellBg + '">' +
+                    (c.a !== null ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
+                    (prefMark ? '<div class="mt-0.5">' + prefMark + '</div>' : '') +
+                    '</td>';
+                if (ci < cols.length - 1) {
+                    const ch = changes[ci];
+                    const chipsHtml = buildCompareChangeChips(cols[ch.from], cols[ch.to], ds);
+                    midHtml += '<td class="py-1.5 px-1 text-center align-middle">' + (chipsHtml ? '<div class="flex flex-col gap-0.5 items-center">' + chipsHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') + '</td>';
+                }
+            }
+            rows += '<tr class="border-b last:border-0 border-gray-100' + rowBg + '">' +
+                '<td class="py-1.5 pl-1 pr-1"><div class="font-bold text-sm sm:text-base leading-tight ' + relNameColor + '">' + escapeHtml(def.name) + '</div></td>' + midHtml + '</tr>';
+        });
+        let headHtml = '<th class="py-1 pl-1 pr-1 text-left text-xs font-semibold">关系</th>';
+        for (let ci = 0; ci < ranges.length; ci++) {
+            headHtml += '<th class="py-1 px-1 text-center text-xs font-semibold">' + escapeHtml(ranges[ci].label) + '</th>';
+            if (ci < ranges.length - 1) headHtml += '<th class="py-1 px-1 text-center text-[10px] font-semibold text-gray-400">' + escapeHtml(changes[ci].label) + '</th>';
+        }
+        return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
+            '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-gray-500">' + headHtml + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    // 时间轴对比内容（格局对比 + 相克/相生对比表）
+    function renderTimelineCompareContent() {
+        const pair = getTimelineComparePair();
+        if (!pair.base || !pair.target) {
+            return '<div class="text-xs text-gray-400 py-2">' + escapeHtml(pair.reason || '暂无对比数据') + '</div>';
+        }
+        const base = pair.base, target = pair.target;
+        let kind = '';
+        if (base.type === 'dayun' && target.type === 'dayun') kind = 'dayun';
+        else if (base.type === 'liunian' && target.type === 'liunian' && base.dayun === target.dayun) kind = 'liunian';
+        const ds = getDisplaySettings();
+        const mode = window.currentShenDisplayMode || 'all';
+        const showMark = window._shenBarShowMark !== false;
+        let html = renderGeJuCompareRow(base, target);
+        if (kind) {
+            const cb = buildCompareRanges(base, target, kind);
+            const defs = getRelationDefs();
+            html += '<div class="bg-white border border-gray-200 rounded-lg p-2">' +
+                renderCompareRelationTable('🔥 相克关系', defs.filter(function(d) { return d.relType === 'ke'; }), cb.ranges, cb.changes, mode, 'text-red-600', showMark, ds) + '</div>';
+            html += '<div class="bg-white border border-gray-200 rounded-lg p-2">' +
+                renderCompareRelationTable('🌱 相生关系', defs.filter(function(d) { return d.relType === 'sheng'; }), cb.ranges, cb.changes, mode, 'text-green-600', showMark, ds) + '</div>';
+        } else {
+            html += '<div class="text-xs text-amber-600 py-1">请选择同级节点对比：大运对大运，或同一大运内的流年对流年。</div>';
+        }
+        return html;
+    }
+
     function displayDuanyuResult() {
         const resultFilter = DOM.resultFilterCategory ? DOM.resultFilterCategory.value : 'all';
         const matchedByCategory = cache.matchedByCategory || {};
@@ -13077,6 +13493,8 @@
         // 生克关系识别面板（主格局面板下方，同构设计）
         const shengkePanelHtml = buildShengKePanelHtml(analyzeShengKe());
         DOM.duanyuResult.innerHTML = (gejuPanelHtml ? gejuPanelHtml + shengkePanelHtml : shengkePanelHtml) + html;
+        // 时间轴：保存当前节点快照（断语命中渲染完成后，供同层级变化对比使用）
+        snapshotCurrentNode();
     }
 
     /** 从 API 断语缓存渲染断语结果 */
