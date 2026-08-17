@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -13077,7 +13077,11 @@
                 matchedByCategory: cache.matchedByCategory || {},
                 geju: analyzeGeJu(),
                 shengke: analyzeShengKe(),
-                statsByScope: cache.statsByScope || null,
+                // statsByScope 原为 {scope0,scope1,scope2} 对象，转数组便于按范围索引（对比表用 [si] 访问）
+                statsByScope: (function() {
+                    const s = cache.statsByScope;
+                    return s ? [s.scope0, s.scope1, s.scope2] : null;
+                })(),
                 prefsByScope: cache.shenTplPrefsByScope || [],
                 boundByScope: cache.shenRelBindingsByScope || [],
                 refRulesByScope: cache.shenRefRulesByScope || []
@@ -13348,7 +13352,9 @@
                 let ok = null;
                 if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
                 const boundList = (node.boundByScope && node.boundByScope[si]) || [];
-                const bound = boundList.indexOf(String(def.id)) >= 0 || boundList.indexOf(def.name) >= 0;
+                // 绑定命中：兼容关系ID/名称/默认名（A克B）三种存储格式（对齐 buildScopeBoundSet）
+                const defRelName = def.shenA + (isKe ? '克' : '生') + def.shenB;
+                const bound = boundList.indexOf(String(def.id)) >= 0 || boundList.indexOf(def.name) >= 0 || boundList.indexOf(defRelName) >= 0;
                 let pref = '';
                 const prefList = (node.prefsByScope && node.prefsByScope[si]) || [];
                 prefList.forEach(function(tp) {
