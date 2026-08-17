@@ -797,22 +797,22 @@
             line-height: 1;
         }
         /* 设置面板样式 */
-        .shen-settings-modal { max-width: 600px; width: 100%; max-height: 70vh; overflow-y: auto; }
-        .shen-settings-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
-        .shen-settings-group label { font-size: 13px; font-weight: 600; width: 100%; color: #374151; }
+        .shen-settings-modal { max-width: 900px; width: 100%; max-height: 84vh; overflow-y: auto; }
+        .shen-settings-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+        .shen-settings-group label { font-size: 15px; font-weight: 600; width: 100%; color: #374151; }
         .shen-settings-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0; flex: 1; min-width: 0; }
         .shen-settings-presets button {
-            width: 36px; height: 36px; font-size: 16px; border: 2px solid #e5e7eb; border-radius: 6px;
+            width: 40px; height: 40px; font-size: 18px; border: 2px solid #e5e7eb; border-radius: 6px;
             cursor: pointer; transition: all 0.15s; background: #fff; display: flex; align-items: center; justify-content: center;
         }
         .shen-settings-presets button:hover { border-color: #6366f1; background: #eef2ff; }
         .shen-settings-presets button.active { border-color: #6366f1; background: #e0e7ff; box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
-        .shen-settings-input { width: 60px; font-size: 14px; padding: 4px 8px; border: 2px solid #e5e7eb; border-radius: 6px; text-align: center; }
+        .shen-settings-input { width: 72px; font-size: 16px; padding: 6px 10px; border: 2px solid #e5e7eb; border-radius: 6px; text-align: center; }
         .shen-settings-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
-        .shen-settings-preview { background: #f9fafb; border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 13px; line-height: 1.8; }
+        .shen-settings-preview { background: #f9fafb; border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 15px; line-height: 1.8; }
         .shen-settings-preview .shen-label { font-weight: 600; margin-right: 4px; }
         .shen-settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-        .shen-settings-actions button { padding: 6px 20px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+        .shen-settings-actions button { padding: 8px 26px; border-radius: 6px; font-size: 15px; font-weight: 500; cursor: pointer; border: none; }
         .shen-settings-actions .btn-primary { background: #6366f1; color: #fff; }
         .shen-settings-actions .btn-primary:hover { background: #4f46e5; }
         .shen-settings-actions .btn-cancel { background: #e5e7eb; color: #374151; }
@@ -827,12 +827,12 @@
         .shen-set-tab-btn { border: 2px solid #e5e7eb; color: #374151; background: #fff; cursor: pointer; transition: all 0.15s; }
         .shen-set-tab-btn:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
         .shen-set-tab-btn.active { border-color: #6366f1; background: #e0e7ff; color: #4338ca; }
-        .ds-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f3f4f6; }
+        .ds-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f3f4f6; }
         .ds-opt-row:last-child { border-bottom: none; }
-        .ds-opt-label { font-size: 13px; color: #374151; white-space: nowrap; }
+        .ds-opt-label { font-size: 15px; color: #374151; white-space: nowrap; }
         .ds-opt-ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-        .ds-opt-ctl input[type="color"] { width: 40px; height: 26px; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px; cursor: pointer; background: #fff; }
-        .ds-opt-ctl input[type="text"] { width: 56px; font-size: 12px; padding: 2px 6px; border: 1px solid #e5e7eb; border-radius: 4px; text-align: center; }
+        .ds-opt-ctl input[type="color"] { width: 46px; height: 30px; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px; cursor: pointer; background: #fff; }
+        .ds-opt-ctl input[type="text"] { width: 64px; font-size: 14px; padding: 3px 8px; border: 1px solid #e5e7eb; border-radius: 4px; text-align: center; }
         .ds-opt-ctl input:disabled { opacity: 0.5; cursor: not-allowed; }
         /* 移动端响应式 */
         @media (max-width: 640px) {
@@ -3305,16 +3305,16 @@
     <div id="shen-settings-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-[9999]">
         <div class="bg-white rounded-lg p-6 mx-4 shadow-2xl shen-settings-modal">
             <div class="flex justify-between items-center mb-4 pb-3 border-b">
-                <h3 class="text-lg font-bold text-gray-800">⚙ 显示设置</h3>
-                <span onclick="closeShenSettingsModal()" class="text-gray-400 hover:text-gray-600 text-xl cursor-pointer">&times;</span>
+                <h3 class="text-2xl font-bold text-gray-800">⚙ 显示设置</h3>
+                <span onclick="closeShenSettingsModal()" class="text-gray-400 hover:text-gray-600 text-2xl cursor-pointer">&times;</span>
             </div>
             <div class="flex gap-2 mb-4">
-                <button type="button" id="shen-set-tab-symbols" class="shen-set-tab-btn px-3 py-1.5 rounded text-sm font-medium active" onclick="switchShenSettingsTab('symbols')">十神标识符</button>
-                <button type="button" id="shen-set-tab-display" class="shen-set-tab-btn px-3 py-1.5 rounded text-sm font-medium" onclick="switchShenSettingsTab('display')">柱状图显示</button>
+                <button type="button" id="shen-set-tab-symbols" class="shen-set-tab-btn px-4 py-2 rounded text-base font-medium active" onclick="switchShenSettingsTab('symbols')">十神标识符</button>
+                <button type="button" id="shen-set-tab-display" class="shen-set-tab-btn px-4 py-2 rounded text-base font-medium" onclick="switchShenSettingsTab('display')">柱状图显示</button>
             </div>
             <!-- Tab1：十神标识符 -->
             <div id="shen-settings-tab-symbols">
-                <div class="text-xs text-gray-500 mb-3">可选择预设标识符或手动输入自定义符号（登录后保存到云端，换设备自动沿用）</div>
+                <div class="text-sm text-gray-500 mb-3">可选择预设标识符或手动输入自定义符号（登录后保存到云端，换设备自动沿用）</div>
                 
                 <div class="shen-settings-group">
                     <label>年柱标识</label>
@@ -10331,8 +10331,9 @@
         bindText: '绑定',         // 绑定文字
         unbindSym: '↘',           // 解绑符号
         unbindText: '解绑',        // 解绑文字
-        youqingEnabled: false,     // 有情度标注总开关
+        youqingEnabled: false,     // 有情标注开关（勾选来源全部为真时显示"有情"）
         youqingSources: ['ratio', 'bound', 'pref'],  // 有情度判断来源：ratio=生克比例达标 / bound=绑定断语命中 / pref=喜忌（仅喜为真）
+        wuqingEnabled: false,      // 无情标注开关（勾选来源任一为假时显示"无情"），与有情开关相互独立
         youqingSym: '情',          // 有情符号
         youqingText: '有情',       // 有情文字
         youqingBg: '#d1fae5',      // 有情徽章底色
@@ -10343,10 +10344,12 @@
         wuqingColor: '#991b1b'     // 无情徽章文字色
     };
     // 有情度判定：对勾选来源（生克比例达标/绑定断语命中/喜忌）取 AND——全部为真=有情，任一为假=无情；
-    // 无判定的来源跳过不参与；无任何有效来源判定时返回 null（不显示）
+    // 无判定的来源跳过不参与；无任何有效来源判定时返回 null（不显示）；
+    // 有情/无情两个开关相互独立：判定为"有情"时仅当 youqingEnabled 才返回，判定为"无情"时仅当 wuqingEnabled 才返回
     // cell: { ok: boolean|null, bound: boolean, pref: 'xi'|'ji'|'' }
     function calcYouqing(cell, ds) {
-        if (!cell || !ds || !ds.youqingEnabled) return null;
+        if (!cell || !ds) return null;
+        if (!ds.youqingEnabled && !ds.wuqingEnabled) return null;
         const sources = Array.isArray(ds.youqingSources) ? ds.youqingSources : [];
         if (!sources.length) return null;
         let effective = 0, allTrue = true;
@@ -10365,7 +10368,8 @@
             if (!v) allTrue = false;
         });
         if (!effective) return null;
-        return allTrue ? 'youqing' : 'wuqing';
+        if (allTrue) return ds.youqingEnabled ? 'youqing' : null;
+        return ds.wuqingEnabled ? 'wuqing' : null;
     }
     // 有情/无情徽章 HTML（yq: 'youqing'|'wuqing'|null）
     function buildYouqingMark(yq, ds) {
@@ -10482,10 +10486,11 @@
         }).join('');
         // 有情度设置：总开关 + 判断来源勾选 + 有情/无情符号文字与颜色
         const yqOn = !!ds.youqingEnabled;
+        const wqOn = !!ds.wuqingEnabled;
         const yqSources = Array.isArray(ds.youqingSources) ? ds.youqingSources : [];
         const yqSrcDefs = [['ratio', '生克比例达标'], ['bound', '绑定断语命中'], ['pref', '喜忌（仅喜为真）']];
         const yqSrcRows = yqSrcDefs.map(function(sd) {
-            return '<label class="inline-flex items-center gap-1 text-[11px] text-gray-600 mr-3"><input type="checkbox" data-ds-source="' + sd[0] + '"' + (yqSources.indexOf(sd[0]) >= 0 ? ' checked' : '') + ro + '>' + sd[1] + '</label>';
+            return '<label class="inline-flex items-center gap-1 text-sm text-gray-600 mr-3"><input type="checkbox" data-ds-source="' + sd[0] + '"' + (yqSources.indexOf(sd[0]) >= 0 ? ' checked' : '') + ro + '>' + sd[1] + '</label>';
         }).join('');
         const yqSymItems = [
             ['youqingSym', '有情符号', 'youqingText', '有情文字'],
@@ -10512,10 +10517,11 @@
                 '<input type="text" data-ds-key="' + it[0] + '" value="' + v + '" maxlength="9"' + ro + '>' +
                 '</span></div>';
         }).join('');
-        const yqHtml = '<div class="font-bold text-xs text-gray-600 mb-1 mt-2">有情度设置</div>' +
+        const yqHtml = '<div class="font-bold text-sm text-gray-600 mb-1 mt-2">有情度设置</div>' +
             '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-3">' +
-            '<label class="inline-flex items-center gap-1 text-xs text-gray-700 mb-1"><input type="checkbox" data-ds-key="youqingEnabled"' + (yqOn ? ' checked' : '') + ro + '> 开启有情度标注（勾选来源全部为真=有情，任一为假=无情）</label>' +
-            '<div class="text-[11px] text-gray-400 mb-1">判断来源：</div>' +
+            '<label class="inline-flex items-center gap-1 text-sm text-gray-700 mb-1"><input type="checkbox" data-ds-key="youqingEnabled"' + (yqOn ? ' checked' : '') + ro + '> 开启有情标注（勾选来源全部为真时显示）</label>' +
+            '<label class="inline-flex items-center gap-1 text-sm text-gray-700 mb-1"><input type="checkbox" data-ds-key="wuqingEnabled"' + (wqOn ? ' checked' : '') + ro + '> 开启无情标注（勾选来源任一为假时显示）</label>' +
+            '<div class="text-xs text-gray-400 mb-1">判断来源：</div>' +
             '<div class="mb-1">' + yqSrcRows + '</div>' +
             yqSymRows +
             yqColorRows +
@@ -10523,15 +10529,15 @@
         // 颜色输入与文本输入双向同步
         box.innerHTML =
             (isAdminUser
-                ? '<div class="text-xs text-gray-500 mb-2">自定义柱状对比图/关系表的标识颜色与符号文字，保存后所有用户实时生效。</div>'
-                : '<div class="text-xs text-gray-500 mb-2">当前为只读模式（仅管理员可修改柱状图显示设置）。</div>') +
-            '<div class="font-bold text-xs text-gray-600 mb-1">颜色设置</div>' +
+                ? '<div class="text-sm text-gray-500 mb-2">自定义柱状对比图/关系表的标识颜色与符号文字，保存后所有用户实时生效。</div>'
+                : '<div class="text-sm text-gray-500 mb-2">当前为只读模式（仅管理员可修改柱状图显示设置）。</div>') +
+            '<div class="font-bold text-sm text-gray-600 mb-1">颜色设置</div>' +
             '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-3">' + colorRows + '</div>' +
-            '<div class="font-bold text-xs text-gray-600 mb-1">符号 / 文字设置</div>' +
+            '<div class="font-bold text-sm text-gray-600 mb-1">符号 / 文字设置</div>' +
             '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-2">' + symRows + '</div>' +
             yqHtml +
             (isAdminUser ? '<button type="button" id="ds-reset-btn" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded text-sm">恢复默认</button>' : '') +
-            '<div class="text-[11px] text-gray-400 mt-1">' + buildShenBarLegendHtml(ds) + '</div>';
+            '<div class="text-xs text-gray-400 mt-1">' + buildShenBarLegendHtml(ds) + '</div>';
         // 颜色 ↔ 文本输入同步
         box.querySelectorAll('[data-ds-key]').forEach(function(input) {
             input.addEventListener('input', function() {
@@ -10784,9 +10790,13 @@
         const ji = ds.jiText || '忌';
         const bind = (ds.bindSym || '↗') + (ds.bindText ? ' ' + ds.bindText : '');
         const unbind = (ds.unbindSym || '↘') + (ds.unbindText ? ' ' + ds.unbindText : '');
-        // 有情度图例（启用时显示）
-        const yqLegend = ds.youqingEnabled
-            ? ' · <span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.youqingBg) + ';color:' + esc(ds.youqingColor) + '">' + esc((ds.youqingSym || '情') + (ds.youqingText ? ' ' + ds.youqingText : '')) + '</span>=有情，<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.wuqingBg) + ';color:' + esc(ds.wuqingColor) + '">' + esc((ds.wuqingSym || '无') + (ds.wuqingText ? ' ' + ds.wuqingText : '')) + '</span>=无情（勾选来源全部为真=有情，任一为假=无情）'
+        // 有情度图例（按两个独立开关分别显示）
+        const yqOn2 = !!ds.youqingEnabled, wqOn2 = !!ds.wuqingEnabled;
+        const yqLegend = (yqOn2 || wqOn2)
+            ? ' · ' + (yqOn2
+                ? '<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.youqingBg) + ';color:' + esc(ds.youqingColor) + '">' + esc((ds.youqingSym || '情') + (ds.youqingText ? ' ' + ds.youqingText : '')) + '</span>=有情（来源全部为真）' : '') +
+              (wqOn2
+                ? (yqOn2 ? '，' : '') + '<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.wuqingBg) + ';color:' + esc(ds.wuqingColor) + '">' + esc((ds.wuqingSym || '无') + (ds.wuqingText ? ' ' + ds.wuqingText : '')) + '</span>=无情（来源任一为假）' : '')
             : '';
         return '图例：<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.okBg) + '">达标</span>/<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.failBg) + '">未达标</span>（需参考比例）' +
             ' · 数字后 <span style="color:' + esc(ds.hitOkColor) + '">' + esc(hitOk) + '</span>=绑定断语/宏命中，<span style="color:' + esc(ds.hitFailColor) + '">' + esc(hitFail) + '</span>=未命中' +
