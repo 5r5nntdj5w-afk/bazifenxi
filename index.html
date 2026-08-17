@@ -14195,8 +14195,8 @@
                 const c = cols[ci];
                 const cellBg = (c.ok !== null) ? ' style="background-color:' + (c.ok ? ds.okBg : ds.failBg) + '"' : '';
                 const hitHtml = c.a !== null ? (c.bound
-                    ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + '</span>'
-                    : '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitFailColor + '">' + (ds.hitFailSym || '✗') + '</span>') : '';
+                    ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + (ds.hitOkText ? ' ' + ds.hitOkText : '') + '</span>'
+                    : '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitFailColor + '">' + (ds.hitFailSym || '✗') + (ds.hitFailText ? ' ' + ds.hitFailText : '') + '</span>') : '';
                 const prefMark = c.pref ? (c.pref === 'xi'
                     ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">' + (ds.xiText || '喜') + '</span>'
                     : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">' + (ds.jiText || '忌') + '</span>') : '';
