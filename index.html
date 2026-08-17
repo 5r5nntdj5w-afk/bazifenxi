@@ -10330,8 +10330,52 @@
         bindSym: '↗',             // 绑定符号
         bindText: '绑定',         // 绑定文字
         unbindSym: '↘',           // 解绑符号
-        unbindText: '解绑'        // 解绑文字
+        unbindText: '解绑',        // 解绑文字
+        youqingEnabled: false,     // 有情度标注总开关
+        youqingSources: ['ratio', 'bound', 'pref'],  // 有情度判断来源：ratio=生克比例达标 / bound=绑定断语命中 / pref=喜忌（仅喜为真）
+        youqingSym: '情',          // 有情符号
+        youqingText: '有情',       // 有情文字
+        youqingBg: '#d1fae5',      // 有情徽章底色
+        youqingColor: '#166534',   // 有情徽章文字色
+        wuqingSym: '无',           // 无情符号
+        wuqingText: '无情',        // 无情文字
+        wuqingBg: '#fee2e2',       // 无情徽章底色
+        wuqingColor: '#991b1b'     // 无情徽章文字色
     };
+    // 有情度判定：对勾选来源（生克比例达标/绑定断语命中/喜忌）取 AND——全部为真=有情，任一为假=无情；
+    // 无判定的来源跳过不参与；无任何有效来源判定时返回 null（不显示）
+    // cell: { ok: boolean|null, bound: boolean, pref: 'xi'|'ji'|'' }
+    function calcYouqing(cell, ds) {
+        if (!cell || !ds || !ds.youqingEnabled) return null;
+        const sources = Array.isArray(ds.youqingSources) ? ds.youqingSources : [];
+        if (!sources.length) return null;
+        let effective = 0, allTrue = true;
+        sources.forEach(function(src) {
+            let v = null;
+            if (src === 'ratio') {
+                if (cell.ok === true || cell.ok === false) v = cell.ok;
+            } else if (src === 'bound') {
+                v = !!cell.bound;
+            } else if (src === 'pref') {
+                if (cell.pref === 'xi') v = true;
+                else if (cell.pref === 'ji') v = false;
+            }
+            if (v === null) return;
+            effective++;
+            if (!v) allTrue = false;
+        });
+        if (!effective) return null;
+        return allTrue ? 'youqing' : 'wuqing';
+    }
+    // 有情/无情徽章 HTML（yq: 'youqing'|'wuqing'|null）
+    function buildYouqingMark(yq, ds) {
+        if (!yq || !ds) return '';
+        const isYou = yq === 'youqing';
+        const sym = isYou ? (ds.youqingSym || '情') : (ds.wuqingSym || '无');
+        const txt = isYou ? (ds.youqingText || '') : (ds.wuqingText || '');
+        return '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold ml-0.5 align-middle" style="background-color:' + (isYou ? ds.youqingBg : ds.wuqingBg) + ';color:' + (isYou ? ds.youqingColor : ds.wuqingColor) + '">' +
+            sym + (txt ? ' ' + txt : '') + '</span>';
+    }
     let _shenDisplaySettings = null;
     function getDisplaySettings() {
         if (!_shenDisplaySettings) _shenDisplaySettings = Object.assign({}, DEFAULT_SHEN_DISPLAY);
@@ -10436,6 +10480,46 @@
                 txtHtml +
                 '</span></div>';
         }).join('');
+        // 有情度设置：总开关 + 判断来源勾选 + 有情/无情符号文字与颜色
+        const yqOn = !!ds.youqingEnabled;
+        const yqSources = Array.isArray(ds.youqingSources) ? ds.youqingSources : [];
+        const yqSrcDefs = [['ratio', '生克比例达标'], ['bound', '绑定断语命中'], ['pref', '喜忌（仅喜为真）']];
+        const yqSrcRows = yqSrcDefs.map(function(sd) {
+            return '<label class="inline-flex items-center gap-1 text-[11px] text-gray-600 mr-3"><input type="checkbox" data-ds-source="' + sd[0] + '"' + (yqSources.indexOf(sd[0]) >= 0 ? ' checked' : '') + ro + '>' + sd[1] + '</label>';
+        }).join('');
+        const yqSymItems = [
+            ['youqingSym', '有情符号', 'youqingText', '有情文字'],
+            ['wuqingSym', '无情符号', 'wuqingText', '无情文字']
+        ];
+        const yqSymRows = yqSymItems.map(function(it) {
+            return '<div class="ds-opt-row"><span class="ds-opt-label">' + it[1] + '</span>' +
+                '<span class="ds-opt-ctl">' +
+                '<input type="text" data-ds-key="' + it[0] + '" value="' + (ds[it[0]] || '') + '" maxlength="3"' + ro + '>' +
+                '<span class="ds-opt-label text-gray-400 text-xs">' + it[3] + '</span><input type="text" data-ds-key="' + it[2] + '" value="' + (ds[it[2]] || '') + '" maxlength="6"' + ro + '>' +
+                '</span></div>';
+        }).join('');
+        const yqColorItems = [
+            ['youqingBg', '有情徽章底色'],
+            ['youqingColor', '有情文字色'],
+            ['wuqingBg', '无情徽章底色'],
+            ['wuqingColor', '无情文字色']
+        ];
+        const yqColorRows = yqColorItems.map(function(it) {
+            const v = ds[it[0]];
+            return '<div class="ds-opt-row"><span class="ds-opt-label">' + it[1] + '</span>' +
+                '<span class="ds-opt-ctl">' +
+                '<input type="color" data-ds-key="' + it[0] + '" value="' + v + '"' + ro + '>' +
+                '<input type="text" data-ds-key="' + it[0] + '" value="' + v + '" maxlength="9"' + ro + '>' +
+                '</span></div>';
+        }).join('');
+        const yqHtml = '<div class="font-bold text-xs text-gray-600 mb-1 mt-2">有情度设置</div>' +
+            '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-3">' +
+            '<label class="inline-flex items-center gap-1 text-xs text-gray-700 mb-1"><input type="checkbox" data-ds-key="youqingEnabled"' + (yqOn ? ' checked' : '') + ro + '> 开启有情度标注（勾选来源全部为真=有情，任一为假=无情）</label>' +
+            '<div class="text-[11px] text-gray-400 mb-1">判断来源：</div>' +
+            '<div class="mb-1">' + yqSrcRows + '</div>' +
+            yqSymRows +
+            yqColorRows +
+            '</div>';
         // 颜色输入与文本输入双向同步
         box.innerHTML =
             (isAdminUser
@@ -10445,6 +10529,7 @@
             '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-3">' + colorRows + '</div>' +
             '<div class="font-bold text-xs text-gray-600 mb-1">符号 / 文字设置</div>' +
             '<div class="bg-gray-50 border border-gray-200 rounded px-3 py-1 mb-2">' + symRows + '</div>' +
+            yqHtml +
             (isAdminUser ? '<button type="button" id="ds-reset-btn" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded text-sm">恢复默认</button>' : '') +
             '<div class="text-[11px] text-gray-400 mt-1">' + buildShenBarLegendHtml(ds) + '</div>';
         // 颜色 ↔ 文本输入同步
@@ -10459,9 +10544,14 @@
         if (isAdminUser) {
             box.querySelector('#ds-reset-btn').addEventListener('click', function() {
                 Object.keys(DEFAULT_SHEN_DISPLAY).forEach(function(k) {
-                    box.querySelectorAll('[data-ds-key="' + k + '"]').forEach(function(peer) {
-                        peer.value = DEFAULT_SHEN_DISPLAY[k];
-                    });
+                    if (k === 'youqingSources') return;
+                    const peer = box.querySelector('[data-ds-key="' + k + '"]');
+                    if (!peer) return;
+                    if (peer.type === 'checkbox') peer.checked = !!DEFAULT_SHEN_DISPLAY[k];
+                    else peer.value = DEFAULT_SHEN_DISPLAY[k];
+                });
+                box.querySelectorAll('input[type="checkbox"][data-ds-source]').forEach(function(cb) {
+                    cb.checked = (DEFAULT_SHEN_DISPLAY.youqingSources || []).indexOf(cb.dataset.dsSource) >= 0;
                 });
             });
         }
@@ -10472,9 +10562,21 @@
         const settings = {};
         if (!box) return settings;
         Object.keys(DEFAULT_SHEN_DISPLAY).forEach(function(k) {
+            if (k === 'youqingSources') return;  // 复选框数组单独收集
             const el = box.querySelector('input[data-ds-key="' + k + '"]');
-            settings[k] = (el && el.value !== undefined && el.value !== null && el.value !== '') ? el.value : DEFAULT_SHEN_DISPLAY[k];
+            if (!el) { settings[k] = DEFAULT_SHEN_DISPLAY[k]; return; }
+            if (el.type === 'checkbox') {
+                settings[k] = !!el.checked;
+            } else {
+                settings[k] = (el.value !== undefined && el.value !== null && el.value !== '') ? el.value : DEFAULT_SHEN_DISPLAY[k];
+            }
         });
+        // 有情度判断来源：收集勾选的复选框
+        const srcCbs = box.querySelectorAll('input[type="checkbox"][data-ds-source]');
+        if (srcCbs.length) {
+            settings.youqingSources = Array.prototype.filter.call(srcCbs, function(cb) { return cb.checked; })
+                .map(function(cb) { return cb.dataset.dsSource; });
+        }
         return settings;
     }
 
@@ -10682,10 +10784,14 @@
         const ji = ds.jiText || '忌';
         const bind = (ds.bindSym || '↗') + (ds.bindText ? ' ' + ds.bindText : '');
         const unbind = (ds.unbindSym || '↘') + (ds.unbindText ? ' ' + ds.unbindText : '');
+        // 有情度图例（启用时显示）
+        const yqLegend = ds.youqingEnabled
+            ? ' · <span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.youqingBg) + ';color:' + esc(ds.youqingColor) + '">' + esc((ds.youqingSym || '情') + (ds.youqingText ? ' ' + ds.youqingText : '')) + '</span>=有情，<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.wuqingBg) + ';color:' + esc(ds.wuqingColor) + '">' + esc((ds.wuqingSym || '无') + (ds.wuqingText ? ' ' + ds.wuqingText : '')) + '</span>=无情（勾选来源全部为真=有情，任一为假=无情）'
+            : '';
         return '图例：<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.okBg) + '">达标</span>/<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.failBg) + '">未达标</span>（需参考比例）' +
             ' · 数字后 <span style="color:' + esc(ds.hitOkColor) + '">' + esc(hitOk) + '</span>=绑定断语/宏命中，<span style="color:' + esc(ds.hitFailColor) + '">' + esc(hitFail) + '</span>=未命中' +
             ' · <span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.xiBg) + ';color:' + esc(ds.xiColor) + '">' + esc(xi) + '</span>=喜用，<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.jiBg) + ';color:' + esc(ds.jiColor) + '">' + esc(ji) + '</span>=忌讳（生克或十神强弱任一命中即标出，随范围动态变化）' +
-            ' · <span style="color:' + esc(ds.bindColor) + '">' + esc(bind) + '</span>=范围切换绑定，<span style="color:' + esc(ds.unbindColor) + '">' + esc(unbind) + '</span>=范围切换解绑';
+            ' · <span style="color:' + esc(ds.bindColor) + '">' + esc(bind) + '</span>=范围切换绑定，<span style="color:' + esc(ds.unbindColor) + '">' + esc(unbind) + '</span>=范围切换解绑' + yqLegend;
     }
     function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount, prefSets, strongPrefSets) {
         visibleCount = (visibleCount === undefined || visibleCount === null) ? 3 : visibleCount;
@@ -10771,8 +10877,10 @@
                     ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">' + (ds.xiText || '喜') + '</span>'
                     : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">' + (ds.jiText || '忌') + '</span>')
                     : '';
+                // 有情度徽章（勾选来源全部为真=有情，任一为假=无情；无有效来源判定不显示）
+                const yqMark = c.stat ? buildYouqingMark(calcYouqing({ ok: c.ok, bound: c.bound, pref: prefByCol[ci] }, ds), ds) : '';
                 midHtml += '<td class="py-1.5 px-1 text-center"' + cellBg + '">' +
-                    (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
+                    (c.stat ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + yqMark + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
                     (prefMark ? '<div class="mt-0.5">' + prefMark + '</div>' : '') +
                     '</td>';
                 if (ci < visibleCount - 1) midHtml += changeTd(trans[ci]);
@@ -14200,8 +14308,10 @@
                 const prefMark = c.pref ? (c.pref === 'xi'
                     ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">' + (ds.xiText || '喜') + '</span>'
                     : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">' + (ds.jiText || '忌') + '</span>') : '';
+                // 有情度徽章（勾选来源全部为真=有情，任一为假=无情；无有效来源判定不显示）
+                const yqMark = c.a !== null ? buildYouqingMark(calcYouqing({ ok: c.ok, bound: c.bound, pref: c.pref }, ds), ds) : '';
                 midHtml += '<td class="py-1.5 px-1 text-center"' + cellBg + '">' +
-                    (c.a !== null ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
+                    (c.a !== null ? '<div class="font-bold text-sm sm:text-base leading-tight">' + c.a + ':' + c.b + hitHtml + yqMark + '</div>' : '<span class="text-gray-300 text-sm">—</span>') +
                     (prefMark ? '<div class="mt-0.5">' + prefMark + '</div>' : '') +
                     '</td>';
                 if (ci < cols.length - 1) {
