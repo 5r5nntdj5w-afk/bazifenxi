@@ -11042,9 +11042,12 @@
                 return;
             }
             const f = node.field;
-            if (typeof f === 'string' && f.indexOf('十神数量-') === 0 && node.val !== undefined && node.val !== '') {
-                const g = f.replace('十神数量-', '');
-                if (!g) return;
+            // 参考值提取：字段以"数量-十神/十神组名"结尾即提取，忽略任意前缀（当前评估范围/原局/原局+大运+流年等），
+            // 断语既然能命中就以断语中的十神为准；五行数量字段（'…五行数量-木'）不属于十神，不参与提取
+            const fmm = (typeof f === 'string') ? /数量-(.+)$/.exec(f) : null;
+            if (fmm && node.val !== undefined && node.val !== '') {
+                const g = fmm[1];
+                if (!g || (GROUPED_SHEN.indexOf(g) < 0 && FULL_SHEN.indexOf(g) < 0)) return;
                 const w = (node.weight !== undefined && node.weight > 0) ? node.weight : 1;
                 if (!best[g] || w < best[g].w) best[g] = { w: w, leaf: node };
             }
@@ -14018,7 +14021,23 @@
         refreshShenBarIfVisible();
     }
 
-    // 单个数据状态列（节点+范围）的断语契合度卡片：默认显示契合度最高命中断语，多候选可下拉切换
+    // 格局候选的展示名：只显示断语绑定的标注模板名（格局名，与柱状图「标注来源」同源）；
+    // 未绑定模板的断语回退显示断语文本（截断）；断语全文无需在此展示，主格局识别区/断语区可见
+    function geJuCandidateLabel(c) {
+        try {
+            if (c && c.rule && c.rule.conditions && c.rule.conditions.referenceOutput) {
+                const rid = c.rule.conditions.referenceOutput.refTemplateId;
+                if (rid) {
+                    const tpl = (typeof getRefTemplateById === 'function') ? getRefTemplateById(rid) : null;
+                    const nm = tpl && (tpl.displayName || tpl.name);
+                    if (nm) return nm;
+                }
+            }
+        } catch (e) {}
+        const t = (c && c.text) || '未命名';
+        return t.length > 20 ? t.slice(0, 20) + '…' : t;
+    }
+    // 单个数据状态列（节点+范围）的断语契合度卡片：默认显示契合度最高命中断语绑定的格局模板名，多候选可下拉切换
     function renderTplFitCell(col) {
         const esc = escapeHtml;
         const label = esc(col.label);
@@ -14036,15 +14055,15 @@
         const top = candidates[idx] || candidates[0];
         const gl = g.levelClass ? { level: g.level, levelClass: g.levelClass } : tplGejuLevelInfo(top.percent);
         const opts = candidates.map(function(c, i) {
-            return '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(c.text) + '（' + c.percent + '%）</option>';
+            return '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(geJuCandidateLabel(c)) + '（' + c.percent + '%）</option>';
         }).join('');
         return '<div class="flex-1 min-w-[190px] border border-violet-100 rounded p-1.5 bg-violet-50/40">' +
             '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
             '<div class="flex items-center gap-1 mb-1">' +
-            '<span class="text-gray-500 shrink-0">断语：</span>' +
+            '<span class="text-gray-500 shrink-0">格局：</span>' +
             '<select class="px-1 py-0.5 border rounded bg-white text-xs min-w-0 flex-1" onchange="setTimelineTplFit(\'' + esc(selKey) + '\', parseInt(this.value))">' + opts + '</select>' +
             '</div>' +
-            '<div class="flex flex-wrap items-center gap-1"><span class="font-bold text-gray-800 truncate max-w-[140px]">' + esc(top.text) + '</span> ' +
+            '<div class="flex flex-wrap items-center gap-1"><span class="font-bold text-gray-800 truncate max-w-[140px]">' + esc(geJuCandidateLabel(top)) + '</span> ' +
             '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ' + gl.levelClass + '">' + esc(gl.level) + '</span> ' +
             '<span class="text-blue-700 font-bold">契合度 ' + top.percent + '%</span></div>' +
             '</div>';
