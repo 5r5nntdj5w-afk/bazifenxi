@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -13099,6 +13099,8 @@
             window.timelineNodeCache[info.key] = snap;
             refreshTimelineBadges();
             renderTimelineCompareBar();
+            // 快照更新后立即重绘对比表：点击相邻节点后自动显示生克关系表，无需再点按钮
+            refreshShenBarIfVisible();
         } catch (e) {
             console.warn('时间轴节点快照失败:', e);
         }
@@ -13309,12 +13311,9 @@
         };
     }
 
-    // 变化徽章组（比例/达标/绑定/喜忌 变化）
+    // 变化徽章组（达标/绑定/喜忌 变化；比例已在单元格中体现，不在变化列重复标识）
     function buildCompareChangeChips(fromCol, toCol, ds) {
         const chips = [];
-        if (fromCol.a !== null && toCol.a !== null && (fromCol.a !== toCol.a || fromCol.b !== toCol.b)) {
-            chips.push('<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:rgba(0,0,0,0.05);color:#6b7280">' + fromCol.a + ':' + fromCol.b + '→' + toCol.a + ':' + toCol.b + '</span>');
-        }
         if (fromCol.ok !== null && toCol.ok !== null && fromCol.ok !== toCol.ok) {
             chips.push('<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + (toCol.ok ? ds.okBg : ds.failBg) + '">' + (toCol.ok ? '达标' : '未达标') + '</span>');
         }
