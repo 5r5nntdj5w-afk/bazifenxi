@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1702,12 +1702,12 @@
             </div>
             <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel relative" id="ref-output-panel-rule">
                 <div class="flex items-center justify-between mb-1">
-                    <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本断语时作为十神柱状对比图的参考值基准；从下方模板库中选择，模板修改后自动生效）</span></label>
-                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出参考值设置</button>
+                    <label class="block text-sm font-medium text-amber-700">📊 标注输出 <span class="text-xs text-gray-500">（命中本断语时作为十神柱状对比图的参考值基准；从下方标注模板库中选择，模板修改后自动生效）</span></label>
+                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出标注设置</button>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <div class="relative flex-1 min-w-[180px]">
-                        <input type="text" class="ref-tpl-search w-full p-1.5 border rounded text-sm" placeholder="🔍 搜索并选择参考值模板（如：食伤格）..." autocomplete="off" onfocus="openRefTplList(this)" oninput="filterRefTplList(this)">
+                        <input type="text" class="ref-tpl-search w-full p-1.5 border rounded text-sm" placeholder="🔍 搜索并选择标注模板（如：食伤格）..." autocomplete="off" onfocus="openRefTplList(this)" oninput="filterRefTplList(this)">
                         <div class="ref-tpl-list hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto z-30"></div>
                     </div>
                     <input type="hidden" class="ref-tpl-id">
@@ -10243,8 +10243,8 @@
     function getRefDisplayName(ref) {
         if (ref.refOutput && ref.refOutput.refTemplateId) {
             const tpl = getRefTemplateById(ref.refOutput.refTemplateId);
-            if (tpl) return (tpl.displayName || tpl.name || '参考值模板');
-            return '参考值模板（缺失）';
+            if (tpl) return (tpl.displayName || tpl.name || '标注模板');
+            return '标注模板（缺失）';
         }
         if (ref.refOutput && ref.refOutput.displayName && String(ref.refOutput.displayName).trim()) return String(ref.refOutput.displayName).trim();
         if (ref.source === 'macro') return ref.name || '未命名宏';
@@ -10464,21 +10464,21 @@
         // 参考值来源栏
         let refBarHtml = '';
         if (rules.length === 0) {
-            refBarHtml = '<div class="text-center text-xs text-gray-400 py-1">未命中任何带参考值的断语或条件宏，仅显示实际数量统计。</div>';
+            refBarHtml = '<div class="text-center text-xs text-gray-400 py-1">未命中任何带标注输出的断语或条件宏，仅显示实际数量统计。</div>';
         } else {
             const optsHtml = rules.map(function(r, i) {
                 const label = (r.source === 'rule' ? '📜' : '🧩') + ' ' + getRefDisplayName(r);
                 return '<option value="' + i + '"' + (i === selIdx ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
             }).join('');
             refBarHtml = '<div class="flex flex-wrap items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5 text-xs">' +
-                '<span class="font-medium text-indigo-700">参考值来源:</span>' +
+                '<span class="font-medium text-indigo-700">标注来源:</span>' +
                 '<select id="shen-ref-select" class="px-1.5 py-0.5 border rounded bg-white text-xs" onchange="window._shenRefIndex=parseInt(this.value);renderShenBar();">' + optsHtml + '</select>' +
                 '<span class="text-gray-500">共' + rules.length + '条命中，可切换参考值</span>' +
                 '</div>';
         }
         // 模板缺失提示（引用的模板被删除或本地拉不到）
         if (selRef && selRef._resolved && selRef._resolved.missing) {
-            refBarHtml += '<div class="mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">⚠ 参考值模板已缺失（可能已被删除或未同步到本机），当前仅显示实际数量统计。</div>';
+            refBarHtml += '<div class="mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">⚠ 标注模板已缺失（可能已被删除或未同步到本机），当前仅显示实际数量统计。</div>';
         }
         refBarBox.innerHTML = refBarHtml;
 
@@ -11488,7 +11488,7 @@
             return (t.name || '').indexOf(kw) >= 0 || (t.displayName || '').indexOf(kw) >= 0 || refTemplateSummary(t).indexOf(kw) >= 0;
         });
         if (!filtered.length) {
-            box.innerHTML = '<p class="text-gray-400 text-center py-4">' + (list.length ? '没有匹配的模板' : '暂无参考值模板，点击「➕ 新建模板」创建') + '</p>';
+            box.innerHTML = '<p class="text-gray-400 text-center py-4">' + (list.length ? '没有匹配的模板' : '暂无标注模板，点击「➕ 新建模板」创建') + '</p>';
             return;
         }
         box.innerHTML = filtered.map(function(t) {
@@ -11518,7 +11518,7 @@
         return n;
     }
     function newRefTemplate() {
-        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再创建参考值模板！'); return; }
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再创建标注模板！'); return; }
         _editingRefTplId = null;
         document.getElementById('ref-tpl-name').value = '';
         document.getElementById('ref-tpl-display-name').value = '';
@@ -11527,7 +11527,7 @@
         document.getElementById('ref-tpl-edit-view').classList.remove('hidden');
     }
     function editRefTemplate(id) {
-        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再编辑参考值模板！'); return; }
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再编辑标注模板！'); return; }
         const tpl = getRefTemplateById(id);
         if (!tpl) { alert('模板不存在或已被删除！'); renderRefTemplateList(); return; }
         _editingRefTplId = tpl.cloudId || tpl.id;
@@ -11539,8 +11539,8 @@
         document.getElementById('ref-tpl-edit-view').classList.remove('hidden');
     }
     async function deleteRefTemplate(id) {
-        if (!confirm('确认删除该参考值模板？所有引用它的断语/宏将显示"模板缺失"提示。')) return;
-        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再删除参考值模板！'); return; }
+        if (!confirm('确认删除该标注模板？所有引用它的断语/宏将显示"模板缺失"提示。')) return;
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再删除标注模板！'); return; }
         try {
             const { error } = await supabaseClient.from('ref_templates').delete().eq('id', id);
             if (error) throw error;
@@ -12006,7 +12006,7 @@
     async function saveRefTemplate() {
         const name = document.getElementById('ref-tpl-name').value.trim();
         if (!name) { alert('请填写模板名称！'); return; }
-        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再保存参考值模板！'); return; }
+        if (!isRefTplLoggedIn()) { alert('请先登录 Supabase 账号后再保存标注模板！'); return; }
         const content = collectRefTemplateEditor() || {};
         // conditions 树为唯一权威存储；四字段由反编译生成，保证旧消费方（柱状图/生克表标注）兼容
         const conditions = content.conditions || null;
@@ -12050,7 +12050,7 @@
                 const search = panel.querySelector('.ref-tpl-search');
                 const tip = panel.querySelector('.ref-tpl-tip');
                 if (tpl && search) { search.value = tpl.displayName || tpl.name || ''; if (tip) tip.classList.add('hidden'); }
-                else if (!tpl && search) { search.value = ''; if (tip) { tip.textContent = '⚠ 引用的参考值模板已缺失，请重新选择或到「输出参考值设置」中恢复。'; tip.classList.remove('hidden'); } }
+                else if (!tpl && search) { search.value = ''; if (tip) { tip.textContent = '⚠ 引用的标注模板已缺失，请重新选择或到「输出标注设置」中恢复。'; tip.classList.remove('hidden'); } }
             }
         });
     }
@@ -12064,7 +12064,7 @@
             return (t.name || '').indexOf(kw) >= 0 || (t.displayName || '').indexOf(kw) >= 0 || refTemplateSummary(t).indexOf(kw) >= 0;
         });
         if (!list.length) {
-            listBox.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">' + (getRefTemplates().length ? '没有匹配的模板' : '暂无模板，点击「⚙️ 输出参考值设置」创建') + '</div>';
+            listBox.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">' + (getRefTemplates().length ? '没有匹配的模板' : '暂无模板，点击「⚙️ 输出标注设置」创建') + '</div>';
             return;
         }
         listBox.innerHTML = list.map(function(t) {
@@ -12725,7 +12725,7 @@
             } else {
                 if (search) search.value = '';
                 if (clearBtn) clearBtn.classList.add('hidden');
-                if (tip) { tip.textContent = '⚠ 引用的参考值模板已缺失，请重新选择或到「输出参考值设置」中恢复。'; tip.classList.remove('hidden'); }
+                if (tip) { tip.textContent = '⚠ 引用的标注模板已缺失，请重新选择或到「输出标注设置」中恢复。'; tip.classList.remove('hidden'); }
             }
         } else if (ro.values || ro.relationRefs) {
             // 旧版内嵌参考值：仍可正常渲染，但编辑器不再支持手动编辑
@@ -13771,7 +13771,7 @@
         if (!fits.length) {
             return '<div class="flex-1 min-w-[190px] border border-gray-100 rounded p-1.5 bg-gray-50/40">' +
                 '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
-                '<span class="text-gray-400">无参考值模板命中</span></div>';
+                '<span class="text-gray-400">无标注模板命中</span></div>';
         }
         const selKey = col.node.key + '#' + col.scopeIdx;
         let idx = 0;
@@ -13820,7 +13820,7 @@
         }
         return '<div class="bg-white border border-violet-200 rounded-lg p-2 mb-2 text-xs">' +
             '<div class="flex items-center gap-2 mb-1.5"><span class="font-bold text-violet-700">🔮 格局对比</span>' +
-            '<span class="text-gray-500">基于参考值模板标准格局（节点 vs 模板契合度，命中多个模板可下拉切换）</span></div>' +
+            '<span class="text-gray-500">基于标注模板标准格局（节点 vs 模板契合度，命中多个模板可下拉切换）</span></div>' +
             '<div class="flex flex-wrap items-start gap-2">' + cols.map(function(col) { return renderTplFitCell(col); }).join('') + '</div>' +
             '</div>';
     }
@@ -27637,7 +27637,7 @@ function renderBatchCondRefTpl() {
     try {
         if (typeof getRefTemplates === 'function') templates = getRefTemplates() || [];
     } catch (e) { templates = []; }
-    sel.innerHTML = '<option value="">--请选择参考值模板--</option>' +
+    sel.innerHTML = '<option value="">--请选择标注模板--</option>' +
         templates.map(function(t) {
             const label = t.displayName || t.name || '未命名模板';
             const id = t.cloudId || t.id || '';
@@ -35201,12 +35201,12 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="mb-3 p-2 border border-amber-200 rounded bg-amber-50 ref-output-panel relative" id="ref-output-panel-macro">
                 <div class="flex items-center justify-between mb-1">
-                    <label class="block text-sm font-medium text-amber-700">📊 参考值输出 <span class="text-xs text-gray-500">（命中本条件宏时作为十神柱状对比图的参考值基准；从下方模板库中选择，模板修改后自动生效）</span></label>
-                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出参考值设置</button>
+                    <label class="block text-sm font-medium text-amber-700">📊 标注输出 <span class="text-xs text-gray-500">（命中本条件宏时作为十神柱状对比图的参考值基准；从下方标注模板库中选择，模板修改后自动生效）</span></label>
+                    <button type="button" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded shrink-0" onclick="openRefTemplateManager()">⚙️ 输出标注设置</button>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <div class="relative flex-1 min-w-[180px]">
-                        <input type="text" class="ref-tpl-search w-full p-1.5 border rounded text-sm" placeholder="🔍 搜索并选择参考值模板（如：食伤格）..." autocomplete="off" onfocus="openRefTplList(this)" oninput="filterRefTplList(this)">
+                        <input type="text" class="ref-tpl-search w-full p-1.5 border rounded text-sm" placeholder="🔍 搜索并选择标注模板（如：食伤格）..." autocomplete="off" onfocus="openRefTplList(this)" oninput="filterRefTplList(this)">
                         <div class="ref-tpl-list hidden absolute left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto z-30"></div>
                     </div>
                     <input type="hidden" class="ref-tpl-id">
@@ -35283,10 +35283,10 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="p-4 overflow-y-auto flex-1 space-y-4">
             <p class="text-sm text-gray-500">已选择 <strong id="batch-cond-count" class="text-blue-600">0</strong> 项，设置将应用到全部选中项。各项均可选择「不修改 / 设置 / 清除」，未修改的项保持原状。</p>
-            <!-- 参考值输出 -->
+            <!-- 标注输出 -->
             <div class="border border-amber-200 rounded-lg p-3">
                 <div class="flex items-center gap-3 mb-2">
-                    <span class="font-bold text-sm text-amber-700">📊 参考值输出</span>
+                    <span class="font-bold text-sm text-amber-700">📊 标注输出</span>
                     <select id="bc-ref-mode" class="px-2 py-1 border rounded text-sm" onchange="onBatchCondModeChange('ref')">
                         <option value="">不修改</option>
                         <option value="set">设置（选择模板）</option>
@@ -35709,11 +35709,11 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
-<!-- 参考值模板管理窗口（十神柱状对比图参考值基准模板） -->
+<!-- 标注模板管理窗口（十神柱状对比图参考值基准模板） -->
 <div id="ref-template-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] hidden">
     <div class="bg-white rounded-lg shadow-xl w-[920px] max-w-[96vw] max-h-[92vh] flex flex-col mx-4">
         <div class="flex justify-between items-center p-4 border-b shrink-0">
-            <h3 class="text-xl font-bold text-amber-800">📊 参考值模板管理</h3>
+            <h3 class="text-xl font-bold text-amber-800">📊 标注模板管理</h3>
             <button onclick="closeRefTemplateManager()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
         </div>
         <!-- 列表视图 -->
@@ -35739,7 +35739,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="text" id="ref-tpl-name" class="w-full p-2 border rounded text-base" placeholder="如：食伤格·身强">
             </div>
             <div class="mb-3">
-                <label class="block text-sm text-gray-600 mb-1">显示名称 <span class="text-gray-400">（留空默认使用模板名称；在柱状图参考值来源下拉中显示）</span></label>
+                <label class="block text-sm text-gray-600 mb-1">显示名称 <span class="text-gray-400">（留空默认使用模板名称；在柱状图标注来源下拉中显示）</span></label>
                 <input type="text" id="ref-tpl-display-name" class="w-full p-2 border rounded text-base" placeholder="如：食伤格·身强">
             </div>
             <!-- 分区 Tab -->
