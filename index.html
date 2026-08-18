@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -13451,7 +13451,8 @@
         const NM_NONE = (typeof glHint.noneName === 'string' && glHint.noneName) ? glHint.noneName : '不成格';
         const levelBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold border ${geju.levelClass}">${escapeHtml(geju.level)}</span>`;
         const fitBadge = `<span class="inline-block px-2 py-0.5 rounded text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">契合度 ${geju.percent}%</span>`;
-        const listHtml = geju.candidates.slice(0, 5).map(c => {
+        // 候选列表跳过主格局（top）本身，避免同一格局在主标题与候选第一行重复显示
+        const listHtml = geju.candidates.filter(c => c !== geju.top).slice(0, 5).map(c => {
             const isTop = c === geju.top;
             return `<div class="flex items-center justify-between text-sm py-0.5 ${isTop ? 'font-bold text-gray-800' : 'text-gray-500'}">
                 <span>${isTop ? '👑 ' : ''}${escapeHtml(c.text).replace(/&lt;br\s*\/?&gt;/gi, '<br>')}</span>
