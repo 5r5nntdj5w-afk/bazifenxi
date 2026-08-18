@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1736,6 +1736,7 @@
                 <button id="add-condition-group" class="px-4 py-2 bg-purple-600 text-white rounded">+ 添加条件组</button>
                 <button id="add-condition" class="px-4 py-2 bg-blue-600 text-white rounded">+ 添加条件</button>
                 <button id="insert-macro-btn" class="px-4 py-2 bg-indigo-500 text-white rounded">🧩 插入条件宏</button>
+                <button id="import-macro-btn" class="px-4 py-2 bg-indigo-700 text-white rounded">📥 导入条件宏</button>
                 <button id="insert-rule-ref-btn" class="px-4 py-2 bg-teal-600 text-white rounded">🔗 引用断语</button>
             </div>
             
@@ -8904,23 +8905,9 @@
                 } else if(!hasAnyBiConstraint){
                     res = false;
                 } else {
+                    // 批量包含的 scope 仅决定统计哪些柱位（biPillars），不要求更高层级不存在：
+                    // scope=原局 → 只统计原局四柱；大运/流年的存在不影响原局统计结果
                     const actualBiGz = biActualGzFinal;
-                    // 层级上限约束：scope 之外的更高层级必须不存在（与定位批量一致）；scope=评估范围 为数据驱动，按实际存在范围解析，无需约束
-                    const biScopeForbid = {
-                        '原局': ['dayun', 'liunian', 'liuyue'],
-                        '原局+大运': ['liunian', 'liuyue'],
-                        '原局+大运+流年': ['liuyue'],
-                        '原局+大运+流年+流月': []
-                    };
-                    const biForbidKeys = biScopeForbid[biSc] || [];
-                    let biScopeForbidFail = false;
-                    for(const fk of biForbidKeys){
-                        const fnode = data[fk];
-                        if(fnode && (fnode.t || fnode.d)){ biScopeForbidFail = true; break; }
-                    }
-                    if(biScopeForbidFail){
-                        res = false;
-                    } else {
                     // scope=评估范围 → 数据驱动解析为实际统计范围（有流年=12字/有大运=10字/仅原局=8字）
                     let biEvalSc = biSc;
                     if(biEvalSc === '评估范围'){
@@ -8966,7 +8953,6 @@
                         res = evalBiDim('天干') || evalBiDim('地支');
                     } else {
                         res = evalBiDim(actualBiGz);
-                    }
                     }
                 }
                 actual = c.val;
@@ -28782,6 +28768,7 @@ async function deleteMacroTag(tag) {
 // 存储宏选择器的目标容器和编辑中的宏ID（用于循环引用检测）
 let _macroSelectorTarget = null;
 let _macroSelectorEditingId = null;
+let _macroSelectorMode = 'insert'; // 'insert'=插入引用, 'import'=导入树结构
 
 // 检查条件树中是否直接引用了指定宏ID
 function hasDirectMacroRef(conditions, targetId) {
@@ -28840,13 +28827,20 @@ function getCircularRefTargets(editingMacroId) {
     return result;
 }
 
-function openMacroSelector(targetContainer, editingMacroId) {
-    // 存储目标容器和编辑中宏ID
+function openMacroSelector(targetContainer, editingMacroId, mode) {
+    // 存储目标容器、编辑中宏ID、操作模式
     _macroSelectorTarget = targetContainer || document.querySelector('#rule-conditions .condition-group-root');
     _macroSelectorEditingId = editingMacroId || null;
+    _macroSelectorMode = mode || 'insert'; // 'insert'=插入引用, 'import'=导入树结构
     
-    // 预先计算循环引用禁止列表
-    const circularRefSet = editingMacroId ? getCircularRefTargets(editingMacroId) : new Set();
+    // 更新弹窗标题和按钮文案
+    const titleEl = document.querySelector('#macro-selector-modal .macro-selector-title');
+    const tipEl = document.querySelector('#macro-selector-modal .macro-selector-tip');
+    if (titleEl) titleEl.textContent = _macroSelectorMode === 'import' ? '📥 选择要导入的条件宏' : '🧩 选择要引用的条件宏';
+    if (tipEl) tipEl.textContent = _macroSelectorMode === 'import' ? '将条件宏的完整条件树展开导入到当前编辑器中，可自由修改' : '将条件宏作为引用插入，引用的宏修改后此处自动同步';
+    
+    // 预先计算循环引用禁止列表（仅插入引用模式需要）
+    const circularRefSet = (_macroSelectorMode === 'insert' && editingMacroId) ? getCircularRefTargets(editingMacroId) : new Set();
     
     const container = document.getElementById('macro-selector-list');
     let macros = getVisibleMacros();
@@ -28929,6 +28923,12 @@ async function insertMacroRef(macroId) {
     if (!macro) return;
     closeMacroSelector();
     
+    // 导入模式：深拷贝条件树并渲染
+    if (_macroSelectorMode === 'import') {
+        importMacroTree(macro);
+        return;
+    }
+    
     // 记录宏的使用
     await recordMacroUsage(macroId);
     
@@ -28953,6 +28953,36 @@ async function insertMacroRef(macroId) {
         <button type="button" class="ml-auto text-red-500 hover:text-red-700 text-sm font-bold" onclick="this.closest('.condition-item').remove()">&times;</button>
     `;
     target.appendChild(item);
+}
+
+/**
+ * 导入条件宏：深拷贝宏的条件树结构，展开渲染到目标容器中
+ * @param {Object} macro - 条件宏对象（含 conditions.logic + conditions.children）
+ */
+function importMacroTree(macro) {
+    if (!macro || !macro.conditions) return;
+    const root = _macroSelectorTarget || document.querySelector('#rule-conditions .condition-group-root');
+    if (!root) return;
+    const target = window._lastGroupChildren || root;
+    
+    // 深拷贝条件树（避免修改源宏数据）
+    const treeData = JSON.parse(JSON.stringify(macro.conditions));
+    
+    // 在目标容器中创建一个新的条件组包裹导入的条件
+    const group = createConditionGroupElement(treeData.logic || 'and', false);
+    const groupChildren = group.querySelector('.group-children');
+    target.appendChild(group);
+    bindGroupEvents(group);
+    
+    // 递归渲染导入的条件节点
+    renderConditionGroup(treeData, groupChildren);
+}
+
+/**
+ * 打开宏选择器（导入模式）
+ */
+function openMacroImporter(targetContainer, editingMacroId) {
+    openMacroSelector(targetContainer, editingMacroId, 'import');
 }
 
 // 断语引用选择器（插入父级断语引用到条件中）
@@ -29329,6 +29359,12 @@ function initMacroEvents() {
         openMacroSelector(root, null);
     };
 
+    const importBtn = document.getElementById('import-macro-btn');
+    if (importBtn) importBtn.onclick = () => {
+        const root = document.querySelector('#rule-conditions .condition-group-root');
+        openMacroImporter(root, null);
+    };
+
     const ruleRefBtn = document.getElementById('insert-rule-ref-btn');
     if (ruleRefBtn) ruleRefBtn.onclick = openRuleSelector;
     
@@ -29367,6 +29403,17 @@ function initMacroEvents() {
             const root = document.getElementById('macro-condition-root');
             if (!root) return;
             openMacroSelector(root, editingMacroId);
+        };
+    }
+    
+    // 宏编辑器导入条件宏按钮
+    const macroImportMacro = document.getElementById('macro-import-macro-btn');
+    if (macroImportMacro) {
+        macroImportMacro.onclick = (e) => {
+            e.stopPropagation();
+            const root = document.getElementById('macro-condition-root');
+            if (!root) return;
+            openMacroImporter(root, editingMacroId);
         };
     }
     
@@ -29435,12 +29482,12 @@ function initMacroEvents() {
         }
     });
     
-    // 宏选择器搜索/筛选/排序（打开时重新渲染）
+    // 宏选择器搜索/筛选/排序（打开时重新渲染，保持当前模式）
     ['macro-selector-search', 'macro-selector-tag-filter', 'macro-selector-sort'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener('input', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(_macroSelectorTarget, _macroSelectorEditingId); });
-            el.addEventListener('change', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(_macroSelectorTarget, _macroSelectorEditingId); });
+            el.addEventListener('input', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(_macroSelectorTarget, _macroSelectorEditingId, _macroSelectorMode); });
+            el.addEventListener('change', () => { if (!document.getElementById('macro-selector-modal').classList.contains('hidden')) openMacroSelector(_macroSelectorTarget, _macroSelectorEditingId, _macroSelectorMode); });
         }
     });
     
@@ -35673,6 +35720,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button id="macro-add-group" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs">+ 添加条件组</button>
                         <button id="macro-add-condition" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs">+ 添加条件</button>
                         <button id="macro-insert-macro-btn" class="px-3 py-1.5 bg-indigo-500 text-white rounded text-xs">🧩 插入条件宏</button>
+                        <button id="macro-import-macro-btn" class="px-3 py-1.5 bg-indigo-700 text-white rounded text-xs">📥 导入条件宏</button>
                     </div>
                 </div>
             </div>
@@ -35801,9 +35849,10 @@ document.addEventListener('DOMContentLoaded', function() {
 <div id="macro-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] hidden">
     <div class="bg-white rounded-lg shadow-xl w-[550px] max-h-[70vh] flex flex-col mx-4">
         <div class="flex justify-between items-center p-4 border-b shrink-0">
-            <h3 class="text-lg font-bold text-indigo-800">🧩 选择条件宏</h3>
+            <h3 class="text-lg font-bold text-indigo-800 macro-selector-title">🧩 选择条件宏</h3>
             <button onclick="closeMacroSelector()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
         </div>
+        <div class="px-4 pt-1 pb-1 text-xs text-gray-400 macro-selector-tip">将条件宏作为引用插入，引用的宏修改后此处自动同步</div>
         <div class="px-4 pt-3 pb-1 flex flex-wrap gap-2 items-center border-b">
             <input type="text" id="macro-selector-search" class="flex-1 min-w-[140px] p-2 border rounded text-sm" placeholder="搜索宏...">
             <select id="macro-selector-tag-filter" class="p-2 border rounded text-sm min-w-[100px]">
@@ -37745,7 +37794,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             const mappingRule = mappingRuleId ? getMappingRuleById(mappingRuleId) : null;
             const mappingType = mappingRule ? mappingRule.type : '';
             const mappingOffset = mappingRule ? mappingRule.offset : '';
-            const parts = [`定位批量`, `mappingBase=${mappingMacroId}`, `mapping=${mappingRuleId}`, `mappingType=${mappingType}`, `mappingOffset=${mappingOffset}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
+            const parts = [`定位批量`, `mappingBase=${mappingMacroId}`, `mapping=${mappingRuleId}`, `mappingType=${mappingType}`, `mappingOffset=${mappingOffset}`, `type=${judgeType}`, `ganZhi=${ganzhi}`, `scope=${scope}`];
             // 自定义映射：序列化 customMap
             if(mappingRule && mappingRule.customMap && mappingType.includes('自定义')){
                 try {
@@ -37783,7 +37832,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                     }
                 }
             });
-            const parts = [`定位批量`, `inherit=${inheritMacroId}`, `type=${judgeType}`, `ganZhi=${ganzhi}`];
+            const parts = [`定位批量`, `inherit=${inheritMacroId}`, `type=${judgeType}`, `ganZhi=${ganzhi}`, `scope=${scope}`];
             if(ganzhi === '通用' && quzhi) parts.push(`取值=${quzhi}`);
             parts.push(`flip=${flip ? '1' : '0'}`);
             if(incrementChecked.length > 0) parts.push(incrementChecked.join('|'));

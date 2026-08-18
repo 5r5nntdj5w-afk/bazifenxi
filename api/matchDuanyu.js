@@ -1043,6 +1043,7 @@ function evaluateLeafCondition(data, cond, context) {
     // 解析编码值
     var parts = val.split('|');
     var pbType = '十神', pbGanZhi = '天干', pbScope = '原局', pbQuZhi = '';
+    var pbScopeExplicit = false; // 字段编码是否显式写入了 scope=（未写时映射/inherit 模式从基准宏排列兜底）
     var pbInheritId = '';
     var pbFlip = false; // 原局翻转（由编码 flip= 决定）
     var pbMappingId = '', pbMappingBaseId = '', pbMappingType = '', pbMappingOffset = '';
@@ -1052,7 +1053,7 @@ function evaluateLeafCondition(data, cond, context) {
       var p = parts[pi];
       if (p.indexOf('type=') === 0) pbType = p.replace('type=','');
       else if (p.indexOf('ganZhi=') === 0) pbGanZhi = p.replace('ganZhi=','');
-      else if (p.indexOf('scope=') === 0) pbScope = p.replace('scope=','');
+      else if (p.indexOf('scope=') === 0) { pbScope = p.replace('scope=',''); pbScopeExplicit = true; }
       else if (p.indexOf('取值=') === 0) pbQuZhi = p.replace('取值=','');
       else if (p.indexOf('inherit=') === 0) pbInheritId = p.replace('inherit=','');
       else if (p.indexOf('flip=') === 0) pbFlip = p.replace('flip=','') === '1';
@@ -1184,6 +1185,9 @@ function evaluateLeafCondition(data, cond, context) {
               if (mapGanZhi === '通用' && mArrGz !== '通用') mapGanZhi = mArrGz;
             } else if (mapParts[mpi].indexOf('取值=') === 0) {
               if (!mapQuZhi) mapQuZhi = mapParts[mpi].replace('取值=','');
+            } else if (mapParts[mpi].indexOf('scope=') === 0) {
+              // scope 兜底：字段编码未显式写 scope= 时，从基准宏排列提取（兼容旧数据/继承语义）
+              if (!pbScopeExplicit) pbScope = mapParts[mpi].replace('scope=','');
             }
           }
           // 判断（含原局翻转）
@@ -1226,6 +1230,9 @@ function evaluateLeafCondition(data, cond, context) {
               if (inhGanZhi === '通用' && arrGz !== '通用') inhGanZhi = arrGz;
             } else if (inhParts[ipi].indexOf('取值=') === 0) {
               if (!inhQuZhi) inhQuZhi = inhParts[ipi].replace('取值=','');
+            } else if (inhParts[ipi].indexOf('scope=') === 0) {
+              // scope 兜底：字段编码未显式写 scope= 时，从被引用宏排列提取（兼容旧数据/继承语义）
+              if (!pbScopeExplicit) pbScope = inhParts[ipi].replace('scope=','');
             }
           }
           // 判断（含原局翻转）
@@ -1360,24 +1367,8 @@ function evaluateLeafCondition(data, cond, context) {
       actual = val;
       biDbg('  判定: ❌ 不匹配（无任何包含/排除配置可判定 fail-closed）');
     } else {
-      // 层级上限约束：scope 之外的更高层级必须不存在（与定位批量一致）；scope=评估范围 为数据驱动，按实际存在范围解析，无需约束
-      var biScopeForbidMap = {
-        '原局': ['dayun', 'liunian', 'liuyue'],
-        '原局+大运': ['liunian', 'liuyue'],
-        '原局+大运+流年': ['liuyue'],
-        '原局+大运+流年+流月': []
-      };
-      var biForbidList = biScopeForbidMap[biScope] || [];
-      var biScopeForbidHit = false;
-      for (var bfi = 0; bfi < biForbidList.length; bfi++) {
-        var bfNode = data[biForbidList[bfi]];
-        if (bfNode && (bfNode.t || bfNode.d)) { biScopeForbidHit = true; break; }
-      }
-      if (biScopeForbidHit) {
-        res = false;
-        actual = val;
-        biDbg('  判定: ❌ 不匹配（层级上限约束：scope=' + biScope + ' 但存在更高层级）');
-      } else {
+      // 批量包含的 scope 仅决定统计哪些柱位（biPillars），不要求更高层级不存在：
+      // scope=原局 → 只统计原局四柱；大运/流年的存在不影响原局统计结果
       // 确定实际取值维度（'自动'=干支自动分化：天干/地支双维度判定，任一满足即匹配）
       var actualBiGz = biActualGzFinal;
 
@@ -1469,7 +1460,6 @@ function evaluateLeafCondition(data, cond, context) {
         res = r1.ok;
         actual = val;
         biDbg('  八字实际值(' + actualBiGz + ',' + biScope + ')=[' + r1.vals.join(',') + '] → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配（' + r1.fail + '）'));
-      }
       }
     }
   }
