@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -2288,17 +2288,8 @@
                         </optgroup>
                         <optgroup label="【批量判断】批量包含判断">
                         <option value="批量包含-五行">批量包含-五行</option>
-                        <option value="批量包含-五行(原局+大运)">批量包含-五行(原局+大运)</option>
-                        <option value="批量包含-五行(原局+大运+流年)">批量包含-五行(原局+大运+流年)</option>
-                        <option value="批量包含-五行(评估范围)">批量包含-五行(评估范围)（跟随评估范围开关）</option>
                         <option value="批量包含-十神">批量包含-十神</option>
-                        <option value="批量包含-十神(原局+大运)">批量包含-十神(原局+大运)</option>
-                        <option value="批量包含-十神(原局+大运+流年)">批量包含-十神(原局+大运+流年)</option>
-                        <option value="批量包含-十神(评估范围)">批量包含-十神(评估范围)（跟随评估范围开关）</option>
                         <option value="批量包含-十神组">批量包含-十神组</option>
-                        <option value="批量包含-十神组(原局+大运)">批量包含-十神组(原局+大运)</option>
-                        <option value="批量包含-十神组(原局+大运+流年)">批量包含-十神组(原局+大运+流年)</option>
-                        <option value="批量包含-十神组(评估范围)">批量包含-十神组(评估范围)（跟随评估范围开关）</option>
                         </optgroup>
                     </select>
                         <div class="custom-field-trigger" tabindex="0" role="combobox" aria-haspopup="listbox">
@@ -8918,6 +8909,7 @@
                     const biPillars = biEvalSc === '原局' ? ['nian','yue','ri','shi']
                         : biEvalSc === '原局+大运' ? ['nian','yue','ri','shi','dayun']
                         : biEvalSc === '原局+大运+流年' ? ['nian','yue','ri','shi','dayun','liunian']
+                        : biEvalSc === '原局+大运+流年+流月' ? ['nian','yue','ri','shi','dayun','liunian','liuyue']
                         : ['nian','yue','ri','shi'];
                     const biRg = data.ri?.t || '';
                     // 收集+判断单个维度（dim='天干'/'地支'）
@@ -15204,13 +15196,23 @@
         return template.content.cloneNode(true).querySelector('.condition-item');
     }
     
+    // 批量包含字段统一（2026-08-18）：字段名从"批量包含-十神组(原局+大运)"等12个独立字段
+    // 精简为"批量包含-十神组"等3个统一字段，层级改由设置窗口的"层级"下拉选择（写入编码 scope=）。
+    // 引擎按前缀"批量包含-"识别、按编码 scope= 统计，字段名不影响匹配；
+    // 此处将已保存的旧字段名归一到统一字段名，编码内 scope= 原样保留，编辑回显/匹配均不受影响。
+    function normalizeBiFieldName(field) {
+        if (typeof field !== 'string' || field.indexOf('批量包含-') !== 0) return field;
+        const m = field.match(/^(批量包含-(?:五行|十神|十神组))(?:\(.+\))?$/);
+        return m ? m[1] : field;
+    }
+    
     // 同步自定义字段选择器的显示文本
     function syncFieldSelectDisplay(item, fieldValue) {
         const wrapper = item.querySelector('.condition-field-wrapper');
         if (!wrapper) return;
         const hiddenSelect = wrapper.querySelector('.condition-field');
         const textSpan = wrapper.querySelector('.custom-field-text');
-        hiddenSelect.value = fieldValue;
+        hiddenSelect.value = normalizeBiFieldName(fieldValue);
         const selectedOpt = hiddenSelect.options[hiddenSelect.selectedIndex];
         if (selectedOpt && selectedOpt.text && selectedOpt.text !== '选择字段') {
             textSpan.textContent = selectedOpt.text;
@@ -29561,7 +29563,7 @@ function loadConditionsToEditor(container, conditions) {
                 const logic = item.querySelector('.condition-logic');
                 container.appendChild(item);
                 // 先设字段值（需在 bindItemEvents / initCustomFieldSelect 之前）
-                if (field) field.value = child.field || '';
+                if (field) field.value = normalizeBiFieldName(child.field || '');
                 // 绑定事件（设置onchange处理器）
                 bindItemEvents(item);
                 // 触发change以更新op选项和值控件
@@ -37902,6 +37904,15 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                 <option value="地支">地支</option>
             </select>
         </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">📊 层级（统计范围）</label>
+            <select id="bi-scope" class="w-full p-2 border rounded text-sm">
+                <option value="原局">原局</option>
+                <option value="原局+大运">原局+大运</option>
+                <option value="原局+大运+流年">原局+大运+流年</option>
+                <option value="原局+大运+流年+流月">原局+大运+流年+流月</option>
+            </select>
+        </div>
         <!-- Tab切换 -->
         <div class="mb-4">
             <div class="flex border-b border-gray-200">
@@ -38367,11 +38378,12 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         const tagFilter = document.getElementById('bi-mapping-tag-filter');
         if(tagFilter) tagFilter.value = '';
 
-        const { type, scope } = parseBiField(field);
+        const { type } = parseBiField(field);
 
         // 读取已有值
         const valSel = item.querySelector('.condition-val-select');
         let existingGanzhi = '通用';
+        let existingScope = '';
         _biExistingInclude = [];
         _biExistingExclude = [];
         let isMappingMode = false;
@@ -38384,6 +38396,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             const parts = valSel.value.split('|');
             for(const p of parts){
                 if(p.startsWith('ganZhi=')) existingGanzhi = p.replace('ganZhi=','');
+                else if(p.startsWith('scope=')) existingScope = p.replace('scope=','');
                 else if(p.startsWith('包含=')) _biExistingInclude = p.replace('包含=','').split(',').filter(v => v);
                 else if(p.startsWith('排除=')) _biExistingExclude = p.replace('排除=','').split(',').filter(v => v);
                 else if(p.startsWith('mappingBase=')) { isMappingMode = true; existingMappingBase = p.replace('mappingBase=',''); }
@@ -38394,6 +38407,18 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         }
 
         document.getElementById('bi-ganzhi').value = existingGanzhi;
+        // 层级：统一字段后从编码 scope= 读取（旧数据编码均已携带 scope=，兼容"评估范围"等非标准值动态补选项）
+        const scopeSel = document.getElementById('bi-scope');
+        const scope = existingScope || '原局';
+        if(scopeSel){
+            if(!Array.from(scopeSel.options).some(o => o.value === scope)){
+                const opt = document.createElement('option');
+                opt.value = scope;
+                opt.textContent = scope;
+                scopeSel.appendChild(opt);
+            }
+            scopeSel.value = scope;
+        }
 
         // 绑定Tab按钮事件
         document.querySelectorAll('.bi-ref-tab').forEach(btn => {
@@ -38435,8 +38460,10 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
 
     window.saveBatchInclude = function(){
         if(!_biCurrentItem) return;
-        const { type, scope } = parseBiField(_biCurrentField);
+        const { type } = parseBiField(_biCurrentField);
         const ganzhi = document.getElementById('bi-ganzhi').value;
+        const scopeSel = document.getElementById('bi-scope');
+        const scope = scopeSel ? scopeSel.value : '原局';
         const currentTab = _biCurrentTab;
 
         if(currentTab === 'mapping'){
