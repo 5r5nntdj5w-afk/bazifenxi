@@ -1381,6 +1381,7 @@ function evaluateLeafCondition(data, cond, context) {
       if (biEvalSc === '原局') biPillars = ['nian','yue','ri','shi'];
       else if (biEvalSc === '原局+大运') biPillars = ['nian','yue','ri','shi','dayun'];
       else if (biEvalSc === '原局+大运+流年') biPillars = ['nian','yue','ri','shi','dayun','liunian'];
+      else if (biEvalSc === '原局+大运+流年+流月') biPillars = ['nian','yue','ri','shi','dayun','liunian','liuyue'];
       else biPillars = ['nian','yue','ri','shi'];
 
       var biRg = data.ri ? data.ri.t : '';
