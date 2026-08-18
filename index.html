@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -38309,9 +38309,11 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             const mappedExcText = mapped.exclude.length > 0 ? `❌${mapped.exclude.join(',')}` : '（无）';
             const finalIncText = finalCfg.include.length > 0 ? `✅${finalCfg.include.join(',')}` : '（无）';
             const finalExcText = finalCfg.exclude.length > 0 ? `❌${finalCfg.exclude.join(',')}` : '（无）';
+            const scopeEl = document.getElementById('bi-scope');
+            const curScope = scopeEl ? scopeEl.value : '原局';
             html += `<div class="py-0.5">
                 <div><span class="text-gray-400">原:</span> ${cfg.type}·${cfg.scope}: ${origIncText} ${origExcText}</div>
-                <div><span class="text-emerald-600">映:</span> ${cfg.type}·${cfg.scope}: ${mappedIncText} ${mappedExcText}</div>
+                <div><span class="text-emerald-600">映:</span> ${cfg.type}·${curScope}: ${mappedIncText} ${mappedExcText}</div>
                 ${(_biIncrementInclude.length > 0 || _biIncrementExclude.length > 0) ? `<div><span class="text-orange-600">最终:</span> ${finalIncText} ${finalExcText}</div>` : ''}
             </div>`;
         });
@@ -38415,6 +38417,12 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                 scopeSel.appendChild(opt);
             }
             scopeSel.value = scope;
+        }
+        // 层级切换时联动刷新映射预览（映: 行按字段自身层级动态显示）
+        if(scopeSel){
+            scopeSel.onchange = function(){
+                if(_biCurrentTab === 'mapping') renderBiMappingPreview();
+            };
         }
 
         // 绑定Tab按钮事件
