@@ -240,3 +240,46 @@ console.log('批量包含(无流月数据, scope=原局+大运+流年+流月): '
 console.log('\n===== 总结 =====');
 console.log('若 有运/流年时批量包含不匹配、无运/流年时匹配 → 根因=批量包含 scope=原局 的"层级上限约束"拦截');
 console.log('（scope=原局 被实现为"更高层级必须不存在"，而用户排盘有大运丙寅+流年戊申 → 恒不匹配）');
+
+// ===== 映射引用层级以引用字段自身为准（2026-08-18 定稿）=====
+console.log('\n===== 映射引用层级以引用字段自身为准 =====');
+// 基准宏：批量包含 scope=原局、包含=[财星]（原局地支无财星，原局+大运地支含财星=大运支寅）
+const baseMacroScopeYuanJu = {
+  id: '999',
+  cloudId: 999,
+  name: '映射层级测试-基准宏（scope=原局，包含=财星）',
+  conditions: {
+    logic: 'and',
+    children: [
+      {
+        op: 'eq',
+        val: '批量包含|type=十神组|ganZhi=通用|scope=原局|包含=财星',
+        field: '批量包含-十神组',
+        logic: 'and'
+      }
+    ],
+    defaultQuZhi: '',
+    defaultMapping: {}
+  }
+};
+const dataSc = JSON.parse(JSON.stringify(data));
+dataSc.macros = (data.macros || []).concat([baseMacroScopeYuanJu]);
+// 字段自身 scope=原局（ganZhi=地支，ctxNone）→ 原局地支无财星 → 不匹配（证明基准宏 scope=原局 未生效于字段层级）
+const leafMapScYuanJu = {
+  op: 'eq',
+  val: '批量包含|mappingBase=999|mapping=|mappingType=|mappingOffset=|type=十神组|ganZhi=地支|scope=原局',
+  field: '批量包含-十神组',
+  logic: 'and'
+};
+let rMapScYuanJu = F.evaluateLeafCondition(dataSc, leafMapScYuanJu, ctxNone);
+console.log('映射引用(基准scope=原局, 字段scope=原局, 地支): ' + (rMapScYuanJu ? '✅ 匹配' : '❌ 不匹配') + '（期望❌：原局地支无财星）');
+// 字段自身 scope=原局+大运（ganZhi=地支，ctxNone）→ 原局+大运地支含财星（大运支寅）→ 匹配
+// 证明：基准宏 scope=原局 被忽略，层级以字段自身（原局+大运）为准统计
+const leafMapScDayun = {
+  op: 'eq',
+  val: '批量包含|mappingBase=999|mapping=|mappingType=|mappingOffset=|type=十神组|ganZhi=地支|scope=原局+大运',
+  field: '批量包含-十神组',
+  logic: 'and'
+};
+let rMapScDayun = F.evaluateLeafCondition(dataSc, leafMapScDayun, ctxNone);
+console.log('映射引用(基准scope=原局, 字段scope=原局+大运, 地支): ' + (rMapScDayun ? '✅ 匹配' : '❌ 不匹配') + '（期望✅：原局+大运地支含财星=大运支寅）');
