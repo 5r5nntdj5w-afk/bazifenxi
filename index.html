@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -37246,6 +37246,42 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         return _refLockedNonYuanKeys.has(posKey);
     }
 
+    // 层级顺序（用于比较大小）
+    const PB_SCOPE_ORDER = ['原局', '原局+大运', '原局+大运+流年', '原局+大运+流年+流月'];
+
+    // 选中基准宏/继承宏时自动跟随层级（只升不降）：字段层级 < 基准宏层级 时提升到基准宏层级，
+    // 防止"字段默认原局但基准宏为原局+大运"导致层级上限约束恒拦截、断语永不匹配
+    function autoFollowScopeToBase(){
+        const curTab = _currentRefTab;
+        let macro = null;
+        if(curTab === 'inherit' && _selectedInheritId) macro = getMacroById(_selectedInheritId);
+        else if(curTab === 'mapping' && _selectedMappingMacroId) macro = getMacroById(_selectedMappingMacroId);
+        if(!macro) return;
+        const leaves = [];
+        collectPbLeaves(macro, leaves, new Set());
+        let maxScopeIdx = 0;
+        leaves.forEach(val => {
+            const scm = /scope=([^|]+)/.exec(val);
+            if(scm){
+                const idx = PB_SCOPE_ORDER.indexOf(scm[1]);
+                if(idx > maxScopeIdx) maxScopeIdx = idx;
+            }
+        });
+        const scopeSel = document.getElementById('pb-scope');
+        if(!scopeSel) return;
+        const curIdx = PB_SCOPE_ORDER.indexOf(scopeSel.value);
+        // 只升不降：字段层级小于基准宏层级（且字段为标准层级）时提升
+        if(curIdx >= 0 && curIdx < maxScopeIdx){
+            scopeSel.value = PB_SCOPE_ORDER[maxScopeIdx];
+            console.log('[PB] 已自动跟随基准宏层级: ' + PB_SCOPE_ORDER[maxScopeIdx]);
+            const judgeType = document.getElementById('pb-judge-type').value;
+            const ganzhi = document.getElementById('pb-ganzhi').value;
+            const quzhi = document.getElementById('pb-quzhi').value;
+            renderPositions(PB_SCOPE_ORDER[maxScopeIdx], judgeType, ganzhi, quzhi);
+            if(curTab === 'mapping') renderMappingPreview();
+        }
+    }
+
     // 渲染位置勾选区
     function renderPositions(scope, judgeType, ganzhi, quzhi){
         collectRefLockedPositions();
@@ -37440,6 +37476,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         listEl.querySelectorAll('[data-macro-id]').forEach(el => {
             el.onclick = function(){
                 _selectedInheritId = this.dataset.macroId;
+                // 自动跟随继承宏层级（只升不降），防止字段层级低于基准宏导致永不匹配
+                autoFollowScopeToBase();
                 renderInheritMacroList();
                 renderInheritPreview(_selectedInheritId);
                 updateMappingFlipLock();
@@ -37507,6 +37545,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         listEl.querySelectorAll('[data-macro-id]').forEach(el => {
             el.onclick = function(){
                 _selectedMappingMacroId = this.dataset.macroId;
+                // 自动跟随基准宏层级（只升不降），防止字段层级低于基准宏导致永不匹配
+                autoFollowScopeToBase();
                 renderMappingMacroList();
                 renderMappingPreview();
                 updateMappingFlipLock();
