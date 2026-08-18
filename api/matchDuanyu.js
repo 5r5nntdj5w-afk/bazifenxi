@@ -1340,12 +1340,12 @@ function evaluateLeafCondition(data, cond, context) {
           var bc = biConfigs[bci];
           // 【修复】ganZhi 兼容判断：基准配置为"通用"（不指定维度）、或与最终收集维度一致、或最终收集维度为"自动"（干支自动分化=双维度全覆盖）时均可合并，
           // 避免映射引用的配置因维度写法不一致（通用 vs 天干/地支）被误过滤，导致多值时不匹配
+          // 【2026-08-18 定稿】映射引用层级以引用字段自身为准：基准宏配置的 scope 不参与过滤，
+          // 只需维度兼容即可合并为候选；统计柱位（biPillars）完全由字段自身 scope 决定，
+          // 这样写一个"原局"基准宏即可复用到 原局+大运 / 原局+大运+流年 / 原局+大运+流年+流月 各层级
           var bcGzOk = bc.ganZhi === '通用' || bc.ganZhi === biActualGzFinal || biActualGzFinal === '自动';
-          // scope 兼容：字段与基准配置的"评估范围"均解析为实际范围后比较
-          var cfgScEval = (bc.scope === '评估范围') ? ((data.liunian && data.liunian.t) ? '原局+大运+流年' : (data.dayun && data.dayun.t) ? '原局+大运' : '原局') : bc.scope;
-          var biScEval = (biScope === '评估范围') ? ((data.liunian && data.liunian.t) ? '原局+大运+流年' : (data.dayun && data.dayun.t) ? '原局+大运' : '原局') : biScope;
-          biDbg('    config[' + bci + ']: type=' + bc.type + ' ganZhi=' + bc.ganZhi + ' scope=' + bc.scope + ' include=[' + (bc.include||[]).join(',') + '] exclude=[' + (bc.exclude||[]).join(',') + '] 维度兼容=' + bcGzOk + ' scope一致=' + (cfgScEval === biScEval));
-          if (bcGzOk && cfgScEval === biScEval) {
+          biDbg('    config[' + bci + ']: type=' + bc.type + ' ganZhi=' + bc.ganZhi + ' scope=' + bc.scope + '(忽略，层级以字段自身=' + biScope + '为准) include=[' + (bc.include||[]).join(',') + '] exclude=[' + (bc.exclude||[]).join(',') + '] 维度兼容=' + bcGzOk);
+          if (bcGzOk) {
             var bcMapped = _mapBiConfigValues(bc, bcRule);
             biCandidates.push({ include: bcMapped.include || [], exclude: bcMapped.exclude || [] });
           }
