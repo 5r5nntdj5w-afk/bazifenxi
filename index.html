@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4214,7 +4214,8 @@
     // 断语排版渲染函数：将纯文本中的换行转为 <br>
     function formatDuanyu(text) {
         if (!text) return '';
-        return text.replace(/\n/g, '<br>');
+        // 数据中字面 <br>（<br/>、<br />）视为换行标记，统一转换，避免原样显示
+        return text.replace(/<br\s*\/?>/gi, '\n').replace(/\n/g, '<br>');
     }
     
     // 渲染断语（含全局显示样式：行间距、段间距）
@@ -13453,7 +13454,7 @@
         const listHtml = geju.candidates.slice(0, 5).map(c => {
             const isTop = c === geju.top;
             return `<div class="flex items-center justify-between text-sm py-0.5 ${isTop ? 'font-bold text-gray-800' : 'text-gray-500'}">
-                <span>${isTop ? '👑 ' : ''}${escapeHtml(c.text)}</span>
+                <span>${isTop ? '👑 ' : ''}${escapeHtml(c.text).replace(/&lt;br\s*\/?&gt;/gi, '<br>')}</span>
                 <span class="text-xs">${c.percent}%</span>
             </div>`;
         }).join('');
@@ -13462,7 +13463,7 @@
                 <div class="font-bold text-gray-700">🔮 主格局识别</div><span class="inline-block px-2 py-0.5 rounded text-xs font-bold border text-indigo-700 bg-indigo-50 border-indigo-200">评估范围：${evalScopeLabel()}</span><button onclick="window.openGeJuLevelSettings()" title="设置主格局层次阈值（契合度≥上等阈值→上等，≥中等阈值→中等，≥普通阈值→普通，低于→不成格）" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">⚙ 阈值</button>
                 <div class="flex items-center gap-2">${levelBadge}${fitBadge}</div>
             </div>
-            <div class="text-gray-800 font-bold text-base">👑 ${escapeHtml(top.text)}</div>
+            <div class="text-gray-800 font-bold text-base">👑 ${escapeHtml(top.text).replace(/&lt;br\s*\/?&gt;/gi, '<br>')}</div>
             ${listHtml ? `<div class="mt-2 pt-2 border-t border-indigo-100 space-y-0.5">${listHtml}</div>` : ''}
             <div class="mt-1 text-xs text-gray-400">层次按契合度划分：≥${L_TOP} ${escapeHtml(NM_TOP)} / ${L_MID}-${L_TOP - 1} ${escapeHtml(NM_MID)} / ${L_LOW}-${L_MID - 1} ${escapeHtml(NM_LOW)} / &lt;${L_LOW} ${escapeHtml(NM_NONE)}</div>
         </div>`;
@@ -37465,7 +37466,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         }
         listEl.innerHTML = macros.map(m => {
             const id = m.cloudId || m.id;
-            const isSelected = id === _selectedInheritId;
+            const isSelected = String(id) === String(_selectedInheritId);
             const tags = (m.tags || []).map(t => `<span class="inline-block px-1 bg-indigo-50 text-indigo-600 rounded text-xs">${escapeHtml(t)}</span>`).join(' ');
             return `<div class="px-2 py-1.5 border-b last:border-b-0 cursor-pointer ${isSelected ? 'bg-indigo-100' : 'hover:bg-indigo-50'}" data-macro-id="${id}">
                 <div class="text-sm font-medium ${isSelected ? 'text-indigo-800' : ''}">🧩 ${escapeHtml(m.name)}${isSelected ? ' ✓' : ''}</div>
@@ -37535,7 +37536,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         }
         listEl.innerHTML = macros.map(m => {
             const id = m.cloudId || m.id;
-            const isSelected = id === _selectedMappingMacroId;
+            const isSelected = String(id) === String(_selectedMappingMacroId);
             const tags = (m.tags || []).map(t => `<span class="inline-block px-1 bg-emerald-50 text-emerald-600 rounded text-xs">${escapeHtml(t)}</span>`).join(' ');
             return `<div class="px-2 py-1.5 border-b last:border-b-0 cursor-pointer ${isSelected ? 'bg-emerald-100' : 'hover:bg-emerald-50'}" data-macro-id="${id}">
                 <div class="text-sm font-medium ${isSelected ? 'text-emerald-800' : ''}">🧩 ${escapeHtml(m.name)}${isSelected ? ' ✓' : ''}</div>
