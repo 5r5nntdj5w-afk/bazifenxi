@@ -868,6 +868,14 @@ function checkSinglePosition(data, path, posCfg, pbType, posName, rg) {
   for (var ki = 0; ki < keys.length; ki++) {
     node = node ? node[keys[ki]] : null;
   }
+  if (posCfg && posCfg.val === '不存在') {
+    // "不存在"：等于=必须不存在；不等于=必须存在（存在且值任意）
+    return posCfg.op === 'eq' ? !node : !!node;
+  }
+  if (posCfg && posCfg.val === '不限') {
+    // "不限"：该位置必须存在（值不限），忽略 op
+    return !!node;
+  }
   if (!node) return false;
   var actualVal = '';
   if (pbType === '五行') {
@@ -1067,6 +1075,21 @@ function evaluateLeafCondition(data, cond, context) {
         }
       }
     }
+    // 层级上限约束：所选层级之外的更高层级必须不存在（scope 只约束上限，不强制所选层级存在）
+    var _pbScopeOk = function() {
+      var pbScopeForbidMap = {
+        '原局': ['dayun', 'liunian', 'liuyue'],
+        '原局+大运': ['liunian', 'liuyue'],
+        '原局+大运+流年': ['liuyue'],
+        '原局+大运+流年+流月': []
+      };
+      var pbForbidList = pbScopeForbidMap[pbScope] || [];
+      for (var pfi = 0; pfi < pbForbidList.length; pfi++) {
+        var pfNode = data[pbForbidList[pfi]];
+        if (pfNode && (pfNode.t || pfNode.d)) return false;
+      }
+      return true;
+    };
     // 取值维度优先级：断语规则默认(最高) > 字段自身 > 条件宏默认
     if (ruleDefaultQuZhi) {
       pbQuZhi = ruleDefaultQuZhi;
@@ -1164,7 +1187,7 @@ function evaluateLeafCondition(data, cond, context) {
             }
           }
           // 判断（含原局翻转）
-          if (evaluateBatchPositionsFlip(data, mappedPositions, pbType, mapGanZhi, mapQuZhi, pbFlip)) {
+          if (_pbScopeOk() && evaluateBatchPositionsFlip(data, mappedPositions, pbType, mapGanZhi, mapQuZhi, pbFlip)) {
             res = true;
             break;
           }
@@ -1206,7 +1229,7 @@ function evaluateLeafCondition(data, cond, context) {
             }
           }
           // 判断（含原局翻转）
-          if (evaluateBatchPositionsFlip(data, mergedPositions, pbType, inhGanZhi, inhQuZhi, pbFlip)) {
+          if (_pbScopeOk() && evaluateBatchPositionsFlip(data, mergedPositions, pbType, inhGanZhi, inhQuZhi, pbFlip)) {
             res = true;
             break;
           }
@@ -1215,7 +1238,7 @@ function evaluateLeafCondition(data, cond, context) {
       actual = val;
     } else {
       // 普通模式
-      res = evaluateBatchPositionsFlip(data, pbPositions, pbType, pbGanZhi, pbQuZhi, pbFlip);
+      res = _pbScopeOk() && evaluateBatchPositionsFlip(data, pbPositions, pbType, pbGanZhi, pbQuZhi, pbFlip);
       actual = val;
     }
   }
@@ -1337,6 +1360,24 @@ function evaluateLeafCondition(data, cond, context) {
       actual = val;
       biDbg('  判定: ❌ 不匹配（无任何包含/排除配置可判定 fail-closed）');
     } else {
+      // 层级上限约束：scope 之外的更高层级必须不存在（与定位批量一致）；scope=评估范围 为数据驱动，按实际存在范围解析，无需约束
+      var biScopeForbidMap = {
+        '原局': ['dayun', 'liunian', 'liuyue'],
+        '原局+大运': ['liunian', 'liuyue'],
+        '原局+大运+流年': ['liuyue'],
+        '原局+大运+流年+流月': []
+      };
+      var biForbidList = biScopeForbidMap[biScope] || [];
+      var biScopeForbidHit = false;
+      for (var bfi = 0; bfi < biForbidList.length; bfi++) {
+        var bfNode = data[biForbidList[bfi]];
+        if (bfNode && (bfNode.t || bfNode.d)) { biScopeForbidHit = true; break; }
+      }
+      if (biScopeForbidHit) {
+        res = false;
+        actual = val;
+        biDbg('  判定: ❌ 不匹配（层级上限约束：scope=' + biScope + ' 但存在更高层级）');
+      } else {
       // 确定实际取值维度（'自动'=干支自动分化：天干/地支双维度判定，任一满足即匹配）
       var actualBiGz = biActualGzFinal;
 
@@ -1428,6 +1469,7 @@ function evaluateLeafCondition(data, cond, context) {
         res = r1.ok;
         actual = val;
         biDbg('  八字实际值(' + actualBiGz + ',' + biScope + ')=[' + r1.vals.join(',') + '] → 判定: ' + (res ? '✅ 匹配' : '❌ 不匹配（' + r1.fail + '）'));
+      }
       }
     }
   }

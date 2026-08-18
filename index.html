@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -684,15 +684,18 @@
             gap: 2px;
         }
         .shen-toggle-btn {
-            padding: 2px 10px;
+            padding: 6px 10px;
             font-size: 11px;
+            height: 28px;
             border: 1px solid #d1d5db;
             border-radius: 4px;
             background: #fff;
             color: #6b7280;
             cursor: pointer;
             transition: all 0.2s;
-            line-height: 1.5;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
         }
         .shen-toggle-btn:hover {
             background: #f3f4f6;
@@ -708,15 +711,18 @@
             gap: 2px;
         }
         .shen-chart-btn {
-            padding: 2px 10px;
+            padding: 6px 10px;
             font-size: 11px;
+            height: 28px;
             border: 1px solid #d1d5db;
             border-radius: 4px;
             background: #fff;
             color: #6b7280;
             cursor: pointer;
             transition: all 0.2s;
-            line-height: 1.5;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
         }
         .shen-chart-btn:hover {
             background: #f3f4f6;
@@ -1388,22 +1394,17 @@
                     
                     <!-- 显示切换按钮 -->
                     <div class="h-8"></div>
-                    <div class="flex justify-center mb-2">
+                    <div class="flex justify-center items-center gap-3 mb-2">
+                        <div class="shen-chart-switch">
+                            <button class="shen-chart-btn shen-chart-active" data-chart="relation" onclick="switchShenChart('relation')">🕸 关系图</button>
+                            <button class="shen-chart-btn" data-chart="bar" onclick="switchShenChart('bar')">📊 柱状对比图</button>
+                        </div>
                         <div class="shen-toggle-group">
                             <button class="shen-toggle-btn shen-toggle-active" data-mode="all" onclick="applyShenDisplayMode('all')">全部</button>
                             <button class="shen-toggle-btn" data-mode="tian" onclick="applyShenDisplayMode('tian')">天干</button>
                             <button class="shen-toggle-btn" data-mode="di" onclick="applyShenDisplayMode('di')">地支</button>
                             <button class="shen-settings-gear" onclick="openShenSettingsModal()" title="标识符设置">⚙</button>
                         </div>
-                    </div>
-                    <div class="flex flex-wrap justify-center items-center gap-2 mb-2">
-                        <div class="shen-chart-switch">
-                            <button class="shen-chart-btn shen-chart-active" data-chart="relation" onclick="switchShenChart('relation')">🕸 关系图</button>
-                            <button class="shen-chart-btn" data-chart="bar" onclick="switchShenChart('bar')">📊 柱状对比图</button>
-                        </div>
-                        <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer select-none" title="显示或隐藏柱状对比图与关系表中的达标/偏差标记">
-                            <input type="checkbox" id="shen-bar-mark-toggle" class="w-3.5 h-3.5" checked> 达标标记
-                        </label>
                     </div>
                     <!-- 环形布局（五等分圆） -->
                     <div id="shen-container" class="relative w-full max-w-3xl mx-auto" style="height: 320px;">
@@ -3306,7 +3307,12 @@
         <div class="bg-white rounded-lg p-6 mx-4 shadow-2xl shen-settings-modal">
             <div class="flex justify-between items-center mb-4 pb-3 border-b">
                 <h3 class="text-2xl font-bold text-gray-800">⚙ 显示设置</h3>
-                <span onclick="closeShenSettingsModal()" class="text-gray-400 hover:text-gray-600 text-2xl cursor-pointer">&times;</span>
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none" title="显示或隐藏柱状对比图与关系表中的达标/偏差标记">
+                        <input type="checkbox" id="shen-bar-mark-toggle" class="w-4 h-4" checked> 达标标记
+                    </label>
+                    <span onclick="closeShenSettingsModal()" class="text-gray-400 hover:text-gray-600 text-2xl cursor-pointer">&times;</span>
+                </div>
             </div>
             <div class="flex gap-2 mb-4">
                 <button type="button" id="shen-set-tab-symbols" class="shen-set-tab-btn px-4 py-2 rounded text-base font-medium active" onclick="switchShenSettingsTab('symbols')">十神标识符</button>
@@ -4740,6 +4746,9 @@
         });
         
         updateShenSettingsPreview(settings);
+        // 同步达标标记 checkbox 状态（与 _shenBarShowMark 一致）
+        var barMarkCb = document.getElementById('shen-bar-mark-toggle');
+        if (barMarkCb) barMarkCb.checked = !!window._shenBarShowMark;
         // 确保 Tab1 为默认视图，并预渲染 Tab2 内容（切换时即时显示）
         window.switchShenSettingsTab('symbols');
         renderShenDisplaySettingsArea();
@@ -8593,6 +8602,14 @@
                 const checkPos = (path, posCfg, posName) => {
                     const [k, p] = path.split('.');
                     const node = data[k]?.[p];
+                    if(posCfg.val === '不存在'){
+                        // "不存在"：等于=必须不存在；不等于=必须存在（存在且值任意）
+                        return posCfg.op === 'eq' ? !node : !!node;
+                    }
+                    if(posCfg.val === '不限'){
+                        // "不限"：该位置必须存在（值不限），忽略 op
+                        return !!node;
+                    }
                     if(!node) return false;
                     let actualVal = '';
                     if(pbType === '五行'){
@@ -8607,6 +8624,18 @@
                 };
                 // 评估一组位置条件
                 const evalPositions = (positions) => {
+                    // 层级上限约束：所选层级之外的更高层级必须不存在（scope 只约束上限，不强制所选层级存在）
+                    const pbScopeForbid = {
+                        '原局': ['dayun', 'liunian', 'liuyue'],
+                        '原局+大运': ['liunian', 'liuyue'],
+                        '原局+大运+流年': ['liuyue'],
+                        '原局+大运+流年+流月': []
+                    };
+                    const pbForbidKeys = pbScopeForbid[pbScope] || [];
+                    for(const fk of pbForbidKeys){
+                        const fnode = data[fk];
+                        if(fnode && (fnode.t || fnode.d)) return false;
+                    }
                     // 先收集合法位置键（排除元信息）
                     const validKeys = [];
                     for(const _k in positions){
@@ -8876,6 +8905,22 @@
                     res = false;
                 } else {
                     const actualBiGz = biActualGzFinal;
+                    // 层级上限约束：scope 之外的更高层级必须不存在（与定位批量一致）；scope=评估范围 为数据驱动，按实际存在范围解析，无需约束
+                    const biScopeForbid = {
+                        '原局': ['dayun', 'liunian', 'liuyue'],
+                        '原局+大运': ['liunian', 'liuyue'],
+                        '原局+大运+流年': ['liuyue'],
+                        '原局+大运+流年+流月': []
+                    };
+                    const biForbidKeys = biScopeForbid[biSc] || [];
+                    let biScopeForbidFail = false;
+                    for(const fk of biForbidKeys){
+                        const fnode = data[fk];
+                        if(fnode && (fnode.t || fnode.d)){ biScopeForbidFail = true; break; }
+                    }
+                    if(biScopeForbidFail){
+                        res = false;
+                    } else {
                     // scope=评估范围 → 数据驱动解析为实际统计范围（有流年=12字/有大运=10字/仅原局=8字）
                     let biEvalSc = biSc;
                     if(biEvalSc === '评估范围'){
@@ -8921,6 +8966,7 @@
                         res = evalBiDim('天干') || evalBiDim('地支');
                     } else {
                         res = evalBiDim(actualBiGz);
+                    }
                     }
                 }
                 actual = c.val;
@@ -36519,10 +36565,11 @@ function resolveDefaultMapping(fieldType, ruleDefaultMapping, macroDefaultMappin
 
 // 生成原局位置翻转后的 positions 副本（年↔时、月↔日），大运/流年/流月位置保持不变
 function flipPositions(positions, pbGanZhi) {
-    // 原局翻转映射：正序→反序（天干键 / 通用柱键），定义在函数内自包含（外部脚本块 IIFE 内同名常量不可见）
+    // 原局翻转映射：正序→反序（天干键 / 地支键 / 通用柱键），定义在函数内自包含（外部脚本块 IIFE 内同名常量不可见）
     var FLIP_MAP_TG = {'年干':'时干','月干':'日干','日干':'月干','时干':'年干'};
+    var FLIP_MAP_DZ = {'年支':'时支','月支':'日支','日支':'月支','时支':'年支'};
     var FLIP_MAP_COL = {'年柱':'时柱','月柱':'日柱','日柱':'月柱','时柱':'年柱'};
-    var flipMap = (pbGanZhi === '通用') ? FLIP_MAP_COL : FLIP_MAP_TG;
+    var flipMap = (pbGanZhi === '通用') ? FLIP_MAP_COL : Object.assign({}, FLIP_MAP_TG, FLIP_MAP_DZ);
     var flipped = {};
     for (var pos in positions) {
         if (!Object.prototype.hasOwnProperty.call(positions, pos)) continue;
@@ -37020,37 +37067,40 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
     const PB_FLIP_MAP = {'年干':'时干','月干':'日干','日干':'月干','时干':'年干'};
     const PB_FLIP_MAP_COL = {'年柱':'时柱','月柱':'日柱','日柱':'月柱','时柱':'年柱'};
 
-    // 根据干支类型获取显示位置名
-    function getPositionDisplayName(posKey, ganzhi){
+    // 根据干支类型获取显示位置名（通用模式可跟随取值维度显示为干支名）
+    function getPositionDisplayName(posKey, ganzhi, quzhi){
         if(ganzhi === '地支'){
             return posKey.replace('干', '支');
         }
         if(ganzhi === '通用'){
-            // 天干键名 → 柱名
-            return posKey.replace('干', '柱');
+            // 取值维度=天干/地支时按维度显示为干支名，否则保持柱名（自动/不指定=柱名，双维度）
+            if(quzhi === '天干') return posKey.replace('柱', '干');
+            if(quzhi === '地支') return posKey.replace('柱', '支');
+            return posKey;
         }
         return posKey;
     }
 
-    // 通用模式下判断是否为日柱（用于限制十神/十神组的值选项）
-    function isDayPosition(posKey, ganzhi){
-        if(ganzhi === '通用') return false; // 通用模式不限制日柱值选项（取值维度可选天干或地支）
-        return posKey === '日干';
+    // 判断是否为日柱/日干（通用模式+取值天干 时按天干硬规定限制值选项）
+    function isDayPosition(posKey, ganzhi, quzhi){
+        if(ganzhi === '通用') return quzhi === '天干' && posKey === '日柱';
+        return ganzhi === '天干' && posKey === '日干';
     }
 
-    function getValueOptions(judgeType, posKey, ganzhi){
+    function getValueOptions(judgeType, posKey, ganzhi, quzhi){
+        // 所有位置均提供"不存在"选项（表示该位置必须不存在；配合"不等于"表示该位置必须存在），不受日柱值限制
         if(judgeType === '五行'){
-            return WU_LIST.map(w => `<option value="${w}">${w}</option>`).join('');
+            return WU_LIST.map(w => `<option value="${w}">${w}</option>`).join('') + '<option value="不存在">不存在</option>';
         } else if(judgeType === '十神'){
-            if(isDayPosition(posKey, ganzhi) && ganzhi === '天干'){
-                return `<option value="比肩">比肩</option>`;
+            if(isDayPosition(posKey, ganzhi, quzhi)){
+                return `<option value="比肩">比肩</option><option value="不存在">不存在</option>`;
             }
-            return FULL_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
+            return FULL_SHEN.map(s => `<option value="${s}">${s}</option>`).join('') + '<option value="不存在">不存在</option>';
         } else if(judgeType === '十神组'){
-            if(isDayPosition(posKey, ganzhi) && ganzhi === '天干'){
-                return `<option value="比劫">比劫</option>`;
+            if(isDayPosition(posKey, ganzhi, quzhi)){
+                return `<option value="比劫">比劫</option><option value="不存在">不存在</option>`;
             }
-            return GROUPED_SHEN.map(s => `<option value="${s}">${s}</option>`).join('');
+            return GROUPED_SHEN.map(s => `<option value="${s}">${s}</option>`).join('') + '<option value="不存在">不存在</option>';
         }
         return '';
     }
@@ -37072,15 +37122,15 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         return PB_SCOPE_MAP[scope] || [];
     }
 
-    // 将显示位置名统一转换为内部天干键名（用于缓存）
+    // 将显示位置名统一转换为内部天干键名（用于缓存；通用模式下可能为"年柱"或取值维度对应的"年干/年支"）
     function posNameToKey(displayName, ganzhi){
         if(ganzhi === '地支') return displayName.replace('支', '干');
-        if(ganzhi === '通用') return displayName.replace('柱', '干');
+        if(ganzhi === '通用') return displayName.replace('柱', '干').replace('支', '干');
         return displayName;
     }
 
     // 渲染位置勾选区
-    function renderPositions(scope, judgeType, ganzhi){
+    function renderPositions(scope, judgeType, ganzhi, quzhi){
         const positions = getScopePositions(scope, ganzhi);
         const container = document.getElementById('pb-positions');
         container.innerHTML = '';
@@ -37094,20 +37144,20 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         };
         
         positions.forEach(posKey => {
-            const displayName = getPositionDisplayName(posKey, ganzhi);
+            const displayName = getPositionDisplayName(posKey, ganzhi, quzhi);
             // 统一用天干键名作为缓存键（兼容天干/地支/通用三种模式）
             const cacheKey = posNameToKey(posKey, ganzhi);
             // 获取缓存或默认值
             let cached = _positionCache[cacheKey];
             if(!cached){
                 cached = { checked: true, op: 'eq', val: '' };
-                if(isDayPosition(posKey, ganzhi)){
+                if(isDayPosition(posKey, ganzhi, quzhi)){
                     cached.val = getDefaultDayValue(judgeType, ganzhi);
                 }
                 // 保存到缓存
                 _positionCache[cacheKey] = cached;
             }
-            const valueOptions = getValueOptions(judgeType, posKey, ganzhi);
+            const valueOptions = getValueOptions(judgeType, posKey, ganzhi, quzhi);
             const readOnly = isReadOnly(posKey);
             
             const row = document.createElement('div');
@@ -37511,7 +37561,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         const scope = document.getElementById('pb-scope').value;
         const judgeType = document.getElementById('pb-judge-type').value;
         const ganzhi = document.getElementById('pb-ganzhi').value;
-        renderPositions(scope, judgeType, ganzhi);
+        const quzhi = document.getElementById('pb-quzhi').value;
+        renderPositions(scope, judgeType, ganzhi, quzhi);
     }
 
     // 绑定Tab按钮事件
@@ -37569,7 +37620,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                     // 兼容天干/地支/通用（柱）的位置名，统一转换为天干键名
                     const posKey = posNameToKey(pos, ganzhi);
                     if(PB_POSITIONS_TG.includes(posKey)){
-                        _positionCache[posKey] = { checked: true, op: op, val: val };
+                        // "不限"编码回填为空值（UI 显示 --不限--，匹配语义为"必须存在"）
+                        _positionCache[posKey] = { checked: true, op: op, val: (val === '不限') ? '' : val };
                     }
                 }
             });
@@ -37604,7 +37656,7 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         }
         // 切换到对应的Tab
         switchRefTab(initialTab);
-        renderPositions(scope, judgeType, ganzhi);
+        renderPositions(scope, judgeType, ganzhi, quzhi);
         document.getElementById('position-batch-modal').classList.remove('hidden');
     };
 
@@ -37622,7 +37674,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
     document.getElementById('pb-judge-type').onchange = function(){
         const ganzhi = document.getElementById('pb-ganzhi').value;
         const scope = document.getElementById('pb-scope').value;
-        renderPositions(scope, this.value, ganzhi);
+        const quzhi = document.getElementById('pb-quzhi').value;
+        renderPositions(scope, this.value, ganzhi, quzhi);
     };
     document.getElementById('pb-ganzhi').onchange = function(){
         const judgeType = document.getElementById('pb-judge-type').value;
@@ -37633,12 +37686,20 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         } else {
             quzhiCell.style.display = 'none';
         }
-        renderPositions(scope, judgeType, this.value);
+        renderPositions(scope, judgeType, this.value, document.getElementById('pb-quzhi').value);
     };
     document.getElementById('pb-scope').onchange = function(){
         const judgeType = document.getElementById('pb-judge-type').value;
         const ganzhi = document.getElementById('pb-ganzhi').value;
-        renderPositions(this.value, judgeType, ganzhi);
+        const quzhi = document.getElementById('pb-quzhi').value;
+        renderPositions(this.value, judgeType, ganzhi, quzhi);
+    };
+    document.getElementById('pb-quzhi').onchange = function(){
+        // 取值维度切换（仅通用模式）：位置名与值选项跟随刷新
+        const judgeType = document.getElementById('pb-judge-type').value;
+        const scope = document.getElementById('pb-scope').value;
+        const ganzhi = document.getElementById('pb-ganzhi').value;
+        if(ganzhi === '通用') renderPositions(scope, judgeType, ganzhi, this.value);
     };
     // 保存按钮
     document.getElementById('pb-save-btn').onclick = function(){
@@ -37670,10 +37731,11 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         positions.forEach(posKey => {
             const cacheKey = posNameToKey(posKey, ganzhi);
             const cache = _positionCache[cacheKey];
-            if(cache && cache.checked && cache.val){
-                // 使用显示名称（天干/地支/柱）
-                const displayName = getPositionDisplayName(posKey, ganzhi);
-                checked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
+            if(cache && cache.checked){
+                // 使用显示名称（天干/地支/柱）；值空=不限=该位置必须存在（值不限）
+                const displayName = getPositionDisplayName(posKey, ganzhi, quzhi);
+                const cval = cache.val || '不限';
+                checked.push(`${displayName}${(cache.val && cache.op === 'ne') ? '!' : ''}=${cval}`);
             }
         });
         // 构建编码
@@ -37697,10 +37759,11 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             positions.forEach(posKey => {
                 const cacheKey = posNameToKey(posKey, ganzhi);
                 const cache = _positionCache[cacheKey];
-                if(cache && cache.checked && cache.val){
-                    const displayName = getPositionDisplayName(posKey, ganzhi);
+                if(cache && cache.checked){
+                    const displayName = getPositionDisplayName(posKey, ganzhi, quzhi);
                     if(!['年干','月干','日干','时干'].includes(cacheKey)){
-                        incrementChecked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
+                        const cval = cache.val || '不限';
+                        incrementChecked.push(`${displayName}${(cache.val && cache.op === 'ne') ? '!' : ''}=${cval}`);
                     }
                 }
             });
@@ -37712,10 +37775,11 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             positions.forEach(posKey => {
                 const cacheKey = posNameToKey(posKey, ganzhi);
                 const cache = _positionCache[cacheKey];
-                if(cache && cache.checked && cache.val){
-                    const displayName = getPositionDisplayName(posKey, ganzhi);
+                if(cache && cache.checked){
+                    const displayName = getPositionDisplayName(posKey, ganzhi, quzhi);
                     if(!['年干','月干','日干','时干'].includes(cacheKey)){
-                        incrementChecked.push(`${displayName}${cache.op === 'ne' ? '!' : ''}=${cache.val}`);
+                        const cval = cache.val || '不限';
+                        incrementChecked.push(`${displayName}${(cache.val && cache.op === 'ne') ? '!' : ''}=${cval}`);
                     }
                 }
             });
