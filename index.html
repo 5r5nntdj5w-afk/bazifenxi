@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -37176,19 +37176,86 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         return displayName;
     }
 
+    // 引用模式下基准宏已约束的非原局位置（动态锁定：只读显示，禁止增量覆盖）
+    let _refLockedNonYuanKeys = new Set();
+    let _refLockedPosValues = {};
+
+    // 递归收集宏内所有定位批量叶子（展开嵌套 inherit/mappingBase 引用，visited 防循环）
+    function collectPbLeaves(macro, out, visited){
+        if(!macro || !macro.conditions) return;
+        const mid = macro.cloudId || macro.id;
+        if(visited.has(mid)) return;
+        visited.add(mid);
+        function walk(node){
+            if(!node) return;
+            if(node.macroRef){
+                const refMacro = getMacroById(node.macroRef);
+                if(refMacro) collectPbLeaves(refMacro, out, visited);
+                return;
+            }
+            if(node.field && node.field.startsWith('定位批量-') && node.val && node.val.startsWith('定位批量|')){
+                out.push(node.val);
+                // 嵌套引用（mappingBase=/inherit=）：继续展开被引用宏
+                const mBase = /mappingBase=([^|]+)/.exec(node.val);
+                const mInherit = /inherit=([^|]+)/.exec(node.val);
+                const refId = mBase ? mBase[1] : (mInherit ? mInherit[1] : '');
+                if(refId){
+                    const refMacro = getMacroById(refId);
+                    if(refMacro) collectPbLeaves(refMacro, out, visited);
+                }
+                return;
+            }
+            if(node.logic && node.children){
+                const cs = node.children;
+                for(let i = 0; i < cs.length; i++) walk(cs[i]);
+            }
+        }
+        walk(macro.conditions);
+    }
+
+    // 从基准宏/继承宏排列中收集已约束的非原局位置（与字段视图位置名直接比对；嵌套引用递归展开）
+    function collectRefLockedPositions(){
+        _refLockedNonYuanKeys = new Set();
+        _refLockedPosValues = {};
+        const curTab = _currentRefTab;
+        let macro = null;
+        if(curTab === 'inherit' && _selectedInheritId) macro = getMacroById(_selectedInheritId);
+        else if(curTab === 'mapping' && _selectedMappingMacroId) macro = getMacroById(_selectedMappingMacroId);
+        if(!macro) return;
+        const leaves = [];
+        collectPbLeaves(macro, leaves, new Set());
+        // 遍历叶子时按"记录值优先"：叶子自身位置段先于其被引用宏记录
+        leaves.forEach(val => {
+            const parts = val.split('|');
+            parts.forEach(p => {
+                if(p === '定位批量' || !p.includes('=')) return;
+                if(p.startsWith('type=') || p.startsWith('ganZhi=') || p.startsWith('scope=') || p.startsWith('取值=') || p.startsWith('inherit=') || p.startsWith('mapping=') || p.startsWith('mappingBase=') || p.startsWith('mappingType=') || p.startsWith('mappingOffset=') || p.startsWith('customMap=') || p.startsWith('flip=')) return;
+                const seg = p.replace('!=', '=').split('=');
+                const posName = seg[0];
+                if(['年干','月干','日干','时干','年支','月支','日支','时支','年柱','月柱','日柱','时柱'].includes(posName)) return;
+                _refLockedNonYuanKeys.add(posName);
+                if(_refLockedPosValues[posName] === undefined) _refLockedPosValues[posName] = seg[1] || '';
+            });
+        });
+    }
+
+    // 判断位置是否为只读（继承/映射引用模式：原局恒只读，非原局若基准宏已约束则动态锁定）
+    function pbPosIsReadOnly(posKey){
+        if(_currentRefTab !== 'inherit' && _currentRefTab !== 'mapping') return false;
+        if(['年干','月干','日干','时干','年支','月支','日支','时支','年柱','月柱','日柱','时柱'].includes(posKey)) return true;
+        return _refLockedNonYuanKeys.has(posKey);
+    }
+
     // 渲染位置勾选区
     function renderPositions(scope, judgeType, ganzhi, quzhi){
+        collectRefLockedPositions();
         const positions = getScopePositions(scope, ganzhi);
         const container = document.getElementById('pb-positions');
         container.innerHTML = '';
         const currentRefMode = _currentRefTab || 'none';
         // 继承或映射模式下原局位置只读（两种引用模式都跟随引用层排列）
         const isRefMode = (currentRefMode === 'inherit' || currentRefMode === 'mapping');
-        const isReadOnly = (posKey) => {
-            if(!isRefMode) return false;
-            // 原局位置（年/月/日/时）只读
-            return ['年干','月干','日干','时干','年支','月支','日支','时支','年柱','月柱','日柱','时柱'].includes(posKey);
-        };
+        const isReadOnly = (posKey) => pbPosIsReadOnly(posKey);
         
         positions.forEach(posKey => {
             const displayName = getPositionDisplayName(posKey, ganzhi, quzhi);
@@ -37226,6 +37293,10 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             container.appendChild(row);
             const valSel = row.querySelector('.pb-pos-val');
             if(cached.val) valSel.value = cached.val;
+            // 动态锁定的非原局位置：显示基准宏中的值（只读）
+            if(readOnly && _refLockedPosValues[posKey] !== undefined){
+                valSel.value = _refLockedPosValues[posKey];
+            }
             // 绑定变化事件，更新缓存（只读位置不绑定）
             if(!readOnly){
                 row.querySelector('.pb-pos-check').onchange = (e) => {
@@ -37371,6 +37442,13 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                 _selectedInheritId = this.dataset.macroId;
                 renderInheritMacroList();
                 renderInheritPreview(_selectedInheritId);
+                updateMappingFlipLock();
+                // 继承宏变化后刷新位置勾选区（动态锁定继承宏已约束的非原局位置）
+                const scope = document.getElementById('pb-scope').value;
+                const judgeType = document.getElementById('pb-judge-type').value;
+                const ganzhi = document.getElementById('pb-ganzhi').value;
+                const quzhi = document.getElementById('pb-quzhi').value;
+                renderPositions(scope, judgeType, ganzhi, quzhi);
             };
         });
     }
@@ -37432,6 +37510,12 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
                 renderMappingMacroList();
                 renderMappingPreview();
                 updateMappingFlipLock();
+                // 基准宏变化后刷新位置勾选区（动态锁定基准宏已约束的非原局位置）
+                const scope = document.getElementById('pb-scope').value;
+                const judgeType = document.getElementById('pb-judge-type').value;
+                const ganzhi = document.getElementById('pb-ganzhi').value;
+                const quzhi = document.getElementById('pb-quzhi').value;
+                renderPositions(scope, judgeType, ganzhi, quzhi);
             };
         });
     }
@@ -37460,12 +37544,19 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         const mappingType = rule ? rule.type : '';
         const mappingOffset = rule ? rule.offset : '';
         const customMap = rule ? rule.customMap : null;
+        // 映:行层级显示字段自身选择的层级（与批量包含预览一致，动态跟随）
+        const scopeEl = document.getElementById('pb-scope');
+        const curScope = scopeEl ? scopeEl.value : '原局';
         previewEl.innerHTML = arrangements.map((a, i) => {
             const mapped = applyMappingToArrangement(a.val, mappingType, mappingOffset, customMap);
             const origText = arrangementToText(a.val);
             const mappedText = arrangementToText(mapped);
-            return `<div class="py-0.5"><span class="text-gray-400">原:</span> ${escapeHtml(origText)}</div>
-                     <div class="py-0.5"><span class="text-emerald-600">映:</span> ${escapeHtml(mappedText)}</div>`;
+            // 原:行显示基准宏排列自身的层级（scope=），缺省按原局
+            let baseScope = '原局';
+            const scm = a.val.match(/scope=([^|]+)/);
+            if(scm) baseScope = scm[1];
+            return `<div class="py-0.5"><span class="text-gray-400">原:</span> ${escapeHtml(origText)} ·层级:${escapeHtml(baseScope)}</div>
+                     <div class="py-0.5"><span class="text-emerald-600">映:</span> ${escapeHtml(mappedText)} ·层级:${escapeHtml(curScope)}</div>`;
         }).join('');
     }
 
@@ -37740,6 +37831,8 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
         const ganzhi = document.getElementById('pb-ganzhi').value;
         const quzhi = document.getElementById('pb-quzhi').value;
         renderPositions(this.value, judgeType, ganzhi, quzhi);
+        // 层级变化时联动刷新映射预览（映:行层级动态显示字段自身层级）
+        if(_currentRefTab === 'mapping') renderMappingPreview();
     };
     document.getElementById('pb-quzhi').onchange = function(){
         // 取值维度切换（仅通用模式）：位置名与值选项跟随刷新
@@ -37804,14 +37897,14 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             // 增量位置（非原局）
             const incrementChecked = [];
             positions.forEach(posKey => {
+                // 跳过只读位置（原局 + 基准宏已动态锁定的非原局位置），避免增量覆盖基准宏约束
+                if(pbPosIsReadOnly(posKey)) return;
                 const cacheKey = posNameToKey(posKey, ganzhi);
                 const cache = _positionCache[cacheKey];
                 if(cache && cache.checked){
                     const displayName = getPositionDisplayName(posKey, ganzhi, quzhi);
-                    if(!['年干','月干','日干','时干'].includes(cacheKey)){
-                        const cval = cache.val || '不限';
-                        incrementChecked.push(`${displayName}${(cache.val && cache.op === 'ne') ? '!' : ''}=${cval}`);
-                    }
+                    const cval = cache.val || '不限';
+                    incrementChecked.push(`${displayName}${(cache.val && cache.op === 'ne') ? '!' : ''}=${cval}`);
                 }
             });
             if(incrementChecked.length > 0) parts.push(incrementChecked.join('|'));
@@ -37820,14 +37913,14 @@ function resolveMappingByType(fieldType, ruleDefault, macroDefault, fieldMapping
             // inherit 模式：只编码增量位置条件（不含原局位置）
             const incrementChecked = [];
             positions.forEach(posKey => {
+                // 跳过只读位置（原局 + 基准宏已动态锁定的非原局位置），避免增量覆盖基准宏约束
+                if(pbPosIsReadOnly(posKey)) return;
                 const cacheKey = posNameToKey(posKey, ganzhi);
                 const cache = _positionCache[cacheKey];
                 if(cache && cache.checked){
                     const displayName = getPositionDisplayName(posKey, ganzhi, quzhi);
-                    if(!['年干','月干','日干','时干'].includes(cacheKey)){
-                        const cval = cache.val || '不限';
-                        incrementChecked.push(`${displayName}${(cache.val && cache.op === 'ne') ? '!' : ''}=${cval}`);
-                    }
+                    const cval = cache.val || '不限';
+                    incrementChecked.push(`${displayName}${(cache.val && cache.op === 'ne') ? '!' : ''}=${cval}`);
                 }
             });
             const parts = [`定位批量`, `inherit=${inheritMacroId}`, `type=${judgeType}`, `ganZhi=${ganzhi}`, `scope=${scope}`];
