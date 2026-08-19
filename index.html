@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -10150,10 +10150,10 @@
                     try { fit = evaluateRuleFitScore(rule, ruleCtx); } catch (e) { fit = null; }
                     if (fit && fit.enabled) {
                         if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
-                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, fit: fit, relationBindings: (rule.conditions && rule.conditions.relationBindings) || [] });
+                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, fit: fit, relationBindings: (rule.conditions && rule.conditions.relationBindings) || [], dims: computeRuleHitDims(rule) });
                     } else {
                         if(!matchedByCategory[rule.category]) matchedByCategory[rule.category] = [];
-                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, relationBindings: (rule.conditions && rule.conditions.relationBindings) || [] });
+                        matchedByCategory[rule.category].push({ text: rule.duanyu, rule: rule, relationBindings: (rule.conditions && rule.conditions.relationBindings) || [], dims: computeRuleHitDims(rule) });
                     }
                 }
             }
@@ -13892,28 +13892,20 @@
         const evalDims = (conds, baseVctx, groupQuZhi, hitByApi, ruleDefQz) => {
             const dims = { tian: false, di: false };
             const gq = (groupQuZhi === '天干' || groupQuZhi === '地支') ? groupQuZhi : '自动';
+            // 服务端命中仅当断语 defaultQuZhi 为显式单一维度（天干/地支）时对该维度权威——
+            // 此时 API 恰好只评估了该维度，命中即该维度满足（862c177 语义保持不变）；
+            // 断语 defaultQuZhi=自动/未设置 时 API 为"天干或地支任一命中"合并返回，无法区分维度，
+            // 若把命中直接归属会误显示未匹配的维度（Bug：地支行显示实际不存在的克关系）。
+            // 面板目标维度由生克设置的组取值维度决定（优先级高于断语 defaultQuZhi），
+            // 无法权威归属的维度一律用本地引擎按 shenkeQzOverride 独立重评，断语取值维度不影响面板。
+            const apiDimAuth = (d) => hitByApi && ruleDefQz === d;
             if (gq === '天干') {
-                dims.tian = hitByApi || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
+                dims.tian = apiDimAuth('天干') || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
             } else if (gq === '地支') {
-                dims.di = hitByApi || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
+                dims.di = apiDimAuth('地支') || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
             } else {
-                if (hitByApi) {
-                    // 服务端命中维度权威显示；另一维度仍独立评估（天干/地支互不影响），
-                    // 避免"断语区在天干/地支维度显示了该关系、面板却因基准断语只有单一 defaultQuZhi 而漏显示"
-                    if (ruleDefQz === '天干') {
-                        dims.tian = true;
-                        dims.di = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
-                    } else if (ruleDefQz === '地支') {
-                        dims.di = true;
-                        dims.tian = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
-                    } else {
-                        dims.tian = true;
-                        dims.di = true;
-                    }
-                } else {
-                    dims.tian = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
-                    dims.di = evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
-                }
+                dims.tian = apiDimAuth('天干') || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
+                dims.di = apiDimAuth('地支') || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '地支' }));
             }
             return dims;
         };
@@ -14519,6 +14511,73 @@
         return html;
     }
 
+    // ===== 取值维度=自动（干支分化）断语的命中维度归属（断语区维度前缀） =====
+    // API/本地匹配对"自动"均为"天干或地支任一命中"合并单条返回，无法区分维度；
+    // 这里用本地条件引擎（与后端双实现、口径一致）分别以天干/地支覆盖重评，得到维度命中标记，
+    // 供断语区显示"天干：/地支："前缀。仅当断语 defaultQuZhi='自动' 且条件树含定位批量字段时计算；
+    // 引擎不可用/数据不一致时返回 null（保持原样显示，fail-closed）。
+
+    /** 条件树是否含定位批量字段（递归展开宏/断语引用，防循环） */
+    function condsHasPb(node, visited) {
+        if (!node) return false;
+        if (node.field && String(node.field).indexOf('定位批量-') === 0) return true;
+        if (node.macroRef) {
+            const key = 'm' + String(node.macroRef);
+            if (visited.has(key)) return false;
+            visited.add(key);
+            const m = (typeof getMacroById === 'function') ? getMacroById(node.macroRef) : null;
+            return m && m.conditions ? condsHasPb(m.conditions, visited) : false;
+        }
+        if (node.ruleRef) {
+            const key = 'r' + String(node.ruleRef);
+            if (visited.has(key)) return false;
+            visited.add(key);
+            const r = (cache.rules || []).find(x => String(x.id) === String(node.ruleRef) || String(x.cloudId) === String(node.ruleRef));
+            return r && r.conditions ? condsHasPb(r.conditions, visited) : false;
+        }
+        if (Array.isArray(node.children)) {
+            for (let i = 0; i < node.children.length; i++) {
+                if (condsHasPb(node.children[i], visited)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** 计算断语的命中维度标记 {tian, di}；无维度区分意义/引擎不可用时返回 null */
+    function computeRuleHitDims(rule) {
+        try {
+            if (!rule || !rule.conditions || rule.conditions.defaultQuZhi !== '自动') return null;
+            if (!condsHasPb(rule.conditions, new Set())) return null;
+            const eng = window.__shengkeCondEngine;
+            if (!eng || typeof eng.evaluateConditionGroup !== 'function') return null;
+            // 引擎数据一致性守卫（与 analyzeShengKe evalConds 口径一致，fail-closed）
+            if (window._lastCalcData && eng.data !== window._lastCalcData) return null;
+            const dims = { tian: false, di: false };
+            dims.tian = !!eng.evaluateConditionGroup(rule.conditions, 0, new Set(), { ruleDefaultQuZhi: '天干' });
+            dims.di = !!eng.evaluateConditionGroup(rule.conditions, 0, new Set(), { ruleDefaultQuZhi: '地支' });
+            if (!dims.tian && !dims.di) return null; // 混合维度命中（多字段跨维度），无法归属 → 保持原样
+            return dims;
+        } catch (e) { return null; }
+    }
+
+    /** 断语区显示：取值维度=自动的断语先附加"天干：/地支："维度前缀再走前缀合并（层次分明）；
+        两个维度都命中时拆成"天干：X"、"地支：X"两条各显示；其余条目原样返回。
+        复制断语直接用原始 matchedByCategory 数据，不带维度前缀。 */
+    function applyDimsPrefixToEntries(duanyus) {
+        const out = [];
+        (duanyus || []).forEach(d => {
+            const dm = d && d.dims;
+            if (!dm || (!dm.tian && !dm.di)) { out.push(d); return; }
+            const labels = [];
+            if (dm.tian) labels.push('天干');
+            if (dm.di) labels.push('地支');
+            labels.forEach(lb => {
+                out.push(Object.assign({}, d, { text: lb + '：' + (d.text || '') }));
+            });
+        });
+        return out;
+    }
+
     function displayDuanyuResult() {
         const resultFilter = DOM.resultFilterCategory ? DOM.resultFilterCategory.value : 'all';
         const matchedByCategory = cache.matchedByCategory || {};
@@ -14536,9 +14595,9 @@
         let html = '';
         const defaultColor = 'from-gray-50 to-gray-100 border-gray-300';
         
-        // 渲染单个分类：数字序号 + 同前缀合并
+        // 渲染单个分类：数字序号 + 同前缀合并（取值维度=自动的断语先附加"天干：/地支："维度前缀）
         const renderCategoryDuanyus = (duanyus) => {
-            return groupDuanyuByPrefix(duanyus).map((entry, i) => {
+            return groupDuanyuByPrefix(applyDimsPrefixToEntries(duanyus)).map((entry, i) => {
                 const displayText = mergedDuanyuText(entry);
                 const rule = entry.type === 'group' ? (entry.contents[0].d && entry.contents[0].d.rule) : (entry.d && entry.d.rule);
                 // 取契合度（同前缀合并时取第一项的）
@@ -14627,7 +14686,7 @@
               if (rr && rr.category === cat && String(rr.duanyu || '') === text) { fullRule = rr; break; }
             }
           }
-          matchedByCategory[cat].push({ text: text, rule: fullRule, fit: fitItem, relationBindings: (item.relationBindings || []) });
+          matchedByCategory[cat].push({ text: text, rule: fullRule, fit: fitItem, relationBindings: (item.relationBindings || []), dims: computeRuleHitDims(fullRule) });
         }
       }
 
