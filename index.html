@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -2319,6 +2319,11 @@
                         <option value="">请选择值</option>
                     </select>
                     <input type="number" min="0" class="condition-val-input flex-1 p-2 border rounded hidden" placeholder="输入正整数">
+                    <div class="condition-range-input flex-1 flex items-center gap-2 hidden">
+                        <input type="number" min="0" max="12" class="condition-range-min flex-1 p-2 border rounded" placeholder="最小值">
+                        <span class="text-gray-500">~</span>
+                        <input type="number" min="0" max="12" class="condition-range-max flex-1 p-2 border rounded" placeholder="最大值">
+                    </div>
                     <div class="condition-val-checkbox flex-1 flex flex-wrap gap-2 p-2 border rounded hidden"></div>
                     <label class="condition-weight-label flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap" title="权重：该条件的重要程度（1-10），权重越高对断语契合度影响越大">权重<input type="number" min="1" max="10" class="condition-weight w-14 p-1.5 border rounded text-sm" value="1"></label>
                     <button class="del-condition px-3 bg-red-500 text-white rounded">−</button>
@@ -9014,6 +9019,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运流年天干五行数量-')){
                 const name = c.field.replace('原局大运流年天干五行数量-', '');
@@ -9029,6 +9035,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运流年地支五行数量-')){
                 const name = c.field.replace('原局大运流年地支五行数量-', '');
@@ -9044,6 +9051,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             // === 原局大运流年十神数量(区分阴阳,整体)分支 ===
             else if(c.field.startsWith('原局大运流年十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
@@ -9064,6 +9072,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运流年天干十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局大运流年天干十神数量-', '');
@@ -9080,6 +9089,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运流年地支十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局大运流年地支十神数量-', '');
@@ -9096,6 +9106,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             // === 原局大运流年十神数量(不区分阴阳,整体)分支 ===
             else if(c.field.startsWith('原局大运流年十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
@@ -9116,6 +9127,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运流年天干十神数量-')){
                 const name = c.field.replace('原局大运流年天干十神数量-', '');
@@ -9132,6 +9144,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运流年地支十神数量-')){
                 const name = c.field.replace('原局大运流年地支十神数量-', '');
@@ -9148,6 +9161,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             // === 原局大运五行数量(整体,天干+地支)分支 ===
             else if(c.field.startsWith('原局大运五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
@@ -9165,6 +9179,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运天干五行数量-')){
                 const name = c.field.replace('原局大运天干五行数量-', '');
@@ -9179,6 +9194,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运地支五行数量-')){
                 const name = c.field.replace('原局大运地支五行数量-', '');
@@ -9193,6 +9209,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             // === 原局大运十神数量(区分阴阳)分支 ===
             else if(c.field.startsWith('原局大运十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
@@ -9211,6 +9228,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运天干十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局大运天干十神数量-', '');
@@ -9226,6 +9244,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运地支十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局大运地支十神数量-', '');
@@ -9241,6 +9260,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             // === 原局大运十神数量(不区分阴阳)分支 ===
             else if(c.field.startsWith('原局大运十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
@@ -9259,6 +9279,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运天干十神数量-')){
                 const name = c.field.replace('原局大运天干十神数量-', '');
@@ -9274,6 +9295,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局大运地支十神数量-')){
                 const name = c.field.replace('原局大运地支十神数量-', '');
@@ -9289,6 +9311,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             // === 原局五行数量分支 ===
             else if(c.field.startsWith('原局五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
@@ -9304,6 +9327,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局天干五行数量-')){
                 const name = c.field.replace('原局天干五行数量-', '');
@@ -9317,6 +9341,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局地支五行数量-')){
                 const name = c.field.replace('原局地支五行数量-', '');
@@ -9330,6 +9355,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('五行数量-')){
                 const name = c.field.replace('五行数量-', '');
@@ -9339,6 +9365,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局十神数量-', '');
@@ -9354,6 +9381,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局天干十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局天干十神数量-', '');
@@ -9368,6 +9396,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局地支十神数量-') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局地支十神数量-', '');
@@ -9382,6 +9411,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
                 const name = c.field.replace('原局十神数量-', '');
@@ -9397,6 +9427,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局天干十神数量-')){
                 const name = c.field.replace('原局天干十神数量-', '');
@@ -9411,6 +9442,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('原局地支十神数量-')){
                 const name = c.field.replace('原局地支十神数量-', '');
@@ -9425,6 +9457,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('十神数量-')){
                 const name = c.field.replace('十神数量-', '');
@@ -9434,6 +9467,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field.startsWith('干支数量-')){
                 const name = c.field.replace('干支数量-', '');
@@ -9443,6 +9477,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
             else if(c.field === '性别'){
                 const gender = data.gender || '';
@@ -9662,6 +9697,7 @@
                 else if(c.op === 'gt') res = cnt > Number(c.val);
                 else if(c.op === 'le') res = cnt <= Number(c.val);
                 else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
                 actual = String(cnt);
             }
             // 十神数量-（统一处理各种前缀：原局、大运、流年等）
@@ -9700,6 +9736,7 @@
                     else if(c.op === 'gt') res = cnt > Number(c.val);
                     else if(c.op === 'le') res = cnt <= Number(c.val);
                     else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
                     actual = String(cnt);
                 }
             }
@@ -12175,6 +12212,21 @@
                 } else {
                     if (valSel.classList.contains('hidden')) valInput.value = cond.val;
                     else valSel.value = cond.val;
+                }
+            }
+            // 区间关系回显：显示两个输入框并填充最小/最大值
+            if (cond.op === 'range') {
+                const rangeInput = row.querySelector('.condition-range-input');
+                if (rangeInput) {
+                    const rp = String(cond.val || '').split('~');
+                    const rangeMin = rangeInput.querySelector('.condition-range-min');
+                    const rangeMax = rangeInput.querySelector('.condition-range-max');
+                    if (valSel) valSel.classList.add('hidden');
+                    if (valInput) valInput.classList.add('hidden');
+                    if (valCheckbox) valCheckbox.classList.add('hidden');
+                    rangeInput.classList.remove('hidden');
+                    if (rangeMin) rangeMin.value = rp[0] || '';
+                    if (rangeMax) rangeMax.value = rp[1] || '';
                 }
             }
             // 回填触发字段联动后再确保区间运算符/文本输入状态正确
@@ -15288,6 +15340,7 @@
                 
                 // onchange之后再设置op和logic
                 opSel.value = child.op || 'eq';
+                applyRangeEcho(item, child.op, child.val);
                 logicSel.value = child.logic || 'and';
                 
                 const excludeCb = item.querySelector('.condition-exclude');
@@ -15467,7 +15520,25 @@
         }
     }
     
-    // 绑定条件项事件
+    // 区间关系条件回显：显示两个输入框并填充最小/最大值（闭区间）
+    function applyRangeEcho(item, op, val) {
+        if (op !== 'range') return;
+        const rangeInput = item.querySelector('.condition-range-input');
+        if (!rangeInput) return;
+        const rp = String(val || '').split('~');
+        const rangeMin = rangeInput.querySelector('.condition-range-min');
+        const rangeMax = rangeInput.querySelector('.condition-range-max');
+        const valSel = item.querySelector('.condition-val-select');
+        const valInput = item.querySelector('.condition-val-input');
+        const valCheckbox = item.querySelector('.condition-val-checkbox');
+        if (valSel) valSel.classList.add('hidden');
+        if (valInput) valInput.classList.add('hidden');
+        if (valCheckbox) valCheckbox.classList.add('hidden');
+        rangeInput.classList.remove('hidden');
+        if (rangeMin) rangeMin.value = rp[0] || '';
+        if (rangeMax) rangeMax.value = rp[1] || '';
+    }
+
     function bindItemEvents(item) {
         initCustomFieldSelect(item);
         const fieldSel = item.querySelector('.condition-field');
@@ -15475,6 +15546,20 @@
         const valSel = item.querySelector('.condition-val-select');
         const valInput = item.querySelector('.condition-val-input');
         const valCheckbox = item.querySelector('.condition-val-checkbox');
+        const rangeInput = item.querySelector('.condition-range-input');
+        
+        // 操作符变化时切换值输入控件（区间关系显示两个输入框）
+        opSel.onchange = function() {
+            if (this.value === 'range') {
+                valSel.classList.add('hidden');
+                valInput.classList.add('hidden');
+                valCheckbox.classList.add('hidden');
+                if (rangeInput) rangeInput.classList.remove('hidden');
+            } else if (rangeInput && !rangeInput.classList.contains('hidden')) {
+                rangeInput.classList.add('hidden');
+                valSel.classList.remove('hidden');
+            }
+        };
         
         // 字段变化时更新值控件
         fieldSel.onchange = function() {
@@ -15482,6 +15567,7 @@
             valSel.classList.add('hidden');
             valInput.classList.add('hidden');
             valCheckbox.classList.add('hidden');
+            if (rangeInput) rangeInput.classList.add('hidden');
             valSel.innerHTML = '<option value="">请选择值</option>';
             valCheckbox.innerHTML = '';
             // 移除可能存在的定位批量容器（避免字段切换后残留）
@@ -15652,7 +15738,7 @@
                         GROUPED_SHEN.forEach(s => { valSel.innerHTML += `<option value="${s}">${s}</option>`; });
                         return;
                     } else if (tt === 'count') {
-                        opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                        opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option><option value="range">区间</option>';
                         valSel.classList.remove('hidden');
                         valSel.innerHTML = '<option value="">请选择数量</option>';
                         for (let n = 0; n <= 12; n++) {
@@ -15732,7 +15818,7 @@
             }
             
             if(field.includes('数量')){
-                opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option><option value="range">区间</option>';
                 valSel.classList.remove('hidden');
                 valSel.innerHTML = '<option value="">请选择数量</option>';
                 for(let n = 0; n <= 12; n++){
@@ -16095,12 +16181,27 @@
             const valSel = item.querySelector('.condition-val-select');
             const valInput = item.querySelector('.condition-val-input');
             const valCheckbox = item.querySelector('.condition-val-checkbox');
+            const rangeInput = item.querySelector('.condition-range-input');
+            
+            // 操作符变化时切换值输入控件（区间关系显示两个输入框）
+            opSel.onchange = function() {
+                if (this.value === 'range') {
+                    valSel.classList.add('hidden');
+                    valInput.classList.add('hidden');
+                    valCheckbox.classList.add('hidden');
+                    if (rangeInput) rangeInput.classList.remove('hidden');
+                } else if (rangeInput && !rangeInput.classList.contains('hidden')) {
+                    rangeInput.classList.add('hidden');
+                    valSel.classList.remove('hidden');
+                }
+            };
             
             fieldSel.onchange = function() {
                 const field = this.value;
                 valSel.classList.add('hidden');
                 valInput.classList.add('hidden');
                 valCheckbox.classList.add('hidden');
+                if (rangeInput) rangeInput.classList.add('hidden');
                 valSel.innerHTML = '<option value="">请选择值</option>';
                 valCheckbox.innerHTML = '';
                 // 移除可能存在的定位批量容器（避免字段切换后残留）
@@ -16202,7 +16303,8 @@
                     valSel.innerHTML = '<option value="">请选择触发范围</option><option value="仅原局">仅原局</option><option value="原局+大运">原局+大运</option><option value="原局+大运+流年">原局+大运+流年</option><option value="原局+大运+流年+流月">原局+大运+流年+流月</option>';
                 }
                 else if(field.includes('五行数量-') || field.startsWith('五行数量对比-')){
-                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                    const isPlainCountField = field.includes('五行数量-');
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>' + (isPlainCountField ? '<option value="range">区间</option>' : '');
                     valSel.classList.remove('hidden');
                     valSel.innerHTML = '<option value="">请选择值</option>';
                     WU_LIST.forEach(w => { valSel.innerHTML += `<option value="${w}">${w}五行数量</option>`; });
@@ -16217,7 +16319,8 @@
                     }
                 }
                 else if(field.includes('十神数量-') || field.startsWith('十神数量对比-')){
-                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                    const isPlainCountField = field.includes('十神数量-');
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>' + (isPlainCountField ? '<option value="range">区间</option>' : '');
                     valSel.classList.remove('hidden');
                     valSel.innerHTML = '<option value="">请选择值</option>';
                     // 所有十神类型（区分阴阳+不区分阴阳）
@@ -16234,7 +16337,7 @@
                     }
                 }
                 else if(field.includes('数量')){
-                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
+                    opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option><option value="range">区间</option>';
                     valSel.classList.remove('hidden');
                     valSel.innerHTML = '<option value="">请选择数量</option>';
                     for(let n = 0; n <= 12; n++){
@@ -16394,7 +16497,20 @@
                 const valInput = child.querySelector('.condition-val-input');
                 const valCheckbox = child.querySelector('.condition-val-checkbox');
                 
-                if (!valCheckbox.classList.contains('hidden')) {
+                if (op === 'range') {
+                    // 区间关系：读取最小值和最大值，保存为 "min~max"
+                    const rangeMin = child.querySelector('.condition-range-min');
+                    const rangeMax = child.querySelector('.condition-range-max');
+                    const minV = rangeMin ? rangeMin.value.trim() : '';
+                    const maxV = rangeMax ? rangeMax.value.trim() : '';
+                    if (!minV || !maxV) {
+                        return { error: '请填写区间的最大值和最小值！' };
+                    }
+                    if (Number(minV) > Number(maxV)) {
+                        return { error: '区间最小值不能大于最大值！' };
+                    }
+                    val = minV + '~' + maxV;
+                } else if (!valCheckbox.classList.contains('hidden')) {
                     const checkedBoxes = valCheckbox.querySelectorAll('input:checked');
                     if (checkedBoxes.length === 0) {
                         return { error: '请至少选择一个值！' };
@@ -16743,6 +16859,7 @@
             'gt': '大于',
             'le': '小于等于',
             'lt': '小于',
+            'range': '区间',
             'in': '包含',
             'nin': '不包含'
         };
@@ -17318,6 +17435,7 @@
                             
                             // onchange之后再设置op和logic
                             opSel.value = c.op || 'eq';
+                            applyRangeEcho(item, c.op, c.val);
                             logicSel.value = c.logic || 'and';
                             
                             // 设置值
@@ -17462,6 +17580,7 @@
                             
                             // onchange之后再设置op和logic
                             opSel.value = c.op || 'eq';
+                            applyRangeEcho(item, c.op, c.val);
                             logicSel.value = c.logic || 'and';
                             
                             // 设置值
@@ -27664,7 +27783,7 @@ function closeMacroManager() {
 }
 
 // 全局版条件转文本（用于宏管理界面，不依赖局部作用域）
-const OP_TEXT_MAP = { 'eq':'等于','ne':'不等于','ge':'大于等于','gt':'大于','le':'小于等于','lt':'小于','in':'包含','nin':'不包含' };
+const OP_TEXT_MAP = { 'eq':'等于','ne':'不等于','ge':'大于等于','gt':'大于','le':'小于等于','lt':'小于','range':'区间','in':'包含','nin':'不包含' };
 function macroConditionsToText(conditions, depth = 0) {
     if (!conditions || !conditions.children) return '无条件';
     let text = '';

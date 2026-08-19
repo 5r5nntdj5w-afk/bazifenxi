@@ -1614,6 +1614,7 @@ function evaluateLeafCondition(data, cond, context) {
     else if (op === 'gt') res = cnt > Number(val);
     else if (op === 'le') res = cnt <= Number(val);
     else if (op === 'lt') res = cnt < Number(val);
+    else if (op === 'range') { var _rp = String(val).split('~'); var _rmin = Number(_rp[0]); var _rmax = Number(_rp[1]); res = !isNaN(_rmin) && !isNaN(_rmax) && _rmax >= _rmin && cnt >= _rmin && cnt <= _rmax; }
     actual = String(cnt);
   }
 
@@ -1707,6 +1708,7 @@ function evaluateLeafCondition(data, cond, context) {
       else if (op === 'gt') res = cnt > Number(val);
       else if (op === 'le') res = cnt <= Number(val);
       else if (op === 'lt') res = cnt < Number(val);
+    else if (op === 'range') { var _rp = String(val).split('~'); var _rmin = Number(_rp[0]); var _rmax = Number(_rp[1]); res = !isNaN(_rmin) && !isNaN(_rmax) && _rmax >= _rmin && cnt >= _rmin && cnt <= _rmax; }
       actual = String(cnt);
     }
   }
@@ -2087,6 +2089,7 @@ function evaluateLeafCondition(data, cond, context) {
     else if (op === 'gt') res = _gzCnt > Number(val);
     else if (op === 'le') res = _gzCnt <= Number(val);
     else if (op === 'lt') res = _gzCnt < Number(val);
+    else if (op === 'range') { var _rp = String(val).split('~'); var _rmin = Number(_rp[0]); var _rmax = Number(_rp[1]); res = !isNaN(_rmin) && !isNaN(_rmax) && _rmax >= _rmin && _gzCnt >= _rmin && _gzCnt <= _rmax; }
   }
 
   // ---- 年龄 ----
