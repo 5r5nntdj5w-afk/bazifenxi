@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3713,6 +3713,8 @@
         正印: '印星', 偏印: '印星'
     };
     const WU_LIST = ['木','火','土','金','水'];
+    // 数量字段排名特殊值（max=最大值 / max2=第二大 / max3=第三大 / min=最小值，去重排名）
+    const COUNT_RANK_TEXT = { 'max': '最大值', 'max2': '第二大', 'max3': '第三大', 'min': '最小值' };
     const RULE_KEY='bazi_rules_final';
     const CATEGORY_KEY='bazi_categories'; 
     const HISTORY_KEY='bazi_history_final';
@@ -8527,9 +8529,6 @@
         const liunianGroupZhi = SHEN_TO_GROUP[liunianShenZhi] || '';
         const liuyueGroupGan = SHEN_TO_GROUP[liuyueShenGan] || '';
         const liuyueGroupZhi = SHEN_TO_GROUP[liuyueShenZhi] || '';
-
-        // 数量字段排名特殊值（max=max 最大值 / max2=第二大 / max3=第三大 / min=最小值，去重排名）
-        const COUNT_RANK_TEXT = { 'max': '最大值', 'max2': '第二大', 'max3': '第三大', 'min': '最小值' };
 
         // 统计数量字段对应成员的数量（统一前缀解析：原局/大运/流年/天干/地支/当前评估范围等）
         function getCountOfField(field, data) {
