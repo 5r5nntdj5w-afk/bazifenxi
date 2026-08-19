@@ -1022,6 +1022,9 @@ function evaluateLeafCondition(data, cond, context) {
           _cnt2 = countWuXing(data, _valName, 'all');
         } else if (WU_LIST.indexOf(val) >= 0) {
           _cnt2 = countWuXing(data, val, 'all');
+        } else if (typeof val === 'string' && val.indexOf('-') >= 0) {
+          // val 是对比字段但未在 field_config 中配置时，从字段名提取五行名兜底
+          _cnt2 = countWuXing(data, val.substring(val.lastIndexOf('-') + 1), 'all');
         } else {
           _cnt2 = countWuXing(data, val, 'all');
         }
@@ -1036,64 +1039,34 @@ function evaluateLeafCondition(data, cond, context) {
         return res;
       }
       
-      // 十神数量对比
+      // 十神数量对比（无前缀 → 跟随评估范围：countShen/countShenGroup 'all' 统计 data 中存在的原局+大运+流年）
       if (tt === 'count_compare_shishen') {
-        var _cntA = 0, _cntB = 0;
-        var _rg = data.ri && data.ri.t;
-        
-        if (_rg) {
-          var _shenName1 = '';
-          var _shenMatch1 = field.match(/-(.+)$/);
-          if (_shenMatch1 && _shenMatch1[1]) {
-            _shenName1 = _shenMatch1[1];
-          }
-          
-          var _isGroup1 = ['比劫','食伤','财星','官杀','印星'].indexOf(_shenName1) >= 0;
-          var _pillarsC = ['nian','yue','ri','shi'];
-          
-          for (var pci = 0; pci < _pillarsC.length; pci++) {
-            var pc = data[_pillarsC[pci]];
-            if (pc && pc.t) {
-              var sc1 = getExactShen(pc.t, _rg);
-              if (_isGroup1 ? (SHEN_TO_GROUP[sc1] === _shenName1) : (sc1 === _shenName1)) _cntA++;
-            }
-            if (pc && pc.d) {
-              var sc2 = getDiShen(pc.d, _rg);
-              if (_isGroup1 ? (SHEN_TO_GROUP[sc2] === _shenName1) : (sc2 === _shenName1)) _cntA++;
-            }
-          }
-          
-          var _valConfig = null;
-          for (var vci2 = 0; vci2 < _fieldConfigCache.length; vci2++) {
-            if (_fieldConfigCache[vci2].field_value === val) {
-              _valConfig = _fieldConfigCache[vci2];
-              break;
-            }
-          }
-          
-          var _shenName2 = val;
-          if (_valConfig && _valConfig.template_type === 'count_compare_shishen') {
-            var _shenMatch2 = val.match(/-(.+)$/);
-            if (_shenMatch2 && _shenMatch2[1]) {
-              _shenName2 = _shenMatch2[1];
-            }
-          }
-          
-          var _isGroup2 = ['比劫','食伤','财星','官杀','印星'].indexOf(_shenName2) >= 0;
-          
-          for (var pcii = 0; pcii < _pillarsC.length; pcii++) {
-            var pcc = data[_pillarsC[pcii]];
-            if (pcc && pcc.t) {
-              var sc3 = getExactShen(pcc.t, _rg);
-              if (_isGroup2 ? (SHEN_TO_GROUP[sc3] === _shenName2) : (sc3 === _shenName2)) _cntB++;
-            }
-            if (pcc && pcc.d) {
-              var sc4 = getDiShen(pcc.d, _rg);
-              if (_isGroup2 ? (SHEN_TO_GROUP[sc4] === _shenName2) : (sc4 === _shenName2)) _cntB++;
-            }
+        var _shenName1 = '';
+        var _shenMatch1 = field.match(/-(.+)$/);
+        if (_shenMatch1 && _shenMatch1[1]) {
+          _shenName1 = _shenMatch1[1];
+        }
+        var _isGroup1 = ['比劫','食伤','财星','官杀','印星'].indexOf(_shenName1) >= 0;
+        var _cntA = _isGroup1 ? countShenGroup(data, _shenName1, 'all') : countShen(data, _shenName1, 'all');
+
+        var _valConfig = null;
+        for (var vci2 = 0; vci2 < _fieldConfigCache.length; vci2++) {
+          if (_fieldConfigCache[vci2].field_value === val) {
+            _valConfig = _fieldConfigCache[vci2];
+            break;
           }
         }
-        
+        // val 可能是对比字段（十神数量对比-比劫）、普通数量字段（十神数量-比劫）或纯十神/组名（比劫）
+        var _shenName2 = (typeof val === 'string' && val.indexOf('-') >= 0) ? val.substring(val.lastIndexOf('-') + 1) : val;
+        if (_valConfig && _valConfig.template_type === 'count_compare_shishen') {
+          var _shenMatch2 = val.match(/-(.+)$/);
+          if (_shenMatch2 && _shenMatch2[1]) {
+            _shenName2 = _shenMatch2[1];
+          }
+        }
+        var _isGroup2 = ['比劫','食伤','财星','官杀','印星'].indexOf(_shenName2) >= 0;
+        var _cntB = _isGroup2 ? countShenGroup(data, _shenName2, 'all') : countShen(data, _shenName2, 'all');
+
         if (op === 'eq') res = _cntA == _cntB;
         else if (op === 'ge') res = _cntA >= _cntB;
         else if (op === 'gt') res = _cntA > _cntB;
@@ -1610,9 +1583,14 @@ function evaluateLeafCondition(data, cond, context) {
   else if (field.indexOf('五行数量-') >= 0 && val && val.indexOf('五行数量-') >= 0) {
     function _countWuxingByScope(fieldName) {
       var fName = fieldName.substring(fieldName.lastIndexOf('-') + 1);
-      var fHasDayun = fieldName.indexOf('大运') >= 0;
-      var fHasLiunian = fieldName.indexOf('流年') >= 0;
-      var fHasYuanJu = fieldName.indexOf('原局') >= 0;
+      var fIsCurScope = fieldName.indexOf('当前评估范围') >= 0;
+      var fHasDayun = fieldName.indexOf('大运') >= 0 || fIsCurScope;
+      var fHasLiunian = fieldName.indexOf('流年') >= 0 || fIsCurScope;
+      var fHasYuanJu = fieldName.indexOf('原局') >= 0 || fIsCurScope;
+      // 无前缀数量字段 → 跟随评估范围（API data 已按评估范围过滤，统计 data 中存在的柱位）
+      if (!fIsCurScope && !fHasYuanJu && !fHasDayun && !fHasLiunian) {
+        fHasYuanJu = true; fHasDayun = true; fHasLiunian = true;
+      }
       var fCnt = 0;
       if (fHasYuanJu || (!fHasDayun && !fHasLiunian)) {
         if (data.nian && data.nian.t && WU_XING[data.nian.t] === fName) fCnt++;
@@ -1705,9 +1683,14 @@ function evaluateLeafCondition(data, cond, context) {
   else if (field.indexOf('十神数量-') >= 0 && val && val.indexOf('十神数量-') >= 0) {
     function _countShishenByScope(fieldName) {
       var fName = fieldName.substring(fieldName.lastIndexOf('-') + 1);
-      var fHasDayun = fieldName.indexOf('大运') >= 0;
-      var fHasLiunian = fieldName.indexOf('流年') >= 0;
-      var fHasYuanJu = fieldName.indexOf('原局') >= 0;
+      var fIsCurScope = fieldName.indexOf('当前评估范围') >= 0;
+      var fHasDayun = fieldName.indexOf('大运') >= 0 || fIsCurScope;
+      var fHasLiunian = fieldName.indexOf('流年') >= 0 || fIsCurScope;
+      var fHasYuanJu = fieldName.indexOf('原局') >= 0 || fIsCurScope;
+      // 无前缀数量字段 → 跟随评估范围（API data 已按评估范围过滤，统计 data 中存在的柱位）
+      if (!fIsCurScope && !fHasYuanJu && !fHasDayun && !fHasLiunian) {
+        fHasYuanJu = true; fHasDayun = true; fHasLiunian = true;
+      }
       var fOnlyTiangan = fieldName.indexOf('天干') >= 0;
       var fOnlyDizhi = fieldName.indexOf('地支') >= 0;
       var fIsGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(fName) >= 0;
@@ -2128,41 +2111,17 @@ function evaluateLeafCondition(data, cond, context) {
     actual = _name1 + '=' + _cnt1 + ', ' + val + '=' + _cnt2;
   }
 
-  // ---- 十神数量对比 ----
+  // ---- 十神数量对比（field 与 val 各为十神/十神组名或数量字段；无前缀 → 跟随评估范围） ----
   else if (field.indexOf('十神数量对比-') === 0) {
     var _name2 = field.replace('十神数量对比-', '');
-    var _cntA = 0, _cntB = 0;
-    var _rg = data.ri && data.ri.t;
-    
-    if (_rg) {
-      var _isGroup2 = ['比劫','食伤','财星','官杀','印星'].indexOf(_name2) >= 0;
-      var _pillars6 = ['nian','yue','ri','shi'];
-      for (var _pi6 = 0; _pi6 < _pillars6.length; _pi6++) {
-        var _p6 = data[_pillars6[_pi6]];
-        if (_p6 && _p6.t) {
-          var _sA = getExactShen(_p6.t, _rg);
-          if (_isGroup2 ? (SHEN_TO_GROUP[_sA] === _name2) : (_sA === _name2)) _cntA++;
-        }
-        if (_p6 && _p6.d) {
-          var _sA2 = getDiShen(_p6.d, _rg);
-          if (_isGroup2 ? (SHEN_TO_GROUP[_sA2] === _name2) : (_sA2 === _name2)) _cntA++;
-        }
-      }
-      
-      var _isGroupVal = ['比劫','食伤','财星','官杀','印星'].indexOf(val) >= 0;
-      for (var _pi6b = 0; _pi6b < _pillars6.length; _pi6b++) {
-        var _p6b = data[_pillars6[_pi6b]];
-        if (_p6b && _p6b.t) {
-          var _sB = getExactShen(_p6b.t, _rg);
-          if (_isGroupVal ? (SHEN_TO_GROUP[_sB] === val) : (_sB === val)) _cntB++;
-        }
-        if (_p6b && _p6b.d) {
-          var _sB2 = getDiShen(_p6b.d, _rg);
-          if (_isGroupVal ? (SHEN_TO_GROUP[_sB2] === val) : (_sB2 === val)) _cntB++;
-        }
-      }
-    }
-    
+    var _isGroup2 = ['比劫','食伤','财星','官杀','印星'].indexOf(_name2) >= 0;
+    var _cntA = _isGroup2 ? countShenGroup(data, _name2, 'all') : countShen(data, _name2, 'all');
+    var _cntB = 0;
+    // val 可能是对比字段（十神数量对比-比劫）、普通数量字段（十神数量-比劫）或纯十神/组名（比劫）
+    var _vName = (typeof val === 'string' && val.indexOf('-') >= 0) ? val.substring(val.lastIndexOf('-') + 1) : val;
+    var _isGroupVal = ['比劫','食伤','财星','官杀','印星'].indexOf(_vName) >= 0;
+    _cntB = _isGroupVal ? countShenGroup(data, _vName, 'all') : countShen(data, _vName, 'all');
+
     if (op === 'eq') res = _cntA == _cntB;
     else if (op === 'ge') res = _cntA >= _cntB;
     else if (op === 'gt') res = _cntA > _cntB;
