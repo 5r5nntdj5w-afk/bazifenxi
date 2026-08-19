@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -3713,8 +3713,8 @@
         正印: '印星', 偏印: '印星'
     };
     const WU_LIST = ['木','火','土','金','水'];
-    // 数量字段排名特殊值（max=最大值 / max2=第二大 / max3=第三大 / min=最小值，去重排名）
-    const COUNT_RANK_TEXT = { 'max': '最大值', 'max2': '第二大', 'max3': '第三大', 'min': '最小值' };
+    // 数量字段排名特殊值（max=最大值 / max2=第二大 / max3=第三大 / min=最小值，去重排名；maxu/max2u/max3u/minu=唯一系列，该名次值在维度内必须唯一）
+    const COUNT_RANK_TEXT = { 'max': '最大值', 'max2': '第二大', 'max3': '第三大', 'min': '最小值', 'maxu': '唯一最大值', 'max2u': '唯一第二大', 'max3u': '唯一第三大', 'minu': '唯一最小值' };
     const RULE_KEY='bazi_rules_final';
     const CATEGORY_KEY='bazi_categories'; 
     const HISTORY_KEY='bazi_history_final';
@@ -8587,6 +8587,7 @@
             return cnt;
         }
         // 计算字段所在维度（五行/十神组/十神）的去重排名值，名次不存在时返回 null
+        // 唯一系列（maxu/max2u/max3u/minu）：该名次对应的值在维度内必须只出现一次才返回，否则 null
         function computeCountRankValue(field, rank, data) {
             const name = field.substring(field.lastIndexOf('-') + 1);
             const isWuxing = field.indexOf('五行数量') >= 0;
@@ -8596,11 +8597,17 @@
             const counts = members.map(m => getCountOfField(prefix + m, data));
             const distinct = [...new Set(counts)].sort((a, b) => b - a);
             if (!distinct.length) return null;
-            if (rank === 'max') return distinct[0];
-            if (rank === 'max2') return distinct.length > 1 ? distinct[1] : null;
-            if (rank === 'max3') return distinct.length > 2 ? distinct[2] : null;
-            if (rank === 'min') return distinct[distinct.length - 1];
-            return null;
+            let rv = null;
+            if (rank === 'max' || rank === 'maxu') rv = distinct[0];
+            else if (rank === 'max2' || rank === 'max2u') rv = distinct.length > 1 ? distinct[1] : null;
+            else if (rank === 'max3' || rank === 'max3u') rv = distinct.length > 2 ? distinct[2] : null;
+            else if (rank === 'min' || rank === 'minu') rv = distinct[distinct.length - 1];
+            if (rv === null) return null;
+            // 唯一系列：名次值在维度内只出现一次才命中（并列时不命中）
+            if (rank === 'maxu' || rank === 'max2u' || rank === 'max3u' || rank === 'minu') {
+                if (counts.filter(v => v === rv).length !== 1) return null;
+            }
+            return rv;
         }
 
         // 调试日志：检查规则匹配
@@ -15909,7 +15916,7 @@
                         for (let n = 0; n <= 12; n++) {
                             valSel.innerHTML += `<option value="${n}">${n}</option>`;
                         }
-                        valSel.innerHTML += '<option value="max">最大值</option><option value="max2">第二大</option><option value="max3">第三大</option><option value="min">最小值</option>';
+                        valSel.innerHTML += '<option value="max">最大值</option><option value="max2">第二大</option><option value="max3">第三大</option><option value="min">最小值</option><option value="maxu">唯一最大值</option><option value="max2u">唯一第二大</option><option value="max3u">唯一第三大</option><option value="minu">唯一最小值</option>';
                         return;
                     } else if (tt === 'count_compare_wuxing') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -15990,7 +15997,7 @@
                 for(let n = 0; n <= 12; n++){
                     valSel.innerHTML += `<option value="${n}">${n}</option>`;
                 }
-                valSel.innerHTML += '<option value="max">最大值</option><option value="max2">第二大</option><option value="max3">第三大</option><option value="min">最小值</option>';
+                valSel.innerHTML += '<option value="max">最大值</option><option value="max2">第二大</option><option value="max3">第三大</option><option value="min">最小值</option><option value="maxu">唯一最大值</option><option value="max2u">唯一第二大</option><option value="max3u">唯一第三大</option><option value="minu">唯一最小值</option>';
             }
             else if(field.startsWith('包含-')){
                 opSel.innerHTML = '<option value="in">包含</option><option value="nin">不包含</option>';

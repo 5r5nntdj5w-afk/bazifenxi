@@ -233,7 +233,8 @@ function countFieldNum(data, field) {
   return cnt;
 }
 
-/** 数量字段排名值：计算字段所在维度（五行/十神组/十神）的去重排名值，名次不存在时返回 null */
+/** 数量字段排名值：计算字段所在维度（五行/十神组/十神）的去重排名值，名次不存在时返回 null
+ *  唯一系列（maxu/max2u/max3u/minu）：该名次对应的值在维度内必须只出现一次才返回，否则 null */
 function computeRankValue(data, field, rank) {
   var name = field.substring(field.lastIndexOf('-') + 1);
   var isWuxing = field.indexOf('五行数量') >= 0;
@@ -248,11 +249,19 @@ function computeRankValue(data, field, rank) {
   for (var j = 0; j < counts.length; j++) { if (distinct.indexOf(counts[j]) < 0) distinct.push(counts[j]); }
   distinct.sort(function(a, b) { return b - a; });
   if (!distinct.length) return null;
-  if (rank === 'max') return distinct[0];
-  if (rank === 'max2') return distinct.length > 1 ? distinct[1] : null;
-  if (rank === 'max3') return distinct.length > 2 ? distinct[2] : null;
-  if (rank === 'min') return distinct[distinct.length - 1];
-  return null;
+  var rv = null;
+  if (rank === 'max' || rank === 'maxu') rv = distinct[0];
+  else if (rank === 'max2' || rank === 'max2u') rv = distinct.length > 1 ? distinct[1] : null;
+  else if (rank === 'max3' || rank === 'max3u') rv = distinct.length > 2 ? distinct[2] : null;
+  else if (rank === 'min' || rank === 'minu') rv = distinct[distinct.length - 1];
+  if (rv === null) return null;
+  // 唯一系列：名次值在维度内只出现一次才命中（并列时不命中）
+  if (rank === 'maxu' || rank === 'max2u' || rank === 'max3u' || rank === 'minu') {
+    var uniqCnt = 0;
+    for (var k = 0; k < counts.length; k++) { if (counts[k] === rv) uniqCnt++; }
+    if (uniqCnt !== 1) return null;
+  }
+  return rv;
 }
 
 // ===================== 条件评估 =====================
@@ -1659,7 +1668,7 @@ function evaluateLeafCondition(data, cond, context) {
       if (!onlyDizhi && data.liunian && data.liunian.t && WU_XING[data.liunian.t] === name) cnt++;
       if (!onlyTiangan && data.liunian && data.liunian.d && WU_XING[data.liunian.d] === name) cnt++;
     }
-    if (val === 'max' || val === 'max2' || val === 'max3' || val === 'min') {
+    if (val === 'max' || val === 'max2' || val === 'max3' || val === 'min' || val === 'maxu' || val === 'max2u' || val === 'max3u' || val === 'minu') {
       var _rv = computeRankValue(data, field, val);
       if (_rv === null) { res = false; }
       else if (op === 'eq') res = cnt == _rv;
@@ -1773,7 +1782,7 @@ function evaluateLeafCondition(data, cond, context) {
         if (!onlyDizhi && data.liunian && data.liunian.t) { var s = getExactShen(data.liunian.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
         if (!onlyTiangan && data.liunian && data.liunian.d) { var s = getDiShen(data.liunian.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
       }
-      if (val === 'max' || val === 'max2' || val === 'max3' || val === 'min') {
+      if (val === 'max' || val === 'max2' || val === 'max3' || val === 'min' || val === 'maxu' || val === 'max2u' || val === 'max3u' || val === 'minu') {
         var _rv = computeRankValue(data, field, val);
         if (_rv === null) { res = false; }
         else if (op === 'eq') res = cnt == _rv;
