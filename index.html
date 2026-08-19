@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8535,11 +8535,19 @@
             const name = field.substring(field.lastIndexOf('-') + 1);
             const isWuxing = field.indexOf('五行数量') >= 0;
             const isCurScope = field.indexOf('当前评估范围') >= 0;
-            const hasDayun = field.indexOf('大运') >= 0 || isCurScope;
-            const hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
-            const hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
+            let hasDayun = field.indexOf('大运') >= 0 || isCurScope;
+            let hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
+            let hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
             const onlyTiangan = field.indexOf('天干') >= 0;
             const onlyDizhi = field.indexOf('地支') >= 0;
+            // 无前缀数量字段（不指定原局/大运/流年范围）→ 跟随排盘页评估范围开关统计，
+            // 与「当前评估范围-」前缀字段语义一致（评估范围仅 原局/原局+大运/原局+大运+流年，不含流月）
+            if (!isCurScope && !hasYuanJu && !hasDayun && !hasLiunian) {
+                const _sc = (typeof getEvalScope === 'function') ? getEvalScope() : 'all';
+                hasYuanJu = true;
+                if (_sc !== 'bazi') hasDayun = true;
+                if (_sc === 'all') hasLiunian = true;
+            }
             const rg = data.ri && data.ri.t;
             const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
             let cnt = 0;
@@ -9434,9 +9442,19 @@
                 else if(c.op === 'lt') res = cnt < Number(c.val);
                     else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
+            // === 当前评估范围五行数量（跟随评估范围开关，与后端口径一致）===
+            else if(c.field.startsWith('当前评估范围五行数量-')){
+                const cnt = getCountOfField(c.field, data);
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
+            }
+            // === 五行数量（无前缀）→ 跟随评估范围（统计所选范围对应五行数量，不受柱状图手动偏移影响）===
             else if(c.field.startsWith('五行数量-')){
-                const name = c.field.replace('五行数量-', '');
-                const cnt = stats.wuCount[name] || 0;
+                const cnt = getCountOfField(c.field, data);
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9536,9 +9554,9 @@
                 else if(c.op === 'lt') res = cnt < Number(c.val);
                     else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
-            else if(c.field.startsWith('十神数量-')){
-                const name = c.field.replace('十神数量-', '');
-                const cnt = stats.shenCount[name] || stats.groupCount[name] || 0;
+            // === 当前评估范围十神数量（跟随评估范围开关，与后端口径一致）===
+            else if(c.field.startsWith('当前评估范围十神数量-')){
+                const cnt = getCountOfField(c.field, data);
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9546,9 +9564,24 @@
                 else if(c.op === 'lt') res = cnt < Number(c.val);
                     else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
             }
+            // === 十神数量（无前缀）→ 跟随评估范围 ===
+            else if(c.field.startsWith('十神数量-')){
+                const cnt = getCountOfField(c.field, data);
+                if(c.op === 'eq') res = cnt == Number(c.val);
+                else if(c.op === 'ge') res = cnt >= Number(c.val);
+                else if(c.op === 'gt') res = cnt > Number(c.val);
+                else if(c.op === 'le') res = cnt <= Number(c.val);
+                else if(c.op === 'lt') res = cnt < Number(c.val);
+                    else if(c.op === 'range'){ const _rp = String(c.val).split('~'); res = cnt >= Number(_rp[0]) && cnt <= Number(_rp[1]); }
+            }
+            // === 干支数量（无前缀）→ 跟随评估范围（原局+大运+流年，不含流月，与五行/十神数量统一）===
             else if(c.field.startsWith('干支数量-')){
                 const name = c.field.replace('干支数量-', '');
-                const cnt = gzCount[name] || 0;
+                const _scGz = (typeof getEvalScope === 'function') ? getEvalScope() : 'all';
+                let cnt = 0;
+                ['nian','yue','ri','shi'].forEach(k => { if(data[k]?.t === name) cnt++; if(data[k]?.d === name) cnt++; });
+                if(_scGz !== 'bazi' && data.dayun){ if(data.dayun.t === name) cnt++; if(data.dayun.d === name) cnt++; }
+                if(_scGz === 'all' && data.liunian){ if(data.liunian.t === name) cnt++; if(data.liunian.d === name) cnt++; }
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
