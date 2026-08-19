@@ -187,6 +187,70 @@ function countShenGroup(data, groupName, scope) {
   return cnt;
 }
 
+/** 统计数量字段对应成员的数量（统一前缀解析：原局/大运/流年/天干/地支/当前评估范围等） */
+function countFieldNum(data, field) {
+  var name = field.substring(field.lastIndexOf('-') + 1);
+  var isWuxing = field.indexOf('五行数量') >= 0;
+  var isCurScope = field.indexOf('当前评估范围') >= 0;
+  var hasDayun = field.indexOf('大运') >= 0 || isCurScope;
+  var hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
+  var hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
+  var onlyTiangan = field.indexOf('天干') >= 0;
+  var onlyDizhi = field.indexOf('地支') >= 0;
+  var rg = data.ri && data.ri.t;
+  var isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
+  var cnt = 0;
+  function hitGan(gan) {
+    if (!gan) return;
+    if (isWuxing) { if (WU_XING[gan] === name) cnt++; }
+    else if (rg) { var s = getExactShen(gan, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+  }
+  function hitZhi(zhi) {
+    if (!zhi) return;
+    if (isWuxing) { if (WU_XING[zhi] === name) cnt++; }
+    else if (rg) { var s = getDiShen(zhi, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+  }
+  if (hasYuanJu || (!hasDayun && !hasLiunian)) {
+    if (!onlyDizhi) {
+      hitGan(data.nian && data.nian.t); hitGan(data.yue && data.yue.t); hitGan(data.ri && data.ri.t); hitGan(data.shi && data.shi.t);
+    }
+    if (!onlyTiangan) {
+      hitZhi(data.nian && data.nian.d); hitZhi(data.yue && data.yue.d); hitZhi(data.ri && data.ri.d); hitZhi(data.shi && data.shi.d);
+    }
+  }
+  if (hasDayun) {
+    if (!onlyDizhi) hitGan(data.dayun && data.dayun.t);
+    if (!onlyTiangan) hitZhi(data.dayun && data.dayun.d);
+  }
+  if (hasLiunian) {
+    if (!onlyDizhi) hitGan(data.liunian && data.liunian.t);
+    if (!onlyTiangan) hitZhi(data.liunian && data.liunian.d);
+  }
+  return cnt;
+}
+
+/** 数量字段排名值：计算字段所在维度（五行/十神组/十神）的去重排名值，名次不存在时返回 null */
+function computeRankValue(data, field, rank) {
+  var name = field.substring(field.lastIndexOf('-') + 1);
+  var isWuxing = field.indexOf('五行数量') >= 0;
+  var isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
+  var prefix = field.substring(0, field.lastIndexOf('-') + 1);
+  var members = isWuxing ? WU_LIST : (isGroup ? ['比劫','食伤','财星','官杀','印星'] : FULL_SHEN);
+  var counts = [];
+  for (var i = 0; i < members.length; i++) {
+    counts.push(countFieldNum(data, prefix + members[i]));
+  }
+  var distinct = [];
+  for (var j = 0; j < counts.length; j++) { if (distinct.indexOf(counts[j]) < 0) distinct.push(counts[j]); }
+  distinct.sort(function(a, b) { return b - a; });
+  if (!distinct.length) return null;
+  if (rank === 'max') return distinct[0];
+  if (rank === 'max2') return distinct.length > 1 ? distinct[1] : null;
+  if (rank === 'max3') return distinct.length > 2 ? distinct[2] : null;
+  if (rank === 'min') return distinct[distinct.length - 1];
+  return null;
+}
+
 // ===================== 条件评估 =====================
 
 /**
@@ -1609,12 +1673,23 @@ function evaluateLeafCondition(data, cond, context) {
       if (!onlyDizhi && data.liunian && data.liunian.t && WU_XING[data.liunian.t] === name) cnt++;
       if (!onlyTiangan && data.liunian && data.liunian.d && WU_XING[data.liunian.d] === name) cnt++;
     }
-    if (op === 'eq') res = cnt == Number(val);
-    else if (op === 'ge') res = cnt >= Number(val);
-    else if (op === 'gt') res = cnt > Number(val);
-    else if (op === 'le') res = cnt <= Number(val);
-    else if (op === 'lt') res = cnt < Number(val);
-    else if (op === 'range') { var _rp = String(val).split('~'); var _rmin = Number(_rp[0]); var _rmax = Number(_rp[1]); res = !isNaN(_rmin) && !isNaN(_rmax) && _rmax >= _rmin && cnt >= _rmin && cnt <= _rmax; }
+    if (val === 'max' || val === 'max2' || val === 'max3' || val === 'min') {
+      var _rv = computeRankValue(data, field, val);
+      if (_rv === null) { res = false; }
+      else if (op === 'eq') res = cnt == _rv;
+      else if (op === 'ge') res = cnt >= _rv;
+      else if (op === 'gt') res = cnt > _rv;
+      else if (op === 'le') res = cnt <= _rv;
+      else if (op === 'lt') res = cnt < _rv;
+      else res = false;
+    } else {
+      if (op === 'eq') res = cnt == Number(val);
+      else if (op === 'ge') res = cnt >= Number(val);
+      else if (op === 'gt') res = cnt > Number(val);
+      else if (op === 'le') res = cnt <= Number(val);
+      else if (op === 'lt') res = cnt < Number(val);
+      else if (op === 'range') { var _rp = String(val).split('~'); var _rmin = Number(_rp[0]); var _rmax = Number(_rp[1]); res = !isNaN(_rmin) && !isNaN(_rmax) && _rmax >= _rmin && cnt >= _rmin && cnt <= _rmax; }
+    }
     actual = String(cnt);
   }
 
@@ -1703,12 +1778,23 @@ function evaluateLeafCondition(data, cond, context) {
         if (!onlyDizhi && data.liunian && data.liunian.t) { var s = getExactShen(data.liunian.t, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
         if (!onlyTiangan && data.liunian && data.liunian.d) { var s = getDiShen(data.liunian.d, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
       }
-      if (op === 'eq') res = cnt == Number(val);
-      else if (op === 'ge') res = cnt >= Number(val);
-      else if (op === 'gt') res = cnt > Number(val);
-      else if (op === 'le') res = cnt <= Number(val);
-      else if (op === 'lt') res = cnt < Number(val);
-    else if (op === 'range') { var _rp = String(val).split('~'); var _rmin = Number(_rp[0]); var _rmax = Number(_rp[1]); res = !isNaN(_rmin) && !isNaN(_rmax) && _rmax >= _rmin && cnt >= _rmin && cnt <= _rmax; }
+      if (val === 'max' || val === 'max2' || val === 'max3' || val === 'min') {
+        var _rv = computeRankValue(data, field, val);
+        if (_rv === null) { res = false; }
+        else if (op === 'eq') res = cnt == _rv;
+        else if (op === 'ge') res = cnt >= _rv;
+        else if (op === 'gt') res = cnt > _rv;
+        else if (op === 'le') res = cnt <= _rv;
+        else if (op === 'lt') res = cnt < _rv;
+        else res = false;
+      } else {
+        if (op === 'eq') res = cnt == Number(val);
+        else if (op === 'ge') res = cnt >= Number(val);
+        else if (op === 'gt') res = cnt > Number(val);
+        else if (op === 'le') res = cnt <= Number(val);
+        else if (op === 'lt') res = cnt < Number(val);
+        else if (op === 'range') { var _rp = String(val).split('~'); var _rmin = Number(_rp[0]); var _rmax = Number(_rp[1]); res = !isNaN(_rmin) && !isNaN(_rmax) && _rmax >= _rmin && cnt >= _rmin && cnt <= _rmax; }
+      }
       actual = String(cnt);
     }
   }

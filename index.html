@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8528,6 +8528,64 @@
         const liuyueGroupGan = SHEN_TO_GROUP[liuyueShenGan] || '';
         const liuyueGroupZhi = SHEN_TO_GROUP[liuyueShenZhi] || '';
 
+        // 数量字段排名特殊值（max=max 最大值 / max2=第二大 / max3=第三大 / min=最小值，去重排名）
+        const COUNT_RANK_TEXT = { 'max': '最大值', 'max2': '第二大', 'max3': '第三大', 'min': '最小值' };
+
+        // 统计数量字段对应成员的数量（统一前缀解析：原局/大运/流年/天干/地支/当前评估范围等）
+        function getCountOfField(field, data) {
+            const name = field.substring(field.lastIndexOf('-') + 1);
+            const isWuxing = field.indexOf('五行数量') >= 0;
+            const isCurScope = field.indexOf('当前评估范围') >= 0;
+            const hasDayun = field.indexOf('大运') >= 0 || isCurScope;
+            const hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
+            const hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
+            const onlyTiangan = field.indexOf('天干') >= 0;
+            const onlyDizhi = field.indexOf('地支') >= 0;
+            const rg = data.ri && data.ri.t;
+            const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
+            let cnt = 0;
+            const hitGan = (gan) => {
+                if (!gan) return;
+                if (isWuxing) { if (WU_XING[gan] === name) cnt++; }
+                else if (rg) { const s = getExactShen(gan, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+            };
+            const hitZhi = (zhi) => {
+                if (!zhi) return;
+                if (isWuxing) { if (WU_XING[zhi] === name) cnt++; }
+                else if (rg) { const s = getDiShen(zhi, rg); if (isGroup ? (SHEN_TO_GROUP[s] === name) : (s === name)) cnt++; }
+            };
+            if (hasYuanJu || (!hasDayun && !hasLiunian)) {
+                const pillars = [data.nian, data.yue, data.ri, data.shi];
+                if (!onlyDizhi) pillars.forEach(p => hitGan(p && p.t));
+                if (!onlyTiangan) pillars.forEach(p => hitZhi(p && p.d));
+            }
+            if (hasDayun) {
+                if (!onlyDizhi) hitGan(data.dayun && data.dayun.t);
+                if (!onlyTiangan) hitZhi(data.dayun && data.dayun.d);
+            }
+            if (hasLiunian) {
+                if (!onlyDizhi) hitGan(data.liunian && data.liunian.t);
+                if (!onlyTiangan) hitZhi(data.liunian && data.liunian.d);
+            }
+            return cnt;
+        }
+        // 计算字段所在维度（五行/十神组/十神）的去重排名值，名次不存在时返回 null
+        function computeCountRankValue(field, rank, data) {
+            const name = field.substring(field.lastIndexOf('-') + 1);
+            const isWuxing = field.indexOf('五行数量') >= 0;
+            const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
+            const prefix = field.substring(0, field.lastIndexOf('-') + 1);
+            const members = isWuxing ? WU_LIST : (isGroup ? GROUPED_SHEN : FULL_SHEN);
+            const counts = members.map(m => getCountOfField(prefix + m, data));
+            const distinct = [...new Set(counts)].sort((a, b) => b - a);
+            if (!distinct.length) return null;
+            if (rank === 'max') return distinct[0];
+            if (rank === 'max2') return distinct.length > 1 ? distinct[1] : null;
+            if (rank === 'max3') return distinct.length > 2 ? distinct[2] : null;
+            if (rank === 'min') return distinct[distinct.length - 1];
+            return null;
+        }
+
         // 调试日志：检查规则匹配
         const debugMatch = false; // 设置为 true 可以开启调试
         
@@ -8536,6 +8594,26 @@
             // ctxMapping: { ruleDefaultMapping, macroDefaultMapping }
             ctxMapping = ctxMapping || {};
             let actual = '', res = false;
+
+            // ===== 数量字段排名特殊值（最大值/第二大/第三大/最小值）=====
+            if (c.val && COUNT_RANK_TEXT[c.val] && c.field.indexOf('数量-') >= 0
+                && c.field.indexOf('干支数量') < 0 && c.field.indexOf('数量对比') < 0) {
+                const rv = computeCountRankValue(c.field, c.val, data);
+                if (rv === null) {
+                    res = false;
+                } else {
+                    const cnt = getCountOfField(c.field, data);
+                    actual = String(cnt);
+                    if (c.op === 'eq') res = cnt == rv;
+                    else if (c.op === 'ne') res = cnt != rv;
+                    else if (c.op === 'ge') res = cnt >= rv;
+                    else if (c.op === 'gt') res = cnt > rv;
+                    else if (c.op === 'le') res = cnt <= rv;
+                    else if (c.op === 'lt') res = cnt < rv;
+                    else res = false;
+                }
+                return { res, actual };
+            }
 
             // 定位批量判断
             if(c.field.startsWith('定位批量-') && c.val && c.val.startsWith('定位批量|')){
@@ -15744,6 +15822,7 @@
                         for (let n = 0; n <= 12; n++) {
                             valSel.innerHTML += `<option value="${n}">${n}</option>`;
                         }
+                        valSel.innerHTML += '<option value="max">最大值</option><option value="max2">第二大</option><option value="max3">第三大</option><option value="min">最小值</option>';
                         return;
                     } else if (tt === 'count_compare_wuxing') {
                         opSel.innerHTML = '<option value="eq">等于</option><option value="ge">大于等于</option><option value="gt">大于</option><option value="le">小于等于</option><option value="lt">小于</option>';
@@ -15824,6 +15903,7 @@
                 for(let n = 0; n <= 12; n++){
                     valSel.innerHTML += `<option value="${n}">${n}</option>`;
                 }
+                valSel.innerHTML += '<option value="max">最大值</option><option value="max2">第二大</option><option value="max3">第三大</option><option value="min">最小值</option>';
             }
             else if(field.startsWith('包含-')){
                 opSel.innerHTML = '<option value="in">包含</option><option value="nin">不包含</option>';
@@ -16986,6 +17066,7 @@
                     let displayVal = c.val || '';
                     if(c.field && c.field.startsWith('批量包含-')) displayVal = biValToText(c.val);
                     else if(c.field && c.field.startsWith('定位批量-')) displayVal = pbValToText(c.val);
+                    displayVal = COUNT_RANK_TEXT[displayVal] || displayVal;
                     text += `${i > 0 ? (c.logic === 'or' ? ' 或者 ' : ' 并且 ') : ''}${c.exclude ? '排除:' : ''}${c.field || ''} ${getOpText(c.op)} ${displayVal}`;
                 }
             });
@@ -17008,6 +17089,7 @@
                     let displayVal = c.val || '';
                     if(c.field && c.field.startsWith('批量包含-')) displayVal = biValToText(c.val);
                     else if(c.field && c.field.startsWith('定位批量-')) displayVal = pbValToText(c.val);
+                    displayVal = COUNT_RANK_TEXT[displayVal] || displayVal;
                     text += `${excludePrefix}${c.field || ''} ${getOpText(c.op)} ${displayVal}`;
                 }
             });
@@ -27819,6 +27901,7 @@ function macroConditionsToText(conditions, depth = 0) {
             let displayVal = c.val || '';
             if(c.field && c.field.startsWith('批量包含-')) displayVal = biValToText(c.val);
             else if(c.field && c.field.startsWith('定位批量-')) displayVal = pbValToText(c.val);
+            displayVal = COUNT_RANK_TEXT[displayVal] || displayVal;
             text += `${c.field || ''} ${OP_TEXT_MAP[c.op] || c.op} ${displayVal}`;
         }
     });
