@@ -195,6 +195,10 @@ function countFieldNum(data, field) {
   var hasDayun = field.indexOf('大运') >= 0 || isCurScope;
   var hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
   var hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
+  // 无前缀数量字段 → 跟随评估范围（API 端 data 已按评估范围过滤：仅原局/原局+大运/原局+大运+流年）
+  if (!isCurScope && !hasYuanJu && !hasDayun && !hasLiunian) {
+    hasYuanJu = true; hasDayun = true; hasLiunian = true;
+  }
   var onlyTiangan = field.indexOf('天干') >= 0;
   var onlyDizhi = field.indexOf('地支') >= 0;
   var rg = data.ri && data.ri.t;
@@ -1647,6 +1651,10 @@ function evaluateLeafCondition(data, cond, context) {
     var hasDayun = field.indexOf('大运') >= 0 || isCurScope;
     var hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
     var hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
+    // 无前缀数量字段 → 跟随评估范围（统计 data 中存在的柱位）
+    if (!isCurScope && !hasYuanJu && !hasDayun && !hasLiunian) {
+      hasYuanJu = true; hasDayun = true; hasLiunian = true;
+    }
     var onlyTiangan = field.indexOf('天干') >= 0;
     var onlyDizhi = field.indexOf('地支') >= 0;
     var cnt = 0;
@@ -1748,6 +1756,10 @@ function evaluateLeafCondition(data, cond, context) {
     var hasDayun = field.indexOf('大运') >= 0 || isCurScope;
     var hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
     var hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
+    // 无前缀数量字段 → 跟随评估范围（统计 data 中存在的柱位）
+    if (!isCurScope && !hasYuanJu && !hasDayun && !hasLiunian) {
+      hasYuanJu = true; hasDayun = true; hasLiunian = true;
+    }
     var onlyTiangan = field.indexOf('天干') >= 0;
     var onlyDizhi = field.indexOf('地支') >= 0;
     var isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
@@ -2159,11 +2171,11 @@ function evaluateLeafCondition(data, cond, context) {
     actual = _name2 + '=' + _cntA + ', ' + val + '=' + _cntB;
   }
 
-  // ---- 干支数量 ----
+  // ---- 干支数量（无前缀 → 跟随评估范围：统计原局+大运+流年，不含流月，与五行/十神数量统一） ----
   else if (field.indexOf('干支数量-') === 0) {
     var _gzName = field.replace('干支数量-', '');
     var _gzCnt = 0;
-    var _gzPillars = ['nian','yue','ri','shi','dayun','liunian','liuyue'];
+    var _gzPillars = ['nian','yue','ri','shi','dayun','liunian'];
     for (var _gzi = 0; _gzi < _gzPillars.length; _gzi++) {
       var _k = data[_gzPillars[_gzi]];
       if (_k && _k.t === _gzName) _gzCnt++;
