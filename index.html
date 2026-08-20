@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8036,7 +8036,7 @@
     function getDiShen(d, rg){ return d?getExactShen(DI_ZHU_MAIN[d],rg):'-'; }
 
     // 根据范围前缀获取五行数量
-    function getScopeWuxingCount(name, data, stats) {
+    function getScopeWuxingCount(name, data, stats, dim) {
         // 检查是否包含范围前缀（支持多种格式：五行数量-、原局+大运五行数量-等）
         const match = name.match(/(.*?)五行数量(?:对比)?-(.+)/);
         if (match) {
@@ -8054,6 +8054,9 @@
             const hasDayun = scopePrefix.includes('大运') || (noPrefix && _sc !== 'bazi');
             const hasLiunian = scopePrefix.includes('流年') || (noPrefix && _sc === 'all');
             const hasLiuyue = scopePrefix.includes('流月');
+            // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+            const onlyTiangan = dim === '天干';
+            const onlyDizhi = dim === '地支';
             
             // 确定需要统计的字段
             const fields = ['nian', 'yue', 'ri', 'shi'];
@@ -8070,10 +8073,10 @@
             // 统计指定五行的数量
             for (const field of fields) {
                 const item = data[field];
-                if (item && item.t && WU_XING[item.t] === wuxingName) {
+                if (item && item.t && !onlyDizhi && WU_XING[item.t] === wuxingName) {
                     count++;
                 }
-                if (item && item.d && WU_XING[item.d] === wuxingName) {
+                if (item && item.d && !onlyTiangan && WU_XING[item.d] === wuxingName) {
                     count++;
                 }
             }
@@ -8086,7 +8089,7 @@
     }
     
     // 根据范围前缀获取十神数量
-    function getScopeShishenCount(name, data, stats) {
+    function getScopeShishenCount(name, data, stats, dim) {
         // 检查是否包含范围前缀（支持多种格式：十神数量-、原局+大运十神数量-等）
         const match = name.match(/(.*?)十神数量(?:对比)?-(.+)/);
         if (match) {
@@ -8104,6 +8107,9 @@
             const hasDayun = scopePrefix.includes('大运') || (noPrefix && _sc !== 'bazi');
             const hasLiunian = scopePrefix.includes('流年') || (noPrefix && _sc === 'all');
             const hasLiuyue = scopePrefix.includes('流月');
+            // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+            const onlyTiangan = dim === '天干';
+            const onlyDizhi = dim === '地支';
             
             // 确定需要统计的字段
             const fields = ['nian', 'yue', 'ri', 'shi'];
@@ -8120,13 +8126,13 @@
             // 统计指定十神的数量
             for (const field of fields) {
                 const item = data[field];
-                if (item && item.t) {
+                if (item && item.t && !onlyDizhi) {
                     const s = getExactShen(item.t, rg);
                     if (s === shishenName) {
                         count++;
                     }
                 }
-                if (item && item.d) {
+                if (item && item.d && !onlyTiangan) {
                     const s = getDiShen(item.d, rg);
                     if (s === shishenName) {
                         count++;
@@ -8147,13 +8153,13 @@
                 let groupCount = 0;
                 for (const field of fields) {
                     const item = data[field];
-                    if (item && item.t) {
+                    if (item && item.t && !onlyDizhi) {
                         const s = getExactShen(item.t, rg);
                         if (groupMembers[shishenName].includes(s)) {
                             groupCount++;
                         }
                     }
-                    if (item && item.d) {
+                    if (item && item.d && !onlyTiangan) {
                         const s = getDiShen(item.d, rg);
                         if (groupMembers[shishenName].includes(s)) {
                             groupCount++;
@@ -8541,15 +8547,20 @@
         const liuyueGroupZhi = SHEN_TO_GROUP[liuyueShenZhi] || '';
 
         // 统计数量字段对应成员的数量（统一前缀解析：原局/大运/流年/天干/地支/当前评估范围等）
-        function getCountOfField(field, data) {
+        function getCountOfField(field, data, dim) {
             const name = field.substring(field.lastIndexOf('-') + 1);
             const isWuxing = field.indexOf('五行数量') >= 0;
             const isCurScope = field.indexOf('当前评估范围') >= 0;
             let hasDayun = field.indexOf('大运') >= 0 || isCurScope;
             let hasLiunian = field.indexOf('流年') >= 0 || isCurScope;
             let hasYuanJu = field.indexOf('原局') >= 0 || isCurScope;
-            const onlyTiangan = field.indexOf('天干') >= 0;
-            const onlyDizhi = field.indexOf('地支') >= 0;
+            let onlyTiangan = field.indexOf('天干') >= 0;
+            let onlyDizhi = field.indexOf('地支') >= 0;
+            // 收集模式取值维度联动（柱状图「全部/天干/地支」按钮）：未指定维度的数量字段只统计对应维度，
+            // 使绑定断语/宏命中状态与柱状图比例显示口径一致；生产匹配（dim 为空）不受影响
+            // （onlyTiangan=true → 只统计天干；onlyDizhi=true → 只统计地支）
+            if (dim === '天干') onlyTiangan = true;
+            else if (dim === '地支') onlyDizhi = true;
             // 无前缀数量字段（不指定原局/大运/流年范围）→ 跟随排盘页评估范围开关统计，
             // 与「当前评估范围-」前缀字段语义一致（评估范围仅 原局/原局+大运/原局+大运+流年，不含流月）
             if (!isCurScope && !hasYuanJu && !hasDayun && !hasLiunian) {
@@ -8588,13 +8599,13 @@
         }
         // 计算字段所在维度（五行/十神组/十神）的去重排名值，名次不存在时返回 null
         // 唯一系列（maxu/max2u/max3u/minu）：该名次对应的值在维度内必须只出现一次才返回，否则 null
-        function computeCountRankValue(field, rank, data) {
+        function computeCountRankValue(field, rank, data, dim) {
             const name = field.substring(field.lastIndexOf('-') + 1);
             const isWuxing = field.indexOf('五行数量') >= 0;
             const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
             const prefix = field.substring(0, field.lastIndexOf('-') + 1);
             const members = isWuxing ? WU_LIST : (isGroup ? GROUPED_SHEN : FULL_SHEN);
-            const counts = members.map(m => getCountOfField(prefix + m, data));
+            const counts = members.map(m => getCountOfField(prefix + m, data, dim));
             const distinct = [...new Set(counts)].sort((a, b) => b - a);
             if (!distinct.length) return null;
             let rv = null;
@@ -8622,11 +8633,11 @@
             // ===== 数量字段排名特殊值（最大值/第二大/第三大/最小值）=====
             if (c.val && COUNT_RANK_TEXT[c.val] && c.field.indexOf('数量-') >= 0
                 && c.field.indexOf('干支数量') < 0 && c.field.indexOf('数量对比') < 0) {
-                const rv = computeCountRankValue(c.field, c.val, data);
+                const rv = computeCountRankValue(c.field, c.val, data, ctxMapping.shenQzOverride);
                 if (rv === null) {
                     res = false;
                 } else {
-                    const cnt = getCountOfField(c.field, data);
+                    const cnt = getCountOfField(c.field, data, ctxMapping.shenQzOverride);
                     actual = String(cnt);
                     if (c.op === 'eq') res = cnt == rv;
                     else if (c.op === 'ne') res = cnt != rv;
@@ -9106,16 +9117,19 @@
             // === 原局大运流年五行数量(整体,天干+地支)分支 ===
             else if(c.field.startsWith('原局大运流年五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
                 const name = c.field.replace('原局大运流年五行数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t && WU_XING[p.t] === name) cnt++;
-                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                    if(p?.t && !_qzz && WU_XING[p.t] === name) cnt++;
+                    if(p?.d && !_qzg && WU_XING[p.d] === name) cnt++;
                 });
-                if(data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
-                if(data.dayun?.d && WU_XING[data.dayun.d] === name) cnt++;
-                if(data.liunian?.t && WU_XING[data.liunian.t] === name) cnt++;
-                if(data.liunian?.d && WU_XING[data.liunian.d] === name) cnt++;
+                if(data.dayun?.t && !_qzz && WU_XING[data.dayun.t] === name) cnt++;
+                if(data.dayun?.d && !_qzg && WU_XING[data.dayun.d] === name) cnt++;
+                if(data.liunian?.t && !_qzz && WU_XING[data.liunian.t] === name) cnt++;
+                if(data.liunian?.d && !_qzg && WU_XING[data.liunian.d] === name) cnt++;
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9158,17 +9172,20 @@
             // === 原局大运流年十神数量(区分阴阳,整体)分支 ===
             else if(c.field.startsWith('原局大运流年十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局大运流年十神数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const rg = data.ri?.t;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
-                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                    if(p?.t && !_qzz) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                    if(p?.d && !_qzg) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
                 });
-                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
-                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
-                if(data.liunian?.t) { const s = getExactShen(data.liunian.t, rg); if(s === name) cnt++; }
-                if(data.liunian?.d) { const s = getDiShen(data.liunian.d, rg); if(s === name) cnt++; }
+                if(data.dayun?.t && !_qzz) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
+                if(data.dayun?.d && !_qzg) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
+                if(data.liunian?.t && !_qzz) { const s = getExactShen(data.liunian.t, rg); if(s === name) cnt++; }
+                if(data.liunian?.d && !_qzg) { const s = getDiShen(data.liunian.d, rg); if(s === name) cnt++; }
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9213,17 +9230,20 @@
             // === 原局大运流年十神数量(不区分阴阳,整体)分支 ===
             else if(c.field.startsWith('原局大运流年十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
                 const name = c.field.replace('原局大运流年十神数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const rg = data.ri?.t;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
-                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.t && !_qzz) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.d && !_qzg) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
                 });
-                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
-                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
-                if(data.liunian?.t) { const s = getExactShen(data.liunian.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
-                if(data.liunian?.d) { const s = getDiShen(data.liunian.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.dayun?.t && !_qzz) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.dayun?.d && !_qzg) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.liunian?.t && !_qzz) { const s = getExactShen(data.liunian.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.liunian?.d && !_qzg) { const s = getDiShen(data.liunian.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9268,14 +9288,17 @@
             // === 原局大运五行数量(整体,天干+地支)分支 ===
             else if(c.field.startsWith('原局大运五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
                 const name = c.field.replace('原局大运五行数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t && WU_XING[p.t] === name) cnt++;
-                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                    if(p?.t && !_qzz && WU_XING[p.t] === name) cnt++;
+                    if(p?.d && !_qzg && WU_XING[p.d] === name) cnt++;
                 });
-                if(data.dayun?.t && WU_XING[data.dayun.t] === name) cnt++;
-                if(data.dayun?.d && WU_XING[data.dayun.d] === name) cnt++;
+                if(data.dayun?.t && !_qzz && WU_XING[data.dayun.t] === name) cnt++;
+                if(data.dayun?.d && !_qzg && WU_XING[data.dayun.d] === name) cnt++;
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9316,15 +9339,18 @@
             // === 原局大运十神数量(区分阴阳)分支 ===
             else if(c.field.startsWith('原局大运十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局大运十神数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const rg = data.ri?.t;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
-                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                    if(p?.t && !_qzz) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                    if(p?.d && !_qzg) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
                 });
-                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
-                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
+                if(data.dayun?.t && !_qzz) { const s = getExactShen(data.dayun.t, rg); if(s === name) cnt++; }
+                if(data.dayun?.d && !_qzg) { const s = getDiShen(data.dayun.d, rg); if(s === name) cnt++; }
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9367,15 +9393,18 @@
             // === 原局大运十神数量(不区分阴阳)分支 ===
             else if(c.field.startsWith('原局大运十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
                 const name = c.field.replace('原局大运十神数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const rg = data.ri?.t;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
-                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.t && !_qzz) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.d && !_qzg) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
                 });
-                if(data.dayun?.t) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
-                if(data.dayun?.d) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.dayun?.t && !_qzz) { const s = getExactShen(data.dayun.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                if(data.dayun?.d && !_qzg) { const s = getDiShen(data.dayun.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9418,11 +9447,14 @@
             // === 原局五行数量分支 ===
             else if(c.field.startsWith('原局五行数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
                 const name = c.field.replace('原局五行数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t && WU_XING[p.t] === name) cnt++;
-                    if(p?.d && WU_XING[p.d] === name) cnt++;
+                    if(p?.t && !_qzz && WU_XING[p.t] === name) cnt++;
+                    if(p?.d && !_qzg && WU_XING[p.d] === name) cnt++;
                 });
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
@@ -9461,7 +9493,7 @@
             }
             // === 当前评估范围五行数量（跟随评估范围开关，与后端口径一致）===
             else if(c.field.startsWith('当前评估范围五行数量-')){
-                const cnt = getCountOfField(c.field, data);
+                const cnt = getCountOfField(c.field, data, ctxMapping.shenQzOverride);
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9471,7 +9503,7 @@
             }
             // === 五行数量（无前缀）→ 跟随评估范围（统计所选范围对应五行数量，不受柱状图手动偏移影响）===
             else if(c.field.startsWith('五行数量-')){
-                const cnt = getCountOfField(c.field, data);
+                const cnt = getCountOfField(c.field, data, ctxMapping.shenQzOverride);
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9481,12 +9513,15 @@
             }
             else if(c.field.startsWith('原局十神数量-') && !c.field.includes('天干') && !c.field.includes('地支') && !c.field.includes('比劫') && !c.field.includes('食伤') && !c.field.includes('财星') && !c.field.includes('官杀') && !c.field.includes('印星')){
                 const name = c.field.replace('原局十神数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const rg = data.ri?.t;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
-                    if(p?.d) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
+                    if(p?.t && !_qzz) { const s = getExactShen(p.t, rg); if(s === name) cnt++; }
+                    if(p?.d && !_qzg) { const s = getDiShen(p.d, rg); if(s === name) cnt++; }
                 });
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
@@ -9527,12 +9562,15 @@
             }
             else if(c.field.startsWith('原局十神数量-') && !c.field.includes('天干') && !c.field.includes('地支')){
                 const name = c.field.replace('原局十神数量-', '');
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _qzg = ctxMapping.shenQzOverride === '天干';
+                const _qzz = ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 const rg = data.ri?.t;
                 const pillars = [data.nian, data.yue, data.ri, data.shi];
                 pillars.forEach(p => {
-                    if(p?.t) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
-                    if(p?.d) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.t && !_qzz) { const s = getExactShen(p.t, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
+                    if(p?.d && !_qzg) { const s = getDiShen(p.d, rg); const g = SHEN_TO_GROUP[s]; if(g === name) cnt++; }
                 });
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
@@ -9573,7 +9611,7 @@
             }
             // === 当前评估范围十神数量（跟随评估范围开关，与后端口径一致）===
             else if(c.field.startsWith('当前评估范围十神数量-')){
-                const cnt = getCountOfField(c.field, data);
+                const cnt = getCountOfField(c.field, data, ctxMapping.shenQzOverride);
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9583,7 +9621,7 @@
             }
             // === 十神数量（无前缀）→ 跟随评估范围 ===
             else if(c.field.startsWith('十神数量-')){
-                const cnt = getCountOfField(c.field, data);
+                const cnt = getCountOfField(c.field, data, ctxMapping.shenQzOverride);
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9595,10 +9633,21 @@
             else if(c.field.startsWith('干支数量-')){
                 const name = c.field.replace('干支数量-', '');
                 const _scGz = (typeof getEvalScope === 'function') ? getEvalScope() : 'all';
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const _gzDim = ctxMapping.shenQzOverride === '天干' ? '天干' : (ctxMapping.shenQzOverride === '地支' ? '地支' : '');
                 let cnt = 0;
-                ['nian','yue','ri','shi'].forEach(k => { if(data[k]?.t === name) cnt++; if(data[k]?.d === name) cnt++; });
-                if(_scGz !== 'bazi' && data.dayun){ if(data.dayun.t === name) cnt++; if(data.dayun.d === name) cnt++; }
-                if(_scGz === 'all' && data.liunian){ if(data.liunian.t === name) cnt++; if(data.liunian.d === name) cnt++; }
+                ['nian','yue','ri','shi'].forEach(k => {
+                    if(_gzDim !== '地支' && data[k]?.t === name) cnt++;
+                    if(_gzDim !== '天干' && data[k]?.d === name) cnt++;
+                });
+                if(_scGz !== 'bazi' && data.dayun){
+                    if(_gzDim !== '地支' && data.dayun.t === name) cnt++;
+                    if(_gzDim !== '天干' && data.dayun.d === name) cnt++;
+                }
+                if(_scGz === 'all' && data.liunian){
+                    if(_gzDim !== '地支' && data.liunian.t === name) cnt++;
+                    if(_gzDim !== '天干' && data.liunian.d === name) cnt++;
+                }
                 if(c.op === 'eq') res = cnt == Number(c.val);
                 else if(c.op === 'ge') res = cnt >= Number(c.val);
                 else if(c.op === 'gt') res = cnt > Number(c.val);
@@ -9639,14 +9688,14 @@
                 }
             }
             else if(c.field.startsWith('五行数量对比-')){
-                const cnt1 = getScopeWuxingCount(c.field, data, stats);
+                const cnt1 = getScopeWuxingCount(c.field, data, stats, ctxMapping.shenQzOverride);
                 let cnt2;
                 // val 可能是对比字段（五行数量对比-木）或纯五行名（木）：
                 // 统一按评估范围统计（无前缀数量字段跟随评估范围，不叠加柱状图手动偏移）
                 if(String(c.val).indexOf('五行数量') >= 0){
-                    cnt2 = getScopeWuxingCount(c.val, data, stats);
+                    cnt2 = getScopeWuxingCount(c.val, data, stats, ctxMapping.shenQzOverride);
                 } else {
-                    cnt2 = getScopeWuxingCount('五行数量对比-' + c.val, data, stats);
+                    cnt2 = getScopeWuxingCount('五行数量对比-' + c.val, data, stats, ctxMapping.shenQzOverride);
                 }
                 if(c.op === 'eq') res = cnt1 == cnt2;
                 else if(c.op === 'ge') res = cnt1 >= cnt2;
@@ -9655,14 +9704,14 @@
                 else if(c.op === 'lt') res = cnt1 < cnt2;
             }
             else if(c.field.startsWith('十神数量对比-')){
-                const cnt1 = getScopeShishenCount(c.field, data, stats);
+                const cnt1 = getScopeShishenCount(c.field, data, stats, ctxMapping.shenQzOverride);
                 let cnt2;
                 // val 可能是对比字段（十神数量对比-比劫）、普通数量字段（十神数量-比劫）或纯十神/组名（比劫）：
                 // 统一按评估范围统计（无前缀数量字段跟随评估范围，不叠加柱状图手动偏移）
                 if(String(c.val).indexOf('十神数量') >= 0){
-                    cnt2 = getScopeShishenCount(c.val, data, stats);
+                    cnt2 = getScopeShishenCount(c.val, data, stats, ctxMapping.shenQzOverride);
                 } else {
-                    cnt2 = getScopeShishenCount('十神数量对比-' + c.val, data, stats);
+                    cnt2 = getScopeShishenCount('十神数量对比-' + c.val, data, stats, ctxMapping.shenQzOverride);
                 }
                 if(c.op === 'eq') res = cnt1 == cnt2;
                 else if(c.op === 'ge') res = cnt1 >= cnt2;
@@ -9671,7 +9720,7 @@
                 else if(c.op === 'lt') res = cnt1 < cnt2;
             }
             else if(c.field.includes('五行数量-')){
-                const cnt = getScopeWuxingCount(c.field, data, stats);
+                const cnt = getScopeWuxingCount(c.field, data, stats, ctxMapping.shenQzOverride);
                 const v = Number(c.val);
                 if(c.op === 'eq') res = cnt == v;
                 else if(c.op === 'ne') res = cnt != v;
@@ -9681,7 +9730,7 @@
                 else if(c.op === 'lt') res = cnt < v;
             }
             else if(c.field.includes('十神数量-')){
-                const cnt = getScopeShishenCount(c.field, data, stats);
+                const cnt = getScopeShishenCount(c.field, data, stats, ctxMapping.shenQzOverride);
                 const v = Number(c.val);
                 if(c.op === 'eq') res = cnt == v;
                 else if(c.op === 'ne') res = cnt != v;
@@ -9743,14 +9792,14 @@
                 if (config && config.template_type) {
                     const tt = config.template_type;
                     if (tt === 'count_compare_wuxing') {
-                        const cnt1 = getScopeWuxingCount(c.field, data, stats);
+                        const cnt1 = getScopeWuxingCount(c.field, data, stats, ctxMapping.shenQzOverride);
                         let cnt2;
                         // val 可能是对比字段（五行数量对比-木）或纯五行名（木）：
                         // 统一按评估范围统计（不叠加柱状图手动偏移）
                         if(String(c.val).indexOf('五行数量') >= 0){
-                            cnt2 = getScopeWuxingCount(c.val, data, stats);
+                            cnt2 = getScopeWuxingCount(c.val, data, stats, ctxMapping.shenQzOverride);
                         } else {
-                            cnt2 = getScopeWuxingCount('五行数量对比-' + c.val, data, stats);
+                            cnt2 = getScopeWuxingCount('五行数量对比-' + c.val, data, stats, ctxMapping.shenQzOverride);
                         }
                         if(c.op === 'eq') res = cnt1 == cnt2;
                         else if(c.op === 'ge') res = cnt1 >= cnt2;
@@ -9758,14 +9807,14 @@
                         else if(c.op === 'le') res = cnt1 <= cnt2;
                         else if(c.op === 'lt') res = cnt1 < cnt2;
                     } else if (tt === 'count_compare_shishen') {
-                        const cnt1 = getScopeShishenCount(c.field, data, stats);
+                        const cnt1 = getScopeShishenCount(c.field, data, stats, ctxMapping.shenQzOverride);
                         let cnt2;
                         // val 可能是对比字段（十神数量对比-比劫）或纯十神/组名（比劫）：
                         // 统一按评估范围统计（不叠加柱状图手动偏移）
                         if(String(c.val).indexOf('十神数量') >= 0){
-                            cnt2 = getScopeShishenCount(c.val, data, stats);
+                            cnt2 = getScopeShishenCount(c.val, data, stats, ctxMapping.shenQzOverride);
                         } else {
-                            cnt2 = getScopeShishenCount('十神数量对比-' + c.val, data, stats);
+                            cnt2 = getScopeShishenCount('十神数量对比-' + c.val, data, stats, ctxMapping.shenQzOverride);
                         }
                         if(c.op === 'eq') res = cnt1 == cnt2;
                         else if(c.op === 'ge') res = cnt1 >= cnt2;
@@ -9784,8 +9833,9 @@
                 const hasDayun = c.field.indexOf('大运') >= 0 || isCurScope;
                 const hasLiunian = c.field.indexOf('流年') >= 0 || isCurScope;
                 const hasYuanJu = c.field.indexOf('原局') >= 0 || isCurScope;
-                const onlyTiangan = c.field.indexOf('天干') >= 0;
-                const onlyDizhi = c.field.indexOf('地支') >= 0;
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const onlyTiangan = c.field.indexOf('天干') >= 0 || ctxMapping.shenQzOverride === '天干';
+                const onlyDizhi = c.field.indexOf('地支') >= 0 || ctxMapping.shenQzOverride === '地支';
                 let cnt = 0;
                 // 仅当字段名含"原局"、或不含"大运流年"时，才统计原局四柱
                 if (hasYuanJu || (!hasDayun && !hasLiunian)) {
@@ -9820,8 +9870,9 @@
                 const hasDayun = c.field.indexOf('大运') >= 0 || isCurScope;
                 const hasLiunian = c.field.indexOf('流年') >= 0 || isCurScope;
                 const hasYuanJu = c.field.indexOf('原局') >= 0 || isCurScope;
-                const onlyTiangan = c.field.indexOf('天干') >= 0;
-                const onlyDizhi = c.field.indexOf('地支') >= 0;
+                // 收集模式取值维度联动：天干/地支模式下只统计对应维度（与 getCountOfField 口径一致）
+                const onlyTiangan = c.field.indexOf('天干') >= 0 || ctxMapping.shenQzOverride === '天干';
+                const onlyDizhi = c.field.indexOf('地支') >= 0 || ctxMapping.shenQzOverride === '地支';
                 const isGroup = ['比劫','食伤','财星','官杀','印星'].indexOf(name) >= 0;
                 if (!data.ri?.t) { res = false; } else {
                     let cnt = 0;
