@@ -8678,14 +8678,15 @@
                         if(pos && val) pbPositions[pos] = { op: pop, val: val };
                     }
                 });
-                // 取值维度优先级：生克设置(最高) > 断语规则默认 > 条件宏默认 > 字段自身 > 联动
+                // 取值维度优先级：生克设置(最高) > 按钮联动 > 断语规则默认 > 条件宏默认 > 字段自身
+                // （按钮联动仅收集模式传入 shenQzOverride 时生效（柱状图/时间轴）；生产匹配不传 shenQzOverride，
+                //   仍维持 断语规则 > 条件宏 > 字段自身 的原有优先级，行为不变）
                 const ruleDefQz = ctxMapping.ruleDefaultQuZhi || '';
                 const macroDefQz = ctxMapping.macroDefaultQuZhi || '';
                 if(ctxMapping.shenkeQzOverride) pbQuZhi = ctxMapping.shenkeQzOverride;
+                else if(ctxMapping.shenQzOverride) pbQuZhi = ctxMapping.shenQzOverride;
                 else if(ruleDefQz) pbQuZhi = ruleDefQz;
                 else if(macroDefQz) pbQuZhi = macroDefQz;
-                // 取值维度联动（最低优先级）：未设置任何取值维度时，跟随柱状对比图按钮（全部=天干或地支任一命中，由外层按维度分别评估）
-                if(!pbQuZhi && ctxMapping.shenQzOverride) pbQuZhi = ctxMapping.shenQzOverride;
                 // 映射规则层级覆盖：断语级 > 条件宏级 > 字段级
                 if(pbMappingBaseId || pbMappingId){
                     let mappingRulesList = (typeof getMappingRules === 'function') ? getMappingRules() : null;
@@ -8954,16 +8955,17 @@
                     }
                 }
 
-                // 取值维度优先级：生克设置(最高) > 断语规则默认 > 条件宏默认 > 字段自身 > 联动
+                // 取值维度优先级：生克设置(最高) > 按钮联动 > 断语规则默认 > 条件宏默认 > 字段自身
+                // （按钮联动仅收集模式传入 shenQzOverride 时生效（柱状图/时间轴）；生产匹配不传 shenQzOverride，
+                //   仍维持 断语规则 > 条件宏 > 字段自身 的原有优先级，行为不变）
                 let biQuZhi = '';
                 const biRuleDefQz = ctxMapping.ruleDefaultQuZhi || '';
                 const biMacroDefQz = ctxMapping.macroDefaultQuZhi || '';
                 if(ctxMapping.shenkeQzOverride) biQuZhi = ctxMapping.shenkeQzOverride;
+                else if(ctxMapping.shenQzOverride) biQuZhi = ctxMapping.shenQzOverride;
                 else if(biRuleDefQz) biQuZhi = biRuleDefQz;
                 else if(biMacroDefQz) biQuZhi = biMacroDefQz;
                 if(!biQuZhi && biGz !== '通用') biQuZhi = biGz;
-                // 取值维度联动（最低优先级）：未设置任何取值维度时，跟随柱状对比图按钮
-                if(!biQuZhi && ctxMapping.shenQzOverride) biQuZhi = ctxMapping.shenQzOverride;
                 // 实际收集取值维度：通用（未指定）时后备为天干
                 const biActualGzFinal = biQuZhi || (biGz !== '通用' ? biGz : '天干');
 
