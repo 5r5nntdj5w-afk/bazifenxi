@@ -11033,8 +11033,23 @@
         prefSets = prefSets || [null, null, null];
         strongPrefSets = strongPrefSets || [null, null, null];
         const ds = getDisplaySettings();
+        // 绑定命中改为生克设置（生克关系识别区）数据源：按范围列分别用对应范围引擎评估生克设置命中，
+        // 再按柱状图「全部/天干/地支」维度过滤（用户确认统一为识别区数据源）；
+        // 不再使用断语/宏 relationBindings 收集，保证柱状图与生克识别区一致
         const boundSets = [];
-        for (let i = 0; i < 3; i++) boundSets.push(buildScopeBoundSet(i));
+        for (let i = 0; i < 3; i++) {
+            const bset = {};
+            try {
+                const sk = analyzeShengKe(i);
+                if (sk && sk.rels) {
+                    sk.rels.forEach(function(r) {
+                        const hit = mode === 'tian' ? r.tianOk : (mode === 'di' ? r.diOk : r.ganZhiOk);
+                        if (hit && r.id) bset[String(r.id)] = true;
+                    });
+                }
+            } catch (e) {}
+            boundSets.push(bset);
+        }
         const changeLabels = ['原局→大运', '大运→流年'];  // 交错插入的状态变化列标题
         let rows = '';
         defList.forEach(function(def) {
@@ -13916,7 +13931,9 @@
      *  组内基准关系 + 各映射引用规则变体，每组独立取值维度。
      *  映射变体作为"虚拟独立断语"：克隆基准断语条件并按映射规则整体偏移十神组/五行引用，
      *  用与断语完全相同的条件引擎评估，满足匹配条件才显示。 */
-    function analyzeShengKe() {
+    // scopeOverride：0=仅原局 / 1=原局+大运 / 2=原局+大运+流年（柱状图按范围列评估生克设置命中时传入）；
+    // 不传时按当前评估范围（getEvalScope）评估（生克识别区面板）
+    function analyzeShengKe(scopeOverride) {
         const cfg = getGlobalDisplayConfig();
         const skCfg = cfg.shengkeCfg || null;
         const rels = [];
@@ -13980,7 +13997,9 @@
         // 仅原局不带大运、原局+大运不带流年、各范围均不带流月），避免用含大运/流年的主数据误判「存在大运/存在流年/存在流月」类限制字段；
         // 分范围引擎缺失时回退主引擎（主数据）；引擎不可用或数据不一致时 fail-closed 不显示
         const evalConds = (conds, vctx) => {
-            const es = getEvalScope();
+            const es = (scopeOverride !== undefined)
+                ? (scopeOverride === 0 ? 'bazi' : scopeOverride === 1 ? 'dayun' : 'all')
+                : getEvalScope();
             const scopeIdx = es === 'bazi' ? 0 : es === 'dayun' ? 1 : 2;
             const scEng = (window.__shengkeCondEngineByScope && window.__shengkeCondEngineByScope[scopeIdx]) || null;
             const eng = scEng || window.__shengkeCondEngine;
@@ -14005,7 +14024,9 @@
             // 若把命中直接归属会误显示未匹配的维度（Bug：地支行显示实际不存在的克关系）。
             // 面板目标维度由生克设置的组取值维度决定（优先级高于断语 defaultQuZhi），
             // 无法权威归属的维度一律用本地引擎按 shenkeQzOverride 独立重评，断语取值维度不影响面板。
-            const apiDimAuth = (d) => hitByApi && ruleDefQz === d;
+            // 服务端命中（matchedByCategory）按「当前评估范围」计算，仅在未指定范围参数（识别区面板）
+            // 时作权威依据；柱状图按范围列评估（scopeOverride 指定）时禁用，全部用本地引擎按该范围独立重评
+            const apiDimAuth = (d) => scopeOverride === undefined && hitByApi && ruleDefQz === d;
             if (gq === '天干') {
                 dims.tian = apiDimAuth('天干') || evalConds(conds, Object.assign({}, baseVctx, { shenkeQzOverride: '天干' }));
             } else if (gq === '地支') {
