@@ -14215,6 +14215,13 @@
                 matchedByCategory: cache.matchedByCategory || {},
                 geju: analyzeGeJu(),
                 shengke: analyzeShengKe(),
+                // 三范围生克识别结果固化（该节点快照时评估，随节点独立保存）：
+                // 时间轴对比表按「节点+范围」读取各自快照结果，避免不同节点共用全局引擎数据互相影响
+                shengkeByScope: (function() {
+                    try {
+                        return [analyzeShengKe(0), analyzeShengKe(1), analyzeShengKe(2)];
+                    } catch (e) { return null; }
+                })(),
                 // statsByScope 原为 {scope0,scope1,scope2} 对象，转数组便于按范围索引（对比表用 [si] 访问）
                 statsByScope: (function() {
                     const s = cache.statsByScope;
@@ -14538,15 +14545,23 @@
     function renderCompareRelationTable(title, defList, ranges, changes, mode, titleColor, showMark, ds) {
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
-        // 绑定命中改为生克设置（生克关系识别区）数据源：按范围列评估 + 当前「全部/天干/地支」维度过滤，
-        // 与普通模式柱状图一致；不再使用节点快照 boundByScope（relationBindings 静态快照，不随维度切换变化）
+        // 绑定命中改为生克设置（生克关系识别区）数据源：按「节点+范围」读取该节点快照固化的三范围结果，
+        // 每个节点的生克关系相互独立（快照在节点激活时评估保存，互不影响）；
+        // 不再使用全局共享引擎 analyzeShengKe(si)（其数据为当前选中节点，会导致 base/target 大运列互相覆盖）
+        const bsKeyOf = function(rg) {
+            const nd = rg.node || null;
+            return (nd && nd.key !== undefined ? String(nd.key) : 'n') + ':' + rg.scopeIdx;
+        };
         const boundSets = {};
         (ranges || []).forEach(function(rg) {
-            const si = rg.scopeIdx;
-            if (boundSets[si] !== undefined) return;
+            const key = bsKeyOf(rg);
+            if (boundSets[key] !== undefined) return;
             const set = {};
             try {
-                const sk = analyzeShengKe(si);
+                const nd = rg.node || null;
+                const sb = (nd && nd.shengkeByScope) || null;
+                // 优先用节点快照固化结果；旧快照无 shengkeByScope 时回退全局引擎按范围评估
+                const sk = (sb && sb[rg.scopeIdx]) || analyzeShengKe(rg.scopeIdx);
                 if (sk && sk.rels) {
                     sk.rels.forEach(function(r) {
                         const hit = mode === 'tian' ? r.tianOk : (mode === 'di' ? r.diOk : r.ganZhiOk);
@@ -14554,7 +14569,7 @@
                     });
                 }
             } catch (e) {}
-            boundSets[si] = set;
+            boundSets[key] = set;
         });
         let rows = '';
         defList.forEach(function(def) {
@@ -14578,9 +14593,9 @@
                 const rr = relMap[def.shenA + (isKe ? '克' : '生') + def.shenB] || relMap[def.name] || null;
                 let ok = null;
                 if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
-                // 绑定命中：按当前维度从生克设置（识别区）结果判断（与普通模式柱状图一致），
+                // 绑定命中：按当前维度从该节点快照固化的生克设置（识别区）结果判断（与普通模式柱状图一致），
                 // 兼容关系ID/名称/默认名（A克B）三种存储格式
-                const bs = boundSets[si] || {};
+                const bs = boundSets[bsKeyOf(rg)] || {};
                 const defRelName = def.shenA + (isKe ? '克' : '生') + def.shenB;
                 const bound = !!bs[String(def.id)] || !!bs[def.name] || !!bs[defRelName];
                 let pref = '';
