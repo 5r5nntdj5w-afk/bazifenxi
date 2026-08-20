@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12308,10 +12308,12 @@
             if (cond.op) { const opSel = row.querySelector('.condition-op'); if (opSel) opSel.value = cond.op; }
             // 回填行首"并且/或者"逻辑（组内条件逻辑；缺省 and）
             if (cond.logic) { const lSel = row.querySelector('.condition-logic'); if (lSel) lSel.value = cond.logic; }
+            // 值控件声明提到 cond 块顶部：区间回显（op==='range'）需在此处引用，
+            // 若声明在 val 非空分支内部会被块级作用域限制，导致含区间条件的模板编辑时 ReferenceError
+            const valSel = row.querySelector('.condition-val-select');
+            const valInput = row.querySelector('.condition-val-input');
+            const valCheckbox = row.querySelector('.condition-val-checkbox');
             if (cond.val !== undefined && cond.val !== '') {
-                const valSel = row.querySelector('.condition-val-select');
-                const valInput = row.querySelector('.condition-val-input');
-                const valCheckbox = row.querySelector('.condition-val-checkbox');
                 const field = cond.field || '';
                 if (field.indexOf('关系比例-') === 0) {
                     if (valInput) { valInput.classList.remove('hidden'); valInput.value = cond.val; }
