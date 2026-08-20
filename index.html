@@ -14538,6 +14538,24 @@
     function renderCompareRelationTable(title, defList, ranges, changes, mode, titleColor, showMark, ds) {
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
+        // 绑定命中改为生克设置（生克关系识别区）数据源：按范围列评估 + 当前「全部/天干/地支」维度过滤，
+        // 与普通模式柱状图一致；不再使用节点快照 boundByScope（relationBindings 静态快照，不随维度切换变化）
+        const boundSets = {};
+        (ranges || []).forEach(function(rg) {
+            const si = rg.scopeIdx;
+            if (boundSets[si] !== undefined) return;
+            const set = {};
+            try {
+                const sk = analyzeShengKe(si);
+                if (sk && sk.rels) {
+                    sk.rels.forEach(function(r) {
+                        const hit = mode === 'tian' ? r.tianOk : (mode === 'di' ? r.diOk : r.ganZhiOk);
+                        if (hit && r.id) set[String(r.id)] = true;
+                    });
+                }
+            } catch (e) {}
+            boundSets[si] = set;
+        });
         let rows = '';
         defList.forEach(function(def) {
             const cols = ranges.map(function(rg) {
@@ -14560,10 +14578,11 @@
                 const rr = relMap[def.shenA + (isKe ? '克' : '生') + def.shenB] || relMap[def.name] || null;
                 let ok = null;
                 if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
-                const boundList = (node.boundByScope && node.boundByScope[si]) || [];
-                // 绑定命中：兼容关系ID/名称/默认名（A克B）三种存储格式（对齐 buildScopeBoundSet）
+                // 绑定命中：按当前维度从生克设置（识别区）结果判断（与普通模式柱状图一致），
+                // 兼容关系ID/名称/默认名（A克B）三种存储格式
+                const bs = boundSets[si] || {};
                 const defRelName = def.shenA + (isKe ? '克' : '生') + def.shenB;
-                const bound = boundList.indexOf(String(def.id)) >= 0 || boundList.indexOf(def.name) >= 0 || boundList.indexOf(defRelName) >= 0;
+                const bound = !!bs[String(def.id)] || !!bs[def.name] || !!bs[defRelName];
                 let pref = '';
                 const prefList = (node.prefsByScope && node.prefsByScope[si]) || [];
                 prefList.forEach(function(tp) {
