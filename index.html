@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -29896,6 +29896,10 @@ function loadConditionsToEditor(container, conditions) {
                     const valSelect = item.querySelector('.condition-val-select');
                     const valInput = item.querySelector('.condition-val-input');
                     const valCheckbox = item.querySelector('.condition-val-checkbox');
+                    // 区间关系（op='range'）：显示 min/max 双输入框并回填区间值（与断语编辑器口径一致）
+                    if (child.op === 'range') {
+                        applyRangeEcho(item, 'range', child.val);
+                    }
                     if (!valSelect.classList.contains('hidden')) valSelect.value = child.val || '';
                     if (!valInput.classList.contains('hidden')) valInput.value = child.val || '';
                     if (!valCheckbox.classList.contains('hidden') && child.val) {
