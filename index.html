@@ -8508,9 +8508,10 @@
         const matchedRefRules = [];
         const boundRelations = [];  // 命中规则/宏绑定的相生/相克关系集合（用于关系表 ✓ 标记）
         // 取值维度联动（仅收集模式）：绑定柱状对比图的「全部/天干/地支」按钮
-        //   'all' = 天干或地支任一为 true 即命中；'tian'/'di' = 固定维度；非收集模式不启用（保持原匹配行为）
+        //   'all' = 不拆分维度（干支合计，与断语区服务端匹配口径一致）；'tian'/'di' = 固定维度；
+        //   非收集模式不启用（保持原匹配行为）
         const shenQzMode = opts.collectRefOnly ? (opts.shenQz || 'all') : '';
-        const shenDims = shenQzMode === 'all' ? ['天干', '地支'] : (shenQzMode === 'tian' ? ['天干'] : (shenQzMode === 'di' ? ['地支'] : []));
+        const shenDims = shenQzMode === 'tian' ? ['天干'] : (shenQzMode === 'di' ? ['地支'] : []);
 
         // 预计算统计数据，避免在循环中重复计算
         const stats = getStats(data);
