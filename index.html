@@ -14844,7 +14844,8 @@
         const t = (c && c.text) || '未命名';
         return t.length > 20 ? t.slice(0, 20) + '…' : t;
     }
-    // 单个数据状态列（节点+范围）的断语契合度卡片：默认显示契合度最高命中断语绑定的格局模板名，多候选可下拉切换
+    // 单个数据状态列（节点+范围）的断语契合度卡片：默认显示契合度最高命中断语绑定的格局模板名，多候选可下拉切换；
+    // 与下方相克/相生对比表完全联动：本列选中的标注模板 id（_tplFitSel[key#scopeIdx]）驱动喜忌徽章/参考比例/格局显示
     function renderTplFitCell(col) {
         const esc = escapeHtml;
         const label = esc(col.label);
@@ -14855,32 +14856,87 @@
                 '<span class="text-gray-400">无断语命中</span></div>';
         }
         const candidates = g.candidates || [];
+        if (!candidates.length) {
+            return '<div class="flex-1 min-w-[190px] border border-gray-100 rounded p-1.5 bg-gray-50/40">' +
+                '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
+                '<span class="text-gray-400">无格局候选</span></div>';
+        }
         const selKey = col.node.key + '#' + col.scopeIdx;
+        const selTplId = window._tplFitSel ? (window._tplFitSel[selKey] || '') : '';
+        // 候选断语 → 绑定标注模板 id（无模板绑定则为空串）；选中状态=模板 id，显示第一个绑定该模板的候选
+        const tplOf = function(c) {
+            try { return (c && c.rule && c.rule.conditions && c.rule.conditions.referenceOutput && c.rule.conditions.referenceOutput.refTemplateId) ? String(c.rule.conditions.referenceOutput.refTemplateId) : ''; }
+            catch (e) { return ''; }
+        };
         let idx = 0;
-        const selVal = window._tplFitSel ? window._tplFitSel[selKey] : null;
-        if (typeof selVal === 'number' && selVal >= 0 && selVal < candidates.length) idx = selVal;
+        if (selTplId) {
+            const found = candidates.findIndex(function(c) { return tplOf(c) === selTplId; });
+            if (found >= 0) idx = found;
+        }
         const top = candidates[idx] || candidates[0];
         const gl = g.levelClass ? { level: g.level, levelClass: g.levelClass } : tplGejuLevelInfo(top.percent);
         const opts = candidates.map(function(c, i) {
-            return '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(geJuCandidateLabel(c)) + '（' + c.percent + '%）</option>';
+            const val = tplOf(c);
+            return '<option value="' + esc(val) + '"' + (i === idx && val === selTplId ? ' selected' : '') + '>' + esc(geJuCandidateLabel(c)) + '（' + c.percent + '%）</option>';
         }).join('');
         return '<div class="flex-1 min-w-[190px] border border-violet-100 rounded p-1.5 bg-violet-50/40">' +
             '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
             '<div class="flex items-center gap-1 mb-1">' +
             '<span class="text-gray-500 shrink-0">格局：</span>' +
-            '<select class="px-1 py-0.5 border rounded bg-white text-xs min-w-0 flex-1" onchange="setTimelineTplFit(\'' + esc(selKey) + '\', parseInt(this.value))">' + opts + '</select>' +
+            '<select class="px-1 py-0.5 border rounded bg-white text-xs min-w-0 flex-1" onchange="setTimelineTplFit(\'' + esc(selKey) + '\', this.value)">' + opts + '</select>' +
             '</div>' +
             '<div class="flex flex-wrap items-center gap-1"><span class="font-bold text-gray-800 truncate max-w-[140px]">' + esc(geJuCandidateLabel(top)) + '</span> ' +
             '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ' + gl.levelClass + '">' + esc(gl.level) + '</span> ' +
             '<span class="text-blue-700 font-bold">契合度 ' + top.percent + '%</span></div>' +
             '</div>';
     }
-    // 切换某列显示的候选断语（记录选择并重绘时间轴对比内容）
-    function setTimelineTplFit(selKey, idx) {
+    // 设置某列（节点+范围）选中的标注模板 id（时间轴对比模式按列独立控制；空值删除回退默认模板）。
+    // 与格局对比行下拉完全联动：共用 _tplFitSel[selKey]（key=节点key#范围序号）状态，切换任一处喜忌徽章/参考比例/格局显示全部跟随
+    function setTimelineTplFit(selKey, tplId) {
         window._tplFitSel = window._tplFitSel || {};
-        if (idx !== undefined && idx !== null && !isNaN(idx)) window._tplFitSel[selKey] = parseInt(idx);
+        if (tplId !== undefined && tplId !== null && String(tplId) !== '') window._tplFitSel[selKey] = String(tplId);
         else delete window._tplFitSel[selKey];
         if (typeof renderShenBar === 'function') renderShenBar();
+    }
+    // 该列（节点+范围）实际使用的标注模板 id：独立选择 > 该列命中规则默认（第一条，最高优先级） > 全局回退
+    function resolveTimelineTplId(node, scopeIdx, fallbackTplId) {
+        const key = (node && node.key !== undefined ? String(node.key) : 'n') + '#' + scopeIdx;
+        const saved = window._tplFitSel ? window._tplFitSel[key] : null;
+        if (saved) return String(saved);
+        try {
+            const rules = (node && node.refRulesByScope && node.refRulesByScope[scopeIdx]) || [];
+            if (rules.length && rules[0] && rules[0].refOutput && rules[0].refOutput.refTemplateId) return String(rules[0].refOutput.refTemplateId);
+        } catch (e) {}
+        return fallbackTplId || null;
+    }
+    // 该列（节点+范围）标注模板选项列表（含名称，优先快照固化的模板契合度列表按 percent 降序；无命中返回空数组）
+    function getScopeTplOptions(node, scopeIdx) {
+        const out = [];
+        const seen = {};
+        const push = function(tplId, name) {
+            const k = String(tplId);
+            if (!k || seen[k]) return;
+            seen[k] = true;
+            out.push({ tplId: k, name: name || '未命名模板' });
+        };
+        try {
+            const fits = (node && node.tplFitsByScope && node.tplFitsByScope[scopeIdx]) || null;
+            if (fits && fits.length) {
+                fits.forEach(function(f) { if (f && f.tplId) push(f.tplId, f.name + '（' + (f.percent !== undefined ? f.percent : '') + '%）'); });
+                return out;
+            }
+        } catch (e) {}
+        try {
+            const rules = (node && node.refRulesByScope && node.refRulesByScope[scopeIdx]) || [];
+            rules.forEach(function(r) {
+                const ro = r && r.refOutput;
+                if (!ro || !ro.refTemplateId) return;
+                let name = '';
+                try { const t = getRefTemplateById(ro.refTemplateId); name = (t && (t.displayName || t.name)) || ''; } catch (e2) {}
+                push(ro.refTemplateId, name);
+            });
+        } catch (e) {}
+        return out;
     }
     // 格局对比行（仅展示断语契合度数值与格局层次，不做吉凶好坏结论）
     // 列结构与对比表一致：每种数据状态（原局/原局+大运A/原局+大运B…）展示该节点快照时评估的
@@ -15004,7 +15060,9 @@
                     return st.groupCount[g] || 0;
                 };
                 const a = gv(def.shenA), b = gv(def.shenB);
-                const relMap = buildTimelineRelMap(node, si, selTplId);
+                // 标注与选中标注模板严格绑定（时间轴按列独立）：每列用各自选中的模板过滤参考比例与喜忌，不再全局共用
+                const tplId = resolveTimelineTplId(node, si, selTplId);
+                const relMap = buildTimelineRelMap(node, si, tplId);
                 const rr = relMap[def.shenA + (isKe ? '克' : '生') + def.shenB] || relMap[def.name] || null;
                 let ok = null;
                 if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
@@ -15014,8 +15072,8 @@
                 const defRelName = def.shenA + (isKe ? '克' : '生') + def.shenB;
                 const bound = !!bs[String(def.id)] || !!bs[def.name] || !!bs[defRelName];
                 let pref = '';
-                // 标注与选中标注模板严格绑定：只取选中模板的喜忌条目（切换标注来源后时间轴表联动）
-                const prefList = filterPrefsByTpl((node.prefsByScope && node.prefsByScope[si]) || [], selTplId);
+                // 标注与选中标注模板严格绑定（时间轴按列独立）：只取该列选中模板的喜忌条目（切换后时间轴表联动）
+                const prefList = filterPrefsByTpl((node.prefsByScope && node.prefsByScope[si]) || [], tplId);
                 prefList.forEach(function(tp) {
                     (tp.prefs || []).forEach(function(p) {
                         // 仅生克喜忌按关系定义ID匹配（十神强弱喜忌只标注在柱状图对应十神柱上，不进关系表）
@@ -15055,7 +15113,18 @@
         });
         let headHtml = '<th class="py-1 pl-1 pr-1 text-left text-xs font-semibold">关系</th>';
         for (let ci = 0; ci < ranges.length; ci++) {
-            headHtml += '<th class="py-1 px-1 text-center text-xs font-semibold">' + escapeHtml(ranges[ci].label) + '</th>';
+            const rg = ranges[ci];
+            const nd = rg.node || null;
+            const tplId = resolveTimelineTplId(nd, rg.scopeIdx, selTplId);
+            let selHtml = '';
+            const opts = getScopeTplOptions(nd, rg.scopeIdx);
+            if (opts.length) {
+                const optHtml = opts.map(function(o) {
+                    return '<option value="' + escapeHtml(o.tplId) + '"' + (o.tplId === tplId ? ' selected' : '') + '>' + escapeHtml(o.name) + '</option>';
+                }).join('');
+                selHtml = '<div class="mt-0.5"><select class="px-1 py-0.5 border rounded bg-white text-[10px] w-full max-w-[120px]" onchange="setTimelineTplFit(\'' + escapeHtml(String(nd.key) + '#' + rg.scopeIdx) + '\', this.value)" title="该列标注模板（独立切换，喜忌/参考比例/格局联动）">' + optHtml + '</select></div>';
+            }
+            headHtml += '<th class="py-1 px-1 text-center text-xs font-semibold">' + escapeHtml(ranges[ci].label) + selHtml + '</th>';
             if (ci < ranges.length - 1) headHtml += '<th class="py-1 px-1 text-center text-[10px] font-semibold text-gray-400">' + escapeHtml(changes[ci].label) + '</th>';
         }
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
