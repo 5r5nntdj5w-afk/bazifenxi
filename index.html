@@ -8631,6 +8631,31 @@
             ctxMapping = ctxMapping || {};
             let actual = '', res = false;
 
+            // 生克命中条件（模板喜忌触发条件专用）：满足=该生克关系在当前评估范围命中；排除=未命中；无需值
+            if (c.field && c.field.indexOf('生克命中-') === 0) {
+                const relName = c.field.replace('生克命中-', '');
+                let hit = false;
+                try {
+                    const defs = (typeof getRelationDefs === 'function') ? getRelationDefs() : [];
+                    const def = defs.find(function(d) { return d.name === relName || (d.shenA + (d.relType === 'ke' ? '克' : '生') + d.shenB) === relName; });
+                    if (def) {
+                        const scopeIdx = (ctxMapping.scopeIdx !== undefined) ? ctxMapping.scopeIdx : undefined;
+                        const sk = analyzeShengKe(scopeIdx);
+                        if (sk && sk.rels) {
+                            const r = sk.rels.find(function(x) { return String(x.id) === String(def.id); });
+                            if (r) {
+                                if (ctxMapping.shenQzOverride === '天干') hit = !!r.tianOk;
+                                else if (ctxMapping.shenQzOverride === '地支') hit = !!r.diOk;
+                                else hit = !!r.ganZhiOk;
+                            }
+                        }
+                    }
+                } catch (e) { hit = false; }
+                res = (c.op === 'ne') ? !hit : hit;
+                actual = hit ? '命中' : '未命中';
+                return { res, actual };
+            }
+
             // ===== 数量字段排名特殊值（最大值/第二大/第三大/最小值）=====
             if (c.val && COUNT_RANK_TEXT[c.val] && c.field.indexOf('数量-') >= 0
                 && c.field.indexOf('干支数量') < 0 && c.field.indexOf('数量对比') < 0) {
@@ -10363,23 +10388,25 @@
                     const grpName = shenQzMode === 'tian' ? 'groupTian' : (shenQzMode === 'di' ? 'groupDi' : 'groupCount');
                     const baseSt = (opts.baseStats && opts.baseStats[grpName]) || null;  // 原局统计（弱判定基准）
                     const prefs = [];
-                    ((tpl.relationPrefs) || []).forEach(function(p) {
+                    getTplXijiRules(tpl).forEach(function(p) {
                         if (!p) return;
-                        let ok = true;
+                        // 触发条件组（and/or 生效；无条件则恒满足；生克命中条件按当前评估范围判定）
+                        let condOk = true;
                         const pc = (p.conds && p.conds.children && Array.isArray(p.conds.children) && p.conds.children.length) ? p.conds : null;
                         if (pc) {
-                            ok = false;
+                            condOk = false;
+                            const baseCtx = (opts.scopeIdx !== undefined) ? { scopeIdx: opts.scopeIdx } : {};
                             if (shenDims.length === 0) {
-                                ok = evaluateConditionGroup(pc, 0, new Set(), {});
+                                condOk = evaluateConditionGroup(pc, 0, new Set(), baseCtx);
                             } else {
                                 for (let di = 0; di < shenDims.length; di++) {
-                                    const ctx = { shenQzOverride: shenDims[di] };
-                                    if (evaluateConditionGroup(pc, 0, new Set(), ctx)) { ok = true; break; }
+                                    const ctx = Object.assign({}, baseCtx, { shenQzOverride: shenDims[di] });
+                                    if (evaluateConditionGroup(pc, 0, new Set(), ctx)) { condOk = true; break; }
                                 }
                             }
                         }
-                        if (!ok) return;
-                        if (p.type === 'qiangruo') {
+                        const invert = !!p.invert;
+                        if (p.ruleType === 'qiangruo') {
                             // 十神强弱喜忌：原局 A 十神弱（数量 ≤ weakVal，默认≤1）+ 当前范围 B 十神数量 > 原局 B（增加）
                             const shenA = p.shenA, shenB = p.shenB;
                             if (!shenA || !shenB || !GROUPED_SHEN.includes(shenA) || !GROUPED_SHEN.includes(shenB)) return;
@@ -10390,13 +10417,32 @@
                             const bCur = curSt[shenB] || 0;
                             const weakVal = (p.weakVal !== undefined && p.weakVal !== null) ? p.weakVal : 1;
                             const aWeak = (p.weakOp === 'lt') ? (aBase < weakVal) : (aBase <= weakVal);
-                            if (aWeak && bCur > bBase) {
+                            const strongOk = aWeak && bCur > bBase;
+                            if (condOk && strongOk) {
                                 prefs.push({ type: 'qiangruo', shenB: shenB, pref: p.pref === 'ji' ? 'ji' : 'xi' });
+                            } else if (invert) {
+                                prefs.push({ type: 'qiangruo', shenB: shenB, pref: p.pref === 'ji' ? 'xi' : 'ji' });
                             }
                             return;
                         }
+                        // 生克关系喜忌
                         if (!p.relId) return;
-                        prefs.push({ type: 'shengke', relId: String(p.relId), pref: p.pref === 'ji' ? 'ji' : 'xi' });
+                        // 比例条件（未配置比例则恒满足；无法判定[关联两十神数量均无]→不标注）
+                        let ratioOk = true;
+                        const relDef = (typeof getRelationDefById === 'function') ? getRelationDefById(p.relId) : null;
+                        if (relDef && (p.ratio || p.presetId)) {
+                            const rr = (typeof resolveXijiRatio === 'function') ? resolveXijiRatio(p) : null;
+                            if (!rr) return;
+                            const curSt = (stats && stats[grpName]) || {};
+                            const a = curSt[relDef.shenA] || 0, b = curSt[relDef.shenB] || 0;
+                            if (a === 0 && b === 0) return;  // 无法判定 → 不标注（无论是否反转）
+                            ratioOk = checkRatioMatch(a, b, rr).ok;
+                        }
+                        if (condOk && ratioOk) {
+                            prefs.push({ type: 'shengke', relId: String(p.relId), pref: p.pref === 'ji' ? 'ji' : 'xi' });
+                        } else if (invert) {
+                            prefs.push({ type: 'shengke', relId: String(p.relId), pref: p.pref === 'ji' ? 'xi' : 'ji' });
+                        }
                     });
                     if (prefs.length) {
                         matchedTplPrefs.push({ tplId: tplId, tplName: tpl.displayName || tpl.name || '', prefs: prefs });
@@ -11022,8 +11068,7 @@
               (wqOn2
                 ? (yqOn2 ? '，' : '') + '<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.wuqingBg) + ';color:' + esc(ds.wuqingColor) + '">' + esc((ds.wuqingSym || '无') + (ds.wuqingText ? ' ' + ds.wuqingText : '')) + '</span>=无情（来源任一为假）' : '')
             : '';
-        return '图例：<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.okBg) + '">达标</span>/<span class="inline-block align-middle px-1 py-0.5 rounded" style="background-color:' + esc(ds.failBg) + '">未达标</span>（需参考比例）' +
-            ' · 数字后 <span style="color:' + esc(ds.hitOkColor) + '">' + esc(hitOk) + '</span>=绑定断语/宏命中，<span style="color:' + esc(ds.hitFailColor) + '">' + esc(hitFail) + '</span>=未命中' +
+        return '图例：数字后 <span style="color:' + esc(ds.hitOkColor) + '">' + esc(hitOk) + '</span>=绑定断语/宏命中，<span style="color:' + esc(ds.hitFailColor) + '">' + esc(hitFail) + '</span>=未命中' +
             ' · <span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.xiBg) + ';color:' + esc(ds.xiColor) + '">' + esc(xi) + '</span>=喜用，<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.jiBg) + ';color:' + esc(ds.jiColor) + '">' + esc(ji) + '</span>=忌讳（生克或十神强弱任一命中即标出，随范围动态变化）' +
             ' · <span style="color:' + esc(ds.bindColor) + '">' + esc(bind) + '</span>=范围切换绑定，<span style="color:' + esc(ds.unbindColor) + '">' + esc(unbind) + '</span>=范围切换解绑' + yqLegend;
     }
@@ -11111,11 +11156,12 @@
                 return '<td class="py-1.5 px-1 text-center align-middle"><div class="flex flex-col gap-0.5 items-center">' + chips.join('') + '</div></td>';
             };
             // 范围列与变化列交错生成
-            // 达标/未达标：仅用单元格底色区分（绿底=达标/红底=未达标，需参考比例且可判定）；命中/未命中：数字比例后跟 ✓（绿）/✗（红）
+            // 达标/未达标底色已移除（合并后统一用喜忌徽章标注）；命中/未命中：数字比例后跟 ✓（绿）/✗（红）
             let midHtml = '';
             for (let ci = 0; ci < visibleCount; ci++) {
                 const c = cols[ci];
-                const cellBg = (c.stat && showMark && rr && c.ok !== null) ? ' style="background-color:' + (c.ok ? ds.okBg : ds.failBg) + '"' : '';
+                // ok 保留仅供有情度计算，不再驱动达标/未达标底色
+                const cellBg = '';
                 const hitHtml = c.stat
                     ? (c.bound
                         ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + (ds.hitOkText ? ' ' + ds.hitOkText : '') + '</span>'
@@ -11581,19 +11627,141 @@
                     if (!node || node.mark !== 'xiji_rule') return;
                     // 新结构：conds={logic,children}；旧结构：children 数组（兼容旧模板）
                     const conds = { logic: (node.conds && node.conds.logic) || 'and', children: ((node.conds && node.conds.children) || node.children || []).slice() };
-                    if (node.ruleType === 'qiangruo') relationPrefs.push({ type: 'qiangruo', pref: node.pref, shenA: node.shenA, shenB: node.shenB, weakOp: node.weakOp || 'lte', weakVal: node.weakVal !== undefined ? node.weakVal : 1, conds: conds });
-                    else if (node.relId) relationPrefs.push({ type: 'shengke', pref: node.pref, relId: node.relId, conds: conds });
+                    const invert = !!node.invert;
+                    if (node.ruleType === 'qiangruo') {
+                        const rec = { type: 'qiangruo', pref: node.pref, shenA: node.shenA, shenB: node.shenB, weakOp: node.weakOp || 'lte', weakVal: node.weakVal !== undefined ? node.weakVal : 1, conds: conds };
+                        if (invert) rec.invert = true;
+                        relationPrefs.push(rec);
+                    } else if (node.relId) {
+                        const rec = { type: 'shengke', pref: node.pref, relId: node.relId, conds: conds };
+                        if (invert) rec.invert = true;
+                        if (node.ratio || node.presetId) {
+                            rec.ratio = node.ratio || null;
+                            rec.presetId = node.presetId || '';
+                            // 生克类型带比例条件：同步输出到 relationRefs（供柱状图「参考 3:1」展示；触发条件沿用规则触发条件组）
+                            const def = (typeof getRelationDefById === 'function') ? getRelationDefById(node.relId) : null;
+                            if (def) {
+                                let rr = null;
+                                if (node.presetId && typeof getRelRatioPresetById === 'function') {
+                                    try {
+                                        const preset = getRelRatioPresetById(node.presetId);
+                                        if (preset) {
+                                            rr = { relation: def.name, type: preset.presetType === 'range' ? 'range' : 'eq' };
+                                            if (rr.type === 'range' && preset.min && preset.max) { rr.min = preset.min; rr.max = preset.max; }
+                                            else rr.values = (preset.values || []).slice();
+                                        }
+                                    } catch (e) { rr = null; }
+                                } else if (node.ratio) {
+                                    if (node.ratio.type === 'range' && node.ratio.min && node.ratio.max) rr = { relation: def.name, type: 'range', min: node.ratio.min, max: node.ratio.max };
+                                    else if (node.ratio.values && node.ratio.values.length) rr = { relation: def.name, type: 'eq', values: node.ratio.values.slice() };
+                                }
+                                if (rr) {
+                                    if (conds.children && conds.children.length) rr.conds = conds;
+                                    relationRefs.push(rr);
+                                }
+                            }
+                        }
+                        relationPrefs.push(rec);
+                    }
                 });
             }
         });
         return { values: values, relationRefs: relationRefs, matchConditions: matchConditions, relationPrefs: relationPrefs };
     }
 
-    // 模板 conditions 统一入口：优先新树；旧模板（仅四字段）自动迁移
+    // 模板 conditions 统一入口：优先新树；旧模板（仅四字段）自动迁移；
+    // 旧「关系比例」分区自动迁移为喜忌规则（生克类型·喜·比例与触发条件原样保留），合并后统一走喜忌标注
     function getTemplateConditions(tpl) {
         if (!tpl) return null;
-        if (tpl.conditions && Array.isArray(tpl.conditions.children)) return tpl.conditions;
-        return compileTemplateConditions(tpl.values || {}, tpl.relationRefs || [], tpl.matchConditions || {}, tpl.relationPrefs || []);
+        let tree = null;
+        if (tpl.conditions && Array.isArray(tpl.conditions.children)) tree = tpl.conditions;
+        else tree = compileTemplateConditions(tpl.values || {}, tpl.relationRefs || [], tpl.matchConditions || {}, tpl.relationPrefs || []);
+        if (!tree) return null;
+        try {
+            const hasRatio = (tree.children || []).some(function(g) { return g && g.mark === 'ratio'; });
+            if (hasRatio) {
+                // 克隆后再迁移，避免原地修改 tpl.conditions（迁移幂等：完成后 ratio 分区被移除）
+                return migrateTplRatioToXiji(JSON.parse(JSON.stringify(tree)));
+            }
+        } catch (e) {}
+        return tree;
+    }
+    // 旧「关系比例」分区 → 喜忌规则迁移：ratio_rule（relation+比例+触发条件）转为 xiji_rule（生克类型·喜）
+    function migrateTplRatioToXiji(tree) {
+        if (!tree || !Array.isArray(tree.children)) return tree;
+        let ratioGrp = null, ratioIdx = -1, xijiGrp = null;
+        tree.children.forEach(function(g, i) {
+            if (g && g.mark === 'ratio') { ratioGrp = g; ratioIdx = i; }
+            if (g && g.mark === 'xiji') xijiGrp = g;
+        });
+        if (!ratioGrp) return tree;
+        const defs = (typeof getRelationDefs === 'function') ? getRelationDefs() : [];
+        const conv = [];
+        ((ratioGrp.children || [])).forEach(function(c) {
+            if (!c) return;
+            // 兼容两种旧结构：ratio_rule 组行（relation+比例+触发条件）与 '关系比例-X' 叶子（恒生效）
+            let relation = null, ratio = null, presetId = '', conds = null;
+            if (c.mark === 'ratio_rule') {
+                relation = c.relation || null;
+                ratio = c.ratio || null;
+                presetId = c.presetId || '';
+                conds = c.conds || null;
+            } else if (c.field && c.field.indexOf('关系比例-') === 0) {
+                relation = c.field.replace('关系比例-', '');
+                ratio = (typeof parseRefRatioLeafToRatio === 'function') ? parseRefRatioLeafToRatio(c) : null;
+            }
+            if (!relation) return;
+            const def = defs.find(function(d) { return d.name === relation || (d.shenA + (d.relType === 'ke' ? '克' : '生') + d.shenB) === relation; });
+            if (!def) return;  // 关系已不存在 → 丢弃该条
+            const node = { mark: 'xiji_rule', ruleType: 'shengke', pref: 'xi', relId: def.id };
+            if (ratio) node.ratio = ratio;
+            if (presetId) node.presetId = presetId;
+            if (conds) node.conds = conds;
+            conv.push(node);
+        });
+        if (!conv.length) {
+            tree.children.splice(ratioIdx, 1);
+            return tree;
+        }
+        if (xijiGrp) {
+            xijiGrp.children = (xijiGrp.children || []).concat(conv);
+        } else {
+            tree.children.push({ mark: 'xiji', logic: 'and', children: conv });
+        }
+        tree.children.splice(ratioIdx, 1);
+        return tree;
+    }
+    // 读取模板的喜忌规则列表（统一从归一化 conditions 树取，保证旧模板迁移后的规则也生效）
+    function getTplXijiRules(tpl) {
+        try {
+            const tree = getTemplateConditions(tpl);
+            if (!tree || !Array.isArray(tree.children)) return [];
+            const xg = tree.children.find(function(g) { return g && g.mark === 'xiji'; });
+            return (xg && Array.isArray(xg.children)) ? xg.children : [];
+        } catch (e) { return []; }
+    }
+    // 解析喜忌规则的比例条件（ratio / presetId）为 rr 结构（供 checkRatioMatch 判定）；未配置返回 null
+    function resolveXijiRatio(node) {
+        if (!node) return null;
+        if (node.presetId) {
+            try {
+                if (typeof getRelRatioPresetById !== 'function') return null;
+                const preset = getRelRatioPresetById(node.presetId);
+                if (!preset) return null;
+                const rr = { type: preset.presetType === 'range' ? 'range' : 'eq' };
+                if (rr.type === 'range' && preset.min && preset.max) { rr.min = preset.min; rr.max = preset.max; }
+                else rr.values = (preset.values || []).slice();
+                return rr;
+            } catch (e) { return null; }
+        }
+        if (!node.ratio) return null;
+        if (node.ratio.type === 'range' && node.ratio.min && node.ratio.max) return { type: 'range', min: node.ratio.min, max: node.ratio.max };
+        if (node.ratio.values && node.ratio.values.length) return { type: 'eq', values: node.ratio.values.slice() };
+        return null;
+    }
+    // 喜忌反转：返回相反喜忌
+    function invertTplPref(pref) {
+        return pref === 'ji' ? 'xi' : 'ji';
     }
 
     // 数值比较（兼容 op eq/ge/gt/le/lt 与 range 值 'min~max'）
@@ -11648,6 +11816,23 @@
         const unsupported = { ok: false, unsupported: true, actual: '' };
         if (!c || !c.field) return unsupported;
         const f = c.field;
+        // 生克命中字段（'生克命中-A克B'）：满足=该生克关系在当前评估范围命中；排除=未命中
+        if (f.indexOf('生克命中-') === 0) {
+            const relName = f.replace('生克命中-', '');
+            let hit = false;
+            try {
+                const defs = (typeof getRelationDefs === 'function') ? getRelationDefs() : [];
+                const def = defs.find(function(d) { return d.name === relName || (d.shenA + (d.relType === 'ke' ? '克' : '生') + d.shenB) === relName; });
+                if (def) {
+                    const sk = analyzeShengKe();
+                    if (sk && sk.rels) {
+                        const r = sk.rels.find(function(x) { return String(x.id) === String(def.id); });
+                        if (r) hit = !!r.ganZhiOk;
+                    }
+                }
+            } catch (e) { hit = false; }
+            return { ok: c.op === 'ne' ? !hit : hit, unsupported: false, actual: hit ? '命中' : '未命中' };
+        }
         // 关系比例字段（'关系比例-A克B' / '关系比例-A生B'），比例 = 前者数量 / 后者数量
         if (f.indexOf('关系比例-') === 0) {
             const rel = f.replace('关系比例-', '');
@@ -11794,9 +11979,13 @@
     // 喜忌规则节点评估：触发条件组 + （强弱规则）弱判定 均满足 → 规则成立，贡献权重
     function scoreTplXijiRule(node, stats, data) {
         const weight = node && node.weight && node.weight > 0 ? node.weight : 1;
+        // 触发条件组（新结构在 node.conds；旧结构 children 兼容）
+        const conds = (node.conds && node.conds.children && Array.isArray(node.conds.children) && node.conds.children.length)
+            ? node.conds
+            : ((node.children && node.children.length) ? { logic: 'and', children: node.children } : null);
         let condOk = true;
-        if (node.children && node.children.length) {
-            const s = scoreTemplateTree({ logic: 'and', children: node.children }, stats, data, 1, {});
+        if (conds) {
+            const s = scoreTemplateTree(conds, stats, data, 1, {});
             condOk = s.ok;
         }
         let ruleOk = true;
@@ -11807,9 +11996,26 @@
             } else ruleOk = false;
         } else if (node.ruleType === 'shengke') {
             ruleOk = !!node.relId;
+            // 比例条件：关联关系两十神数量比需满足比例（无法判定视为不满足）
+            if (ruleOk && (node.ratio || node.presetId)) {
+                const def = (typeof getRelationDefById === 'function') ? getRelationDefById(node.relId) : null;
+                const rr = (typeof resolveXijiRatio === 'function') ? resolveXijiRatio(node) : null;
+                if (def && rr && stats && stats.groupCount) {
+                    const a = stats.groupCount[def.shenA] !== undefined ? stats.groupCount[def.shenA] : 0;
+                    const b = stats.groupCount[def.shenB] !== undefined ? stats.groupCount[def.shenB] : 0;
+                    if (a === 0 && b === 0) ruleOk = false;
+                    else ruleOk = checkRatioMatch(a, b, rr).ok;
+                } else ruleOk = false;
+            }
         }
-        const ok = condOk && ruleOk;
-        return { ok: ok, hit: ok ? weight : 0, total: weight, details: [{ field: '喜忌:' + (node.ruleType || '') + ':' + (node.pref || ''), op: '', val: '', actual: '', hit: ok, weight: weight, exclude: false, xijiRule: true }] };
+        // 反转：明确满足或不满足都算命中（喜忌相反）
+        let ok;
+        if (node.invert) {
+            ok = (condOk && ruleOk) || (!condOk || !ruleOk);
+        } else {
+            ok = condOk && ruleOk;
+        }
+        return { ok: ok, hit: ok ? weight : 0, total: weight, details: [{ field: '喜忌:' + (node.ruleType || '') + ':' + (node.pref || '') + (node.invert ? '(反转)' : ''), op: '', val: '', actual: '', hit: ok, weight: weight, exclude: false, xijiRule: true }] };
     }
 
     // 模板条件树评分（and/or/not_all + 权重 + exclude + 宏引用）
@@ -12203,12 +12409,10 @@
         if (!box) return;
         const sChildren = collectRefTplConds(document.getElementById('ref-tpl-shishen-box'));
         const sMode = document.getElementById('ref-tpl-shishen-mode');
-        const rCount = document.querySelectorAll('#ref-tpl-ratio-box .ref-tpl-ratio-row').length;
         const xCount = document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').length;
         const parts = [];
         if (sMode && sMode.value === 'auto') parts.push('十神:自动');
         else if (sChildren.length) parts.push('十神' + sChildren.length + '条');
-        if (rCount) parts.push('比例' + rCount + '组');
         if (xCount) parts.push('喜忌' + xCount + '条');
         // 【修复】ref-tpl-summary 位于 MutationObserver 观察的子树内（ref-tpl-edit-view），
         // 直接写 textContent 会再次触发 childList mutation → 无限循环卡死页面。
@@ -12250,6 +12454,13 @@
             SHEN_SHENG_LIST.forEach(function(p) { rels.push(p[0] + '生' + p[1]); });
             html += '<optgroup label="关系比例">' + rels.map(function(r) {
                 return '<option value="关系比例-' + r + '">' + r + ' 比例</option>';
+            }).join('') + '</optgroup>';
+            // 追加「生克命中」字段组（满足=该生克关系在当前范围命中；排除=未命中；无需填值）
+            const hitRels = [];
+            SHEN_KE_LIST.forEach(function(p) { hitRels.push(p[0] + '克' + p[1]); });
+            SHEN_SHENG_LIST.forEach(function(p) { hitRels.push(p[0] + '生' + p[1]); });
+            html += '<optgroup label="生克命中">' + hitRels.map(function(r) {
+                return '<option value="生克命中-' + r + '">' + r + ' 命中</option>';
             }).join('') + '</optgroup>';
             _refTplFieldOptionsCache = html;
         }
@@ -12302,7 +12513,15 @@
             f.indexOf('原局十神数量-') === 0 || f.indexOf('原局天干十神数量-') === 0 || f.indexOf('原局地支十神数量-') === 0 ||
             f.indexOf('原局天干五行数量-') === 0 || f.indexOf('原局地支五行数量-') === 0;
         const isRatio = f.indexOf('关系比例-') === 0;
-        if (!isTplNum && !isRatio) return;
+        const isShengkeHit = f.indexOf('生克命中-') === 0;
+        if (!isTplNum && !isRatio && !isShengkeHit) return;
+        // 生克命中字段：无需填值（满足=命中/排除=未命中），隐藏所有值输入控件
+        if (isShengkeHit) {
+            if (valSel) valSel.classList.add('hidden');
+            if (valCheckbox) valCheckbox.classList.add('hidden');
+            if (valInput) { valInput.classList.add('hidden'); valInput.value = ''; }
+            return;
+        }
         if (opSel) {
             const hasRange = Array.from(opSel.options).some(function(o) { return o.value === 'range'; });
             if (!hasRange) {
@@ -12444,7 +12663,7 @@
     }
     // 喜忌规则行（类型=生克关系/十神强弱 + 喜/忌 + 关联关系 或 A/B十神与弱判定 + 触发条件列表）
     function createRefTplPrefRow(p) {
-        const isStrong = p && p.type === 'qiangruo';
+        const isStrong = p && (p.type === 'qiangruo' || p.ruleType === 'qiangruo');
         const row = document.createElement('div');
         row.className = 'ref-tpl-pref-row bg-white border border-rose-100 rounded p-2';
         row.innerHTML =
@@ -12454,6 +12673,8 @@
             '<option value="xi"' + (!isStrong && (!p || p.pref === 'xi') ? ' selected' : '') + '>喜</option>' +
             '<option value="ji"' + (!isStrong && p && p.pref === 'ji' ? ' selected' : '') + '>忌</option>' +
             '</select>' +
+            '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer select-none" title="勾选后：条件满足=喜(忌)，条件不满足=相反喜忌；无法判定时不标注">' +
+            '<input type="checkbox" class="rtp-invert"' + (p && p.invert ? ' checked' : '') + '>🔃 反转</label>' +
             '<span class="text-xs font-bold text-gray-600">类型：</span>' +
             '<select class="rtp-type text-sm p-1 border rounded">' +
             '<option value="shengke"' + (!isStrong ? ' selected' : '') + '>生克关系</option>' +
@@ -12478,21 +12699,47 @@
             '</div>' +
             '<button type="button" class="text-red-500 text-sm px-1 shrink-0" onclick="this.closest(\'.ref-tpl-pref-row\').remove()">✕ 删除</button>' +
             '</div>' +
+            '<div class="rtp-pref-ratio-wrap flex flex-wrap items-center gap-1.5 mb-1' + (isStrong ? ' hidden' : '') + '">' +
+            '<span class="text-xs font-bold text-gray-600">比例：</span>' +
+            '<span class="ref-rel-preset-badge hidden"></span>' +
+            '<div class="rtp-ratio-vals flex flex-wrap gap-1"></div>' +
+            '<input type="hidden" class="rtp-ratio-preset-id" value="' + escapeHtml((p && p.presetId) || '') + '">' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" onclick="addRefRelValue(this)">+ 精确值</button>' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" onclick="addRefRelRange(this)">+ 区间</button>' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs" onclick="openRelRatioPresetPicker(this)">📋 选预设</button>' +
+            '<button type="button" class="ref-rel-add-btn px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs" onclick="saveRowAsRelRatioPreset(this)">💾 存为预设</button>' +
+            '</div>' +
             '<div class="text-xs text-gray-500 mb-1">触发条件组（组内条件可设"并且/或者"逻辑；不添加则恒生效）：</div>' +
             '<div class="rtp-conds space-y-1"></div>' +
             '<div class="flex gap-1.5 flex-wrap">' +
             '<button type="button" onclick="addRefTplPrefCond(this)" class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs mt-1">➕ 添加触发条件</button>' +
             '<button type="button" onclick="openRefTplMacroSelector(this, \'pref\')" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs mt-1">🧩 插入条件宏</button>' +
             '</div>';
-        // 类型切换：生克关系 ↔ 十神强弱
+        // 类型切换：生克关系 ↔ 十神强弱（比例配置区仅生克类型显示）
         const typeSel = row.querySelector('.rtp-type');
         const relBox = row.querySelector('.rtp-rel-box');
         const strongBox = row.querySelector('.rtp-strong-box');
+        const ratioWrap = row.querySelector('.rtp-pref-ratio-wrap');
         typeSel.onchange = function() {
             const strong = this.value === 'qiangruo';
             relBox.classList.toggle('hidden', strong);
             strongBox.classList.toggle('hidden', !strong);
+            if (ratioWrap) ratioWrap.classList.toggle('hidden', strong);
         };
+        // 回填比例配置（预设引用优先；否则精确值/区间）
+        const valsBox = row.querySelector('.rtp-ratio-vals');
+        if (p && p.presetId) {
+            const preset = (typeof getRelRatioPresetById === 'function') ? getRelRatioPresetById(p.presetId) : null;
+            if (preset) applyRelRatioPresetToRow(row, preset);
+        } else if (p && p.ratio) {
+            if (p.ratio.type === 'range' && p.ratio.min && p.ratio.max) {
+                valsBox.appendChild(createRefRelRangeItem(p.ratio.min.n, p.ratio.min.d, p.ratio.max.n, p.ratio.max.d));
+            } else {
+                (p.ratio.values || []).forEach(function(v) {
+                    valsBox.appendChild(createRefRelValueItem(v.n, v.d));
+                });
+            }
+        }
         const condsBox = row.querySelector('.rtp-conds');
         const pConds = (p && p.conds && p.conds.children && Array.isArray(p.conds.children)) ? p.conds.children : [];
         pConds.forEach(function(cond) { appendRefTplCond(condsBox, cond); });
@@ -12546,7 +12793,7 @@
             } else {
                 val = (valSel && !valSel.classList.contains('hidden')) ? valSel.value : (valInput ? valInput.value.trim() : '');
             }
-            if (field && val !== '') {
+            if (field && (val !== '' || field.indexOf('生克命中-') === 0)) {
                 children.push({ logic: logic, field: field, op: op, val: val });
             }
         });
@@ -12563,49 +12810,7 @@
         const sNode = { mark: 'shishen', mode: shishenMode };
         if (shishenMode === 'manual' && sChildren.length) sNode.children = sChildren;
         children.push(sNode);
-        // 关系比例（每个关系一个独立组：触发条件组 + 比例配置；组间相互独立）
-        const ratioChildren = [];
-        document.querySelectorAll('#ref-tpl-ratio-box .ref-tpl-ratio-row').forEach(function(row) {
-            const relation = row.querySelector('.rtp-rel-relation') ? row.querySelector('.rtp-rel-relation').value : '';
-            if (!relation) return;
-            const ratioNode = { mark: 'ratio_rule', relation: relation };
-            // 触发条件组（行首"并且/或者"生效；无条件则恒生效）
-            const cChildren = collectRefTplConds(row.querySelector('.rtp-ratio-conds'));
-            if (cChildren.length) {
-                // 组逻辑取首条条件的行首逻辑；首条叶子保留自身 logic（回填后行首显示与组逻辑一致），其余叶子去掉
-                const gLogic = cChildren[0].logic || 'and';
-                ratioNode.conds = { logic: gLogic, children: cChildren.map(function(c, i) { var cc = Object.assign({}, c); if (i > 0) delete cc.logic; return cc; }) };
-            } else {
-                ratioNode.conds = null;
-            }
-            // 比例配置（预设引用 / 精确值集合 / 区间）
-            const presetSel = row.querySelector('.rtp-ratio-preset-id');
-            if (presetSel && presetSel.value) {
-                ratioNode.presetId = presetSel.value;
-            } else {
-                const rangeItem = row.querySelector('.rtp-ratio-vals > .ref-range-item');
-                if (rangeItem) {
-                    const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
-                    const minD = parseInt(rangeItem.querySelector('.ref-min-d').value);
-                    const maxN = parseInt(rangeItem.querySelector('.ref-max-n').value);
-                    const maxD = parseInt(rangeItem.querySelector('.ref-max-d').value);
-                    if (!isNaN(minN) && !isNaN(minD) && !isNaN(maxN) && !isNaN(maxD)) {
-                        ratioNode.ratio = { type: 'range', min: { n: minN, d: minD }, max: { n: maxN, d: maxD } };
-                    }
-                } else {
-                    const vals = [];
-                    row.querySelectorAll('.rtp-ratio-vals > div:not(.ref-range-item)').forEach(function(item) {
-                        const n = parseInt(item.querySelector('.ref-n') ? item.querySelector('.ref-n').value : '');
-                        const d = parseInt(item.querySelector('.ref-d') ? item.querySelector('.ref-d').value : '');
-                        if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) vals.push({ n: n, d: d });
-                    });
-                    if (vals.length) ratioNode.ratio = { type: 'eq', values: vals };
-                }
-            }
-            if (ratioNode.presetId || ratioNode.ratio) ratioChildren.push(ratioNode);
-        });
-        if (ratioChildren.length) children.push({ mark: 'ratio', children: ratioChildren });
-        // 喜忌规则（每条相互独立；触发条件为条件组，组内 and/or 生效）
+        // 喜忌规则（每条相互独立；触发条件为条件组，组内 and/or 生效；生克类型可带比例条件/反转开关）
         const xiji = [];
         document.querySelectorAll('#ref-tpl-prefs-box .ref-tpl-pref-row').forEach(function(row) {
             const type = row.querySelector('.rtp-type').value === 'qiangruo' ? 'qiangruo' : 'shengke';
@@ -12613,17 +12818,47 @@
             const condsLogic = condsChildren.length ? (condsChildren[0].logic || 'and') : 'and';
             const conds = { logic: condsLogic, children: condsChildren.map(function(c, i) { var cc = Object.assign({}, c); if (i > 0) delete cc.logic; return cc; }) };
             const pref = row.querySelector('.rtp-pref').value === 'ji' ? 'ji' : 'xi';
+            const invertSel = row.querySelector('.rtp-invert');
+            const invert = !!(invertSel && invertSel.checked);
             if (type === 'qiangruo') {
                 const shenA = row.querySelector('.rtp-shen-a').value;
                 const shenB = row.querySelector('.rtp-shen-b').value;
                 if (!shenA || !shenB) return;
                 const weakOp = row.querySelector('.rtp-weak-op').value === 'lt' ? 'lt' : 'lte';
                 const weakVal = parseInt(row.querySelector('.rtp-weak-val').value);
-                xiji.push({ mark: 'xiji_rule', ruleType: 'qiangruo', pref: pref, shenA: shenA, shenB: shenB, weakOp: weakOp, weakVal: isNaN(weakVal) ? 1 : weakVal, conds: conds });
+                const rule = { mark: 'xiji_rule', ruleType: 'qiangruo', pref: pref, shenA: shenA, shenB: shenB, weakOp: weakOp, weakVal: isNaN(weakVal) ? 1 : weakVal, conds: conds };
+                if (invert) rule.invert = true;
+                xiji.push(rule);
             } else {
                 const relId = row.querySelector('.rtp-rel').value;
                 if (!relId) return;
-                xiji.push({ mark: 'xiji_rule', ruleType: 'shengke', pref: pref, relId: relId, conds: conds });
+                const rule = { mark: 'xiji_rule', ruleType: 'shengke', pref: pref, relId: relId, conds: conds };
+                if (invert) rule.invert = true;
+                // 比例条件（预设引用 / 精确值集合 / 区间）；未配置时不带
+                const presetSel = row.querySelector('.rtp-ratio-preset-id');
+                if (presetSel && presetSel.value) {
+                    rule.presetId = presetSel.value;
+                } else {
+                    const rangeItem = row.querySelector('.rtp-ratio-vals > .ref-range-item');
+                    if (rangeItem) {
+                        const minN = parseInt(rangeItem.querySelector('.ref-min-n').value);
+                        const minD = parseInt(rangeItem.querySelector('.ref-min-d').value);
+                        const maxN = parseInt(rangeItem.querySelector('.ref-max-n').value);
+                        const maxD = parseInt(rangeItem.querySelector('.ref-max-d').value);
+                        if (!isNaN(minN) && !isNaN(minD) && !isNaN(maxN) && !isNaN(maxD)) {
+                            rule.ratio = { type: 'range', min: { n: minN, d: minD }, max: { n: maxN, d: maxD } };
+                        }
+                    } else {
+                        const vals = [];
+                        row.querySelectorAll('.rtp-ratio-vals > div:not(.ref-range-item)').forEach(function(item) {
+                            const n = parseInt(item.querySelector('.ref-n') ? item.querySelector('.ref-n').value : '');
+                            const d = parseInt(item.querySelector('.ref-d') ? item.querySelector('.ref-d').value : '');
+                            if (!isNaN(n) && !isNaN(d) && !(n === 0 && d === 0)) vals.push({ n: n, d: d });
+                        });
+                        if (vals.length) rule.ratio = { type: 'eq', values: vals };
+                    }
+                }
+                xiji.push(rule);
             }
         });
         if (xiji.length) children.push({ mark: 'xiji', children: xiji });
@@ -13027,9 +13262,9 @@
     }
 
     // 添加一个精确比例输入项（n:d）
-    // 行容器兼容两种结构：旧 .ref-rel-row（模板列表页）/ 新 .ref-tpl-ratio-row（模板编辑器关系比例组）
+    // 行容器兼容多种结构：旧 .ref-rel-row（模板列表页）/ 模板编辑器关系比例组 .ref-tpl-ratio-row / 喜忌规则行 .ref-tpl-pref-row
     function refRelRowOf(btn) {
-        return btn.closest('.ref-rel-row') || btn.closest('.ref-tpl-ratio-row');
+        return btn.closest('.ref-rel-row') || btn.closest('.ref-tpl-ratio-row') || btn.closest('.ref-tpl-pref-row');
     }
     function refRelValsOf(btn) {
         const row = refRelRowOf(btn);
@@ -14616,7 +14851,8 @@
             let midHtml = '';
             for (let ci = 0; ci < cols.length; ci++) {
                 const c = cols[ci];
-                const cellBg = (c.ok !== null) ? ' style="background-color:' + (c.ok ? ds.okBg : ds.failBg) + '"' : '';
+                // 达标/未达标底色已移除（合并后统一用喜忌徽章标注）；ok 保留仅供有情度计算
+                const cellBg = '';
                 const hitHtml = c.a !== null ? (c.bound
                     ? '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + (ds.hitOkText ? ' ' + ds.hitOkText : '') + '</span>'
                     : '<span class="font-bold text-sm sm:text-base leading-tight" style="color:' + ds.hitFailColor + '">' + (ds.hitFailSym || '✗') + (ds.hitFailText ? ' ' + ds.hitFailText : '') + '</span>') : '';
@@ -36638,7 +36874,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-gray-600">
                 <p class="font-medium text-amber-700 mb-1">模板说明：</p>
-                <p>• 一个模板包含<b>五种十神参考值</b>（= / ≥ / ≤ / 区间）与<b>十组相生/相克关系比例</b>（多个精确值或区间）。</p>
+                <p>• 一个模板包含<b>十神参考值</b>（= / ≥ / ≤ / 区间）与<b>喜忌规则</b>（关联关系可配置比例条件＋触发条件＋反转开关，或十神强弱规则）。</p>
                 <p>• 断语/条件宏通过下拉框选择引用模板；<b>修改模板后，所有引用的断语/宏自动生效</b>。</p>
             </div>
             <div id="ref-tpl-list" class="space-y-2">
@@ -36658,7 +36894,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- 分区 Tab -->
             <div class="flex flex-wrap gap-1 mb-3 border-b border-gray-200">
                 <button type="button" class="ref-tpl-tab px-3 py-1.5 text-sm font-medium rounded-t border-b-2 border-amber-500 text-amber-700 bg-amber-50" data-tab="shishen" onclick="switchRefTplTab('shishen')">十神分布</button>
-                <button type="button" class="ref-tpl-tab px-3 py-1.5 text-sm font-medium rounded-t border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="ratio" onclick="switchRefTplTab('ratio')">关系比例</button>
                 <button type="button" class="ref-tpl-tab px-3 py-1.5 text-sm font-medium rounded-t border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="xiji" onclick="switchRefTplTab('xiji')">喜忌</button>
                 <span id="ref-tpl-summary" class="ml-auto self-center text-xs text-gray-400 truncate max-w-[320px]"></span>
             </div>
@@ -36685,18 +36920,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             </div>
-            <!-- 关系比例区 -->
-            <div id="ref-tpl-tab-ratio" class="ref-tpl-tab-panel hidden">
-                <div class="mb-1.5 text-xs text-gray-500">关系比例标注：每个关系一个<b>独立组</b>（组间互不影响），组内触发条件满足时才标注该关系比例；比例可设<b>多个精确值、区间</b>或引用<b>比例预设库</b>。</div>
-                <div id="ref-tpl-ratio-box" class="space-y-2 mb-2"></div>
-                <div class="flex gap-1.5 flex-wrap items-center">
-                    <select id="ref-tpl-ratio-rel-select" class="px-2 py-1 border rounded text-sm bg-white max-w-[220px]"><option value="">选择关系…</option></select>
-                    <button type="button" onclick="addRefTplRatioRow()" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-sm">➕ 添加关系比例组</button>
-                </div>
-            </div>
             <!-- 喜忌区 -->
             <div id="ref-tpl-tab-xiji" class="ref-tpl-tab-panel hidden">
-                <div class="mb-1.5 text-xs text-gray-500">生克喜忌标注：每条规则<b>相互独立</b>（互不影响），触发条件满足时在相克/相生表标注喜/忌。</div>
+                <div class="mb-1.5 text-xs text-gray-500">生克喜忌标注：每条规则<b>相互独立</b>（互不影响）。规则可配置<b>关联关系（含比例条件）/ 十神强弱</b>＋<b>触发条件组</b>（普通条件、关系比例、生克命中满足/排除）＋<b>反转开关</b>（满足为喜/忌、不满足为相反）；触发条件满足且比例达标时才标注喜/忌，无法判定时不标注。</div>
                 <div id="ref-tpl-prefs-box" class="space-y-2 mb-2"></div>
                 <button type="button" onclick="addRefTplPrefRule()" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-sm">➕ 添加喜忌规则</button>
             </div>
