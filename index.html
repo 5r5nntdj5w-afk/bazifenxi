@@ -10918,7 +10918,14 @@
         refBarBox.innerHTML = refBarHtml;
 
         // 柱状图（十神强弱喜忌映射 { 十神B: 'xi'|'ji' }，徽章标注在增量十神B柱上）
-        const strongPrefMap = buildStrongPrefMap(cache.shenTplPrefs || []);
+        // 强弱评估按柱状图当前显示范围选取：含流月→主范围评估（基准=原局+大运+流年）；含流年→scope2；含大运→scope1；原局无上一级→不标注
+        const _chartData = window._lastCalcData || null;
+        let strongList = null;
+        if (_chartData && _chartData.liuyue) strongList = cache.shenTplPrefs || [];
+        else if (_chartData && _chartData.liunian) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[2]) || [];
+        else if (_chartData && _chartData.dayun) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[1]) || [];
+        else strongList = [];
+        const strongPrefMap = buildStrongPrefMap(strongList || []);
         chartBox.innerHTML = renderShenBarChart(stats, selRef, mode, strongPrefMap);
         // 时间轴对比控制条（生克关系表上方）
         renderTimelineCompareBar();
@@ -11037,9 +11044,8 @@
         const keDefs = defs.filter(function(d) { return d.relType === 'ke'; });
         const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
         // 模板喜忌（按范围）：scopeIdx -> { 关系DefId: 'xi'|'ji' }（scope0 缺失时回退主缓存）
+        // 注：十神强弱（增量十神B）喜忌只标注在柱状图对应十神柱上，不进入关系表（避免涉及同一十神的多行同时标注造成误导）
         const prefSets = [null, null, null];
-        // 模板十神强弱喜忌（按范围）：scopeIdx -> { 增量十神B: 'xi'|'ji' }（共用喜忌徽章：涉及 B 十神的关系行标出）
-        const strongPrefSets = [null, null, null];
         for (let i = 0; i < 3; i++) {
             const scList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[i]);
             const list = (i === 0 && !scList) ? (cache.shenTplPrefs || []) : (scList || []);
@@ -11052,13 +11058,11 @@
                     });
                 });
                 prefSets[i] = map;
-                const smap = buildStrongPrefMap(list);
-                if (Object.keys(smap).length) strongPrefSets[i] = smap;
             }
         }
 
-        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark, visibleCount, prefSets, strongPrefSets);
-        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark, visibleCount, prefSets, strongPrefSets);
+        const keHtml = renderRelationTable('🔥 相克关系', keDefs, relMap, scopes, mode, 'text-red-600', showMark, visibleCount, prefSets);
+        const shengHtml = renderRelationTable('🌱 相生关系', shengDefs, relMap, scopes, mode, 'text-green-600', showMark, visibleCount, prefSets);
         return '<div class="bg-white border border-gray-200 rounded-lg p-2">' + keHtml + '</div>' +
                '<div class="bg-white border border-gray-200 rounded-lg p-2">' + shengHtml + '</div>';
     }
@@ -11100,15 +11104,14 @@
                 ? (yqOn2 ? '，' : '') + '<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.wuqingBg) + ';color:' + esc(ds.wuqingColor) + '">' + esc((ds.wuqingSym || '无') + (ds.wuqingText ? ' ' + ds.wuqingText : '')) + '</span>=无情（来源任一为假）' : '')
             : '';
         return '图例：数字后 <span style="color:' + esc(ds.hitOkColor) + '">' + esc(hitOk) + '</span>=绑定断语/宏命中，<span style="color:' + esc(ds.hitFailColor) + '">' + esc(hitFail) + '</span>=未命中' +
-            ' · <span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.xiBg) + ';color:' + esc(ds.xiColor) + '">' + esc(xi) + '</span>=喜用，<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.jiBg) + ';color:' + esc(ds.jiColor) + '">' + esc(ji) + '</span>=忌讳（生克或十神强弱任一命中即标出，随范围动态变化）' +
+            ' · <span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.xiBg) + ';color:' + esc(ds.xiColor) + '">' + esc(xi) + '</span>=喜用，<span class="inline-block align-middle px-1 py-0.5 rounded font-bold" style="background-color:' + esc(ds.jiBg) + ';color:' + esc(ds.jiColor) + '">' + esc(ji) + '</span>=忌讳（生克喜忌命中即标出，随范围动态变化）' +
             ' · <span style="color:' + esc(ds.bindColor) + '">' + esc(bind) + '</span>=范围切换绑定，<span style="color:' + esc(ds.unbindColor) + '">' + esc(unbind) + '</span>=范围切换解绑' + yqLegend;
     }
-    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount, prefSets, strongPrefSets) {
+    function renderRelationTable(title, defList, relMap, scopes, mode, titleColor, showMark, visibleCount, prefSets) {
         visibleCount = (visibleCount === undefined || visibleCount === null) ? 3 : visibleCount;
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
         prefSets = prefSets || [null, null, null];
-        strongPrefSets = strongPrefSets || [null, null, null];
         const ds = getDisplaySettings();
         // 绑定命中改为生克设置（生克关系识别区）数据源：按范围列分别用对应范围引擎评估生克设置命中，
         // 再按柱状图「全部/天干/地支」维度过滤（用户确认统一为识别区数据源）；
@@ -11132,19 +11135,11 @@
         defList.forEach(function(def) {
             const defaultName = def.shenA + (isKe ? '克' : '生') + def.shenB;  // 参考比例键（模板按默认名存）
             const rr = relMap[defaultName] || null;
-            // 模板喜忌（列级）：生克喜忌按关系定义ID匹配；强弱喜忌按涉及 B 十神的关系行匹配（任一命中即标出）
+            // 模板喜忌（列级）：仅生克喜忌按关系定义ID匹配（十神强弱喜忌只标注在柱状图，不进关系表）
             const prefByCol = [];
             for (let ci = 0; ci < 3; ci++) {
                 const ps = prefSets[ci];
-                let v = ps ? (ps[String(def.id)] || '') : '';
-                if (!v) {
-                    const sps = strongPrefSets[ci];
-                    if (sps) {
-                        // 喜忌徽章标注在增量十神B（缺省=A自身），优先按 B 匹配该关系行
-                        if (sps[String(def.shenB)]) v = sps[String(def.shenB)];
-                        else if (sps[String(def.shenA)]) v = sps[String(def.shenA)];
-                    }
-                }
+                const v = ps ? (ps[String(def.id)] || '') : '';
                 prefByCol.push(v);
             }
             // 行背景（任一可见范围命中喜/忌 → 行背景着色）
@@ -15006,12 +15001,8 @@
                 const prefList = (node.prefsByScope && node.prefsByScope[si]) || [];
                 prefList.forEach(function(tp) {
                     (tp.prefs || []).forEach(function(p) {
-                        if (!p) return;
-                        if (p.relId && String(p.relId) === String(def.id)) pref = p.pref === 'ji' ? 'ji' : 'xi';
-                        else {
-                            const s = p.shenB || p.shen;
-                            if (s && (s === def.shenA || s === def.shenB) && !pref) pref = p.pref === 'ji' ? 'ji' : 'xi';
-                        }
+                        // 仅生克喜忌按关系定义ID匹配（十神强弱喜忌只标注在柱状图对应十神柱上，不进关系表）
+                        if (p && p.relId && String(p.relId) === String(def.id)) pref = p.pref === 'ji' ? 'ji' : 'xi';
                     });
                 });
                 return { label: rg.label, a: a, b: b, ok: ok, bound: bound, pref: pref };
