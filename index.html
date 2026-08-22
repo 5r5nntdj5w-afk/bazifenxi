@@ -10879,6 +10879,14 @@
         return smap;
     }
 
+    // 过滤出指定标注模板的喜忌条目（标注与选中模板严格绑定：切换标注来源后只显示该模板的喜忌）
+    function filterPrefsByTpl(tplPrefList, tplId) {
+        if (!tplId) return [];
+        return (tplPrefList || []).filter(function(tp) {
+            return tp && tp.tplId && String(tp.tplId) === String(tplId);
+        });
+    }
+
     // 柱状图主渲染入口
     function renderShenBar() {
         const chartBox = document.getElementById('shen-bar-chart');
@@ -10926,14 +10934,16 @@
         else if (_chartData && _chartData.liunian && _chartData.liunian.t) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[2]) || [];
         else if (_chartData && _chartData.dayun && _chartData.dayun.t) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[1]) || [];
         else strongList = [];
-        const strongPrefMap = buildStrongPrefMap(strongList || []);
+        // 标注与选中标注模板严格绑定：喜忌只取该模板对应条目（切换标注来源后柱状图徽章/关系表徽章/参考比例全部联动）
+        const selTplId = (selRef && selRef.refOutput && selRef.refOutput.refTemplateId) ? String(selRef.refOutput.refTemplateId) : null;
+        const strongPrefMap = buildStrongPrefMap(filterPrefsByTpl(strongList || [], selTplId));
         chartBox.innerHTML = renderShenBarChart(stats, selRef, mode, strongPrefMap);
         // 时间轴对比控制条（生克关系表上方）
         renderTimelineCompareBar();
         // 关系表：时间轴对比开启时显示同层级对比表（大运对大运、流年对流年），否则显示原三范围表
         tablesBox.innerHTML = window.timelineCompareOn
-            ? renderTimelineCompareContent()
-            : renderShenBarTables(stats, rules, selIdx, mode);
+            ? renderTimelineCompareContent(selTplId)
+            : renderShenBarTables(stats, rules, selIdx, mode, selTplId);
     }
 
     // 渲染柱状图主体
@@ -11014,8 +11024,9 @@
 
     // 渲染相生/相克关系对比表（按关系定义列表：内置+自定义；三范围对比：原局 / 原局+大运 / 原局+大运+流年）
     // 实际值、达标标记、绑定命中均按范围实时计算；范围间状态变化以单元格底色+「状态变化」列高亮标记
-    function renderShenBarTables(stats, rules, selIdx, mode) {
+    function renderShenBarTables(stats, rules, selIdx, mode, selTplId) {
         const selRef = rules[selIdx] || null;
+        if (!selTplId) selTplId = (selRef && selRef.refOutput && selRef.refOutput.refTemplateId) ? String(selRef.refOutput.refTemplateId) : null;
         const relMap = {};  // 默认关系名（A克B / A生B） -> 参考比例配置（参考值模板按默认名存键，重命名不受影响）
         if (selRef) {
             // 优先使用触发条件评估后的关系比例（collectRefOnly 中按条件过滤）；回退原始 relationRefs（旧模板无触发条件）
@@ -11046,13 +11057,15 @@
         const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
         // 模板喜忌（按范围）：scopeIdx -> { 关系DefId: 'xi'|'ji' }（scope0 缺失时回退主缓存）
         // 注：十神强弱（增量十神B）喜忌只标注在柱状图对应十神柱上，不进入关系表（避免涉及同一十神的多行同时标注造成误导）
+        // 标注与选中标注模板严格绑定：喜忌只取选中模板对应条目，切换标注来源后随参考比例一起联动
         const prefSets = [null, null, null];
         for (let i = 0; i < 3; i++) {
             const scList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[i]);
             const list = (i === 0 && !scList) ? (cache.shenTplPrefs || []) : (scList || []);
-            if (list && list.length) {
+            const tplList = filterPrefsByTpl(list, selTplId);
+            if (tplList && tplList.length) {
                 const map = {};
-                list.forEach(function(tp) {
+                tplList.forEach(function(tp) {
                     (tp.prefs || []).forEach(function(p) {
                         if (!p || p.type === 'qiangruo') return;
                         if (p.relId) map[String(p.relId)] = p.pref === 'ji' ? 'ji' : 'xi';
@@ -14711,11 +14724,13 @@
     }
 
     // 解析某节点某范围的参考比例映射：取该范围命中最适合（最后一条）的参考值规则 → relationRefs → relMap
-    function buildTimelineRelMap(node, scopeIdx) {
+    function buildTimelineRelMap(node, scopeIdx, tplId) {
         const relMap = {};
         if (!node || !node.refRulesByScope || !node.refRulesByScope[scopeIdx]) return relMap;
         const rules = node.refRulesByScope[scopeIdx];
-        const rule = rules.length ? rules[rules.length - 1] : null;
+        // 标注与选中标注模板严格绑定：只取绑定该模板的规则（同模板多条取第一条）；未指定模板时回退原逻辑（最后一条）
+        const selRules = tplId ? rules.filter(function(r) { return r && r.refOutput && String(r.refOutput.refTemplateId) === String(tplId); }) : rules;
+        const rule = selRules.length ? (tplId ? selRules[0] : selRules[selRules.length - 1]) : null;
         if (rule) {
             try { rule._resolved = resolveRefOutput(rule.refOutput, rule.rule); } catch (e) {}
             const ratioList = (rule._relRatios && rule._relRatios.length) ? rule._relRatios : null;
@@ -14942,7 +14957,7 @@
     }
 
     // 单张对比表（范围列 + 变化列交错）
-    function renderCompareRelationTable(title, defList, ranges, changes, mode, titleColor, showMark, ds) {
+    function renderCompareRelationTable(title, defList, ranges, changes, mode, titleColor, showMark, ds, selTplId) {
         const isKe = title.indexOf('相克') >= 0;
         const relNameColor = isKe ? 'text-red-700' : 'text-green-700';
         // 绑定命中改为生克设置（生克关系识别区）数据源：按「节点+范围」读取该节点快照固化的三范围结果，
@@ -14989,7 +15004,7 @@
                     return st.groupCount[g] || 0;
                 };
                 const a = gv(def.shenA), b = gv(def.shenB);
-                const relMap = buildTimelineRelMap(node, si);
+                const relMap = buildTimelineRelMap(node, si, selTplId);
                 const rr = relMap[def.shenA + (isKe ? '克' : '生') + def.shenB] || relMap[def.name] || null;
                 let ok = null;
                 if (rr && showMark && a !== null && b !== null) ok = checkRatioMatch(a, b, rr).ok;
@@ -14999,7 +15014,8 @@
                 const defRelName = def.shenA + (isKe ? '克' : '生') + def.shenB;
                 const bound = !!bs[String(def.id)] || !!bs[def.name] || !!bs[defRelName];
                 let pref = '';
-                const prefList = (node.prefsByScope && node.prefsByScope[si]) || [];
+                // 标注与选中标注模板严格绑定：只取选中模板的喜忌条目（切换标注来源后时间轴表联动）
+                const prefList = filterPrefsByTpl((node.prefsByScope && node.prefsByScope[si]) || [], selTplId);
                 prefList.forEach(function(tp) {
                     (tp.prefs || []).forEach(function(p) {
                         // 仅生克喜忌按关系定义ID匹配（十神强弱喜忌只标注在柱状图对应十神柱上，不进关系表）
@@ -15047,7 +15063,7 @@
     }
 
     // 时间轴对比内容（格局对比 + 相克/相生对比表）
-    function renderTimelineCompareContent() {
+    function renderTimelineCompareContent(selTplId) {
         const pair = getTimelineComparePair();
         if (!pair.base || !pair.target) {
             return '<div class="text-xs text-gray-400 py-2">' + escapeHtml(pair.reason || '暂无对比数据') + '</div>';
@@ -15064,9 +15080,9 @@
             const cb = buildCompareRanges(base, target, kind);
             const defs = getRelationDefs();
             html += '<div class="bg-white border border-gray-200 rounded-lg p-2">' +
-                renderCompareRelationTable('🔥 相克关系', defs.filter(function(d) { return d.relType === 'ke'; }), cb.ranges, cb.changes, mode, 'text-red-600', showMark, ds) + '</div>';
+                renderCompareRelationTable('🔥 相克关系', defs.filter(function(d) { return d.relType === 'ke'; }), cb.ranges, cb.changes, mode, 'text-red-600', showMark, ds, selTplId) + '</div>';
             html += '<div class="bg-white border border-gray-200 rounded-lg p-2">' +
-                renderCompareRelationTable('🌱 相生关系', defs.filter(function(d) { return d.relType === 'sheng'; }), cb.ranges, cb.changes, mode, 'text-green-600', showMark, ds) + '</div>';
+                renderCompareRelationTable('🌱 相生关系', defs.filter(function(d) { return d.relType === 'sheng'; }), cb.ranges, cb.changes, mode, 'text-green-600', showMark, ds, selTplId) + '</div>';
         } else {
             html += '<div class="text-xs text-amber-600 py-1">请选择同级节点对比：大运对大运，或同一大运内的流年对流年。</div>';
         }
