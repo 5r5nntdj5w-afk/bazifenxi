@@ -10866,6 +10866,19 @@
         return settings;
     }
 
+    // 构建十神强弱喜忌映射：{ 十神B: 'xi'|'ji' }（B缺省=A自身；喜忌徽章标注在增量十神B）
+    function buildStrongPrefMap(tplPrefList) {
+        const smap = {};
+        (tplPrefList || []).forEach(function(tp) {
+            (tp.prefs || []).forEach(function(p) {
+                if (!p || p.type !== 'qiangruo') return;
+                const s = p.shenB || p.shen;
+                if (s) smap[String(s)] = p.pref === 'ji' ? 'ji' : 'xi';
+            });
+        });
+        return smap;
+    }
+
     // 柱状图主渲染入口
     function renderShenBar() {
         const chartBox = document.getElementById('shen-bar-chart');
@@ -10904,8 +10917,9 @@
         }
         refBarBox.innerHTML = refBarHtml;
 
-        // 柱状图
-        chartBox.innerHTML = renderShenBarChart(stats, selRef, mode);
+        // 柱状图（十神强弱喜忌映射 { 十神B: 'xi'|'ji' }，徽章标注在增量十神B柱上）
+        const strongPrefMap = buildStrongPrefMap(cache.shenTplPrefs || []);
+        chartBox.innerHTML = renderShenBarChart(stats, selRef, mode, strongPrefMap);
         // 时间轴对比控制条（生克关系表上方）
         renderTimelineCompareBar();
         // 关系表：时间轴对比开启时显示同层级对比表（大运对大运、流年对流年），否则显示原三范围表
@@ -10915,7 +10929,8 @@
     }
 
     // 渲染柱状图主体
-    function renderShenBarChart(stats, selRef, mode) {
+    function renderShenBarChart(stats, selRef, mode, strongPrefMap) {
+        strongPrefMap = strongPrefMap || {};
         const groups = GROUPED_SHEN;
         const refVals = (selRef && selRef._resolved) ? normalizeRefValues(selRef._resolved.values) : {};
         // 实际值（跟随当前模式：全部/天干/地支，含用户调节偏移量）
@@ -10963,6 +10978,13 @@
             const markHtml = actMark ? (actMark.ok
                 ? '<span class="bar-done font-bold" style="color:' + ds.hitOkColor + '">' + (ds.hitOkSym || '✓') + (ds.hitOkText ? ' ' + ds.hitOkText : '') + '</span>'
                 : '<span class="bar-miss font-bold" style="color:' + ds.hitFailColor + '">' + (ds.hitFailSym || '✗') + (ds.hitFailText ? ' ' + ds.hitFailText : '') + '</span>') : '';
+            // 十神强弱喜忌徽章：标注在增量十神B的柱位（B缺省=A自身），样式与生克关系表列级徽章一致
+            const strongPref = strongPrefMap[g];
+            const strongHtml = strongPref
+                ? (strongPref === 'ji'
+                    ? '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.jiBg + ';color:' + ds.jiColor + '">' + (ds.jiText || '忌') + '</span>'
+                    : '<span class="inline-block text-[10px] leading-none px-1.5 py-1 rounded font-bold" style="background-color:' + ds.xiBg + ';color:' + ds.xiColor + '">' + (ds.xiText || '喜') + '</span>')
+                : '';
             // 顺序：参考值柱在前（左），实际八字十神柱在后（右）
             html += '<div class="flex-1 flex flex-col items-center min-w-0">' +
                 '<div class="relative flex items-end justify-center gap-1 w-full" style="height:' + chartH + 'px;">' +
@@ -10972,7 +10994,10 @@
                 '<div class="rounded-t-sm w-full" style="height:' + Math.min(actH, chartH) + 'px;background:' + colors[g] + ';"></div>' +
                 '</div>' +
                 '</div>' +
-                '<div class="mt-1 font-bold text-xs text-gray-600 leading-none truncate">' + g + '</div>' +
+                '<div class="mt-1 flex items-center justify-center gap-1 min-w-0">' +
+                '<span class="font-bold text-xs text-gray-600 leading-none truncate">' + g + '</span>' +
+                strongHtml +
+                '</div>' +
                 '</div>';
         });
         html += '</div>';
@@ -11020,20 +11045,14 @@
             const list = (i === 0 && !scList) ? (cache.shenTplPrefs || []) : (scList || []);
             if (list && list.length) {
                 const map = {};
-                const smap = {};
                 list.forEach(function(tp) {
                     (tp.prefs || []).forEach(function(p) {
-                        if (!p) return;
-                        if (p.type === 'qiangruo') {
-                            // 喜忌徽章标注在增量十神B（B缺省=A自身时即标A）
-                            const s = p.shenB || p.shen;
-                            if (s) smap[String(s)] = p.pref === 'ji' ? 'ji' : 'xi';
-                        } else if (p.relId) {
-                            map[String(p.relId)] = p.pref === 'ji' ? 'ji' : 'xi';
-                        }
+                        if (!p || p.type === 'qiangruo') return;
+                        if (p.relId) map[String(p.relId)] = p.pref === 'ji' ? 'ji' : 'xi';
                     });
                 });
                 prefSets[i] = map;
+                const smap = buildStrongPrefMap(list);
                 if (Object.keys(smap).length) strongPrefSets[i] = smap;
             }
         }
@@ -12617,12 +12636,35 @@
             f.indexOf('原局天干五行数量-') === 0 || f.indexOf('原局地支五行数量-') === 0;
         const isRatio = f.indexOf('关系比例-') === 0;
         const isShengkeHit = f.indexOf('生克命中-') === 0;
+        // 从生克命中字段切回其他字段：先恢复完整运算符选项（必须在此提前 return 之前，否则 shengkeHitOp 标记残留）
+        if (opSel && row.dataset.shengkeHitOp && !isShengkeHit) {
+            opSel.innerHTML = row.dataset._fullOpHtml || '';
+            delete row.dataset.shengkeHitOp;
+            delete row.dataset._fullOpHtml;
+            if (opSel.value === '') opSel.value = 'eq';
+        }
         if (!isTplNum && !isRatio && !isShengkeHit) return;
-        // 生克命中字段：无需填值（满足=命中/排除=未命中），隐藏所有值输入控件
+        // 生克命中字段：无需填值（满足=命中/排除=未命中），隐藏所有值输入控件；运算符仅保留 = / ≠
         if (isShengkeHit) {
             if (valSel) valSel.classList.add('hidden');
             if (valCheckbox) valCheckbox.classList.add('hidden');
             if (valInput) { valInput.classList.add('hidden'); valInput.value = ''; }
+            if (opSel && !row.dataset.shengkeHitOp) {
+                // 首次裁剪：缓存完整运算符选项，替换为 满足(=)/排除(≠)
+                const cur = opSel.value;
+                row.dataset._fullOpHtml = opSel.innerHTML;
+                opSel.innerHTML = '';
+                [['eq', '='], ['ne', '≠']].forEach(function(o) {
+                    const opt = document.createElement('option');
+                    opt.value = o[0]; opt.text = o[1];
+                    if (o[0] === (cur === 'ne' ? 'ne' : 'eq')) opt.selected = true;
+                    opSel.appendChild(opt);
+                });
+                row.dataset.shengkeHitOp = '1';
+            } else if (opSel) {
+                // 已是生克命中专用选项：非 = / ≠ 的旧值归一化为 =
+                if (opSel.value !== 'eq' && opSel.value !== 'ne') opSel.value = 'eq';
+            }
             return;
         }
         if (opSel) {
