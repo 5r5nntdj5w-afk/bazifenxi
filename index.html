@@ -10407,21 +10407,31 @@
                         }
                         const invert = !!p.invert;
                         if (p.ruleType === 'qiangruo') {
-                            // 十神强弱喜忌：比较「上一级范围」该十神数量是否满足条件（≥/>/≤/<）
-                            // （getTplXijiRules 已把旧 shenA+weakOp+weakVal 归一化为 shen+cmpOp+cmpVal）
-                            const shen = p.shen, cmpOp = p.cmpOp || 'lte', cmpVal = (p.cmpVal !== undefined && p.cmpVal !== null) ? p.cmpVal : 1;
-                            if (!shen || !GROUPED_SHEN.includes(shen)) return;
-                            if (!baseSt) return;  // 无上一级范围统计（无法判定）
-                            const baseVal = baseSt[shen] || 0;
+                            // 十神强弱喜忌：以「上一级范围」A十神数量满足条件（≥/>/≤/<）为基准，
+                            // 且 B十神数量由上一级范围到当前范围按增量方向变化（'dec'=未增加 ≤；否则=增加 >）；
+                            // 原局等无上一级范围 → 增量无从比较 → 整条规则不标注（无论是否反转）
+                            // （getTplXijiRules 已把旧 shenA+weakOp+weakVal 归一化为 shen+cmpOp+cmpVal+shenB+incOp）
+                            const shenA = p.shen, cmpOp = p.cmpOp || 'lte', cmpVal = (p.cmpVal !== undefined && p.cmpVal !== null) ? p.cmpVal : 1;
+                            if (!shenA || !GROUPED_SHEN.includes(shenA)) return;
+                            const hasPrev = !!(data && (data.dayun || data.liunian || data.liuyue));
+                            if (!hasPrev || !baseSt || !stats) return;  // 无上一级范围（无法比较增量）→ 不标注
+                            const baseVal = baseSt[shenA] || 0;
                             let strongOk = false;
                             if (cmpOp === 'gte') strongOk = baseVal >= cmpVal;
                             else if (cmpOp === 'gt') strongOk = baseVal > cmpVal;
                             else if (cmpOp === 'lt') strongOk = baseVal < cmpVal;
                             else strongOk = baseVal <= cmpVal;
-                            if (condOk && strongOk) {
-                                prefs.push({ type: 'qiangruo', shen: shen, pref: p.pref === 'ji' ? 'ji' : 'xi' });
+                            // 增量：B 十神当前范围数量 vs 上一级范围数量
+                            const shenB = p.shenB || shenA;
+                            const incOp = p.incOp === 'dec' ? 'dec' : 'inc';
+                            const curSt = (stats && stats[grpName]) || {};
+                            const curB = curSt[shenB] || 0;
+                            const baseB = baseSt[shenB] || 0;
+                            const incOk = incOp === 'dec' ? (curB <= baseB) : (curB > baseB);
+                            if (condOk && strongOk && incOk) {
+                                prefs.push({ type: 'qiangruo', shen: shenA, shenB: shenB, pref: p.pref === 'ji' ? 'ji' : 'xi' });
                             } else if (invert) {
-                                prefs.push({ type: 'qiangruo', shen: shen, pref: p.pref === 'ji' ? 'xi' : 'ji' });
+                                prefs.push({ type: 'qiangruo', shen: shenA, shenB: shenB, pref: p.pref === 'ji' ? 'xi' : 'ji' });
                             }
                             return;
                         }
@@ -11003,7 +11013,7 @@
         const shengDefs = defs.filter(function(d) { return d.relType === 'sheng'; });
         // 模板喜忌（按范围）：scopeIdx -> { 关系DefId: 'xi'|'ji' }（scope0 缺失时回退主缓存）
         const prefSets = [null, null, null];
-        // 模板十神强弱喜忌（按范围）：scopeIdx -> { 增强十神B: 'xi'|'ji' }（共用喜忌徽章：涉及 B 十神的关系行标出）
+        // 模板十神强弱喜忌（按范围）：scopeIdx -> { 增量十神B: 'xi'|'ji' }（共用喜忌徽章：涉及 B 十神的关系行标出）
         const strongPrefSets = [null, null, null];
         for (let i = 0; i < 3; i++) {
             const scList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[i]);
@@ -11015,7 +11025,8 @@
                     (tp.prefs || []).forEach(function(p) {
                         if (!p) return;
                         if (p.type === 'qiangruo') {
-                            const s = p.shen || p.shenB;
+                            // 喜忌徽章标注在增量十神B（B缺省=A自身时即标A）
+                            const s = p.shenB || p.shen;
                             if (s) smap[String(s)] = p.pref === 'ji' ? 'ji' : 'xi';
                         } else if (p.relId) {
                             map[String(p.relId)] = p.pref === 'ji' ? 'ji' : 'xi';
@@ -11110,8 +11121,9 @@
                 if (!v) {
                     const sps = strongPrefSets[ci];
                     if (sps) {
-                        if (sps[String(def.shenA)]) v = sps[String(def.shenA)];
-                        else if (sps[String(def.shenB)]) v = sps[String(def.shenB)];
+                        // 喜忌徽章标注在增量十神B（缺省=A自身），优先按 B 匹配该关系行
+                        if (sps[String(def.shenB)]) v = sps[String(def.shenB)];
+                        else if (sps[String(def.shenA)]) v = sps[String(def.shenA)];
                     }
                 }
                 prefByCol.push(v);
@@ -11517,8 +11529,8 @@
     // ============ 参考值模板条件树化（结构/迁移/契合度评估） ============
     // 模板 conditions 树：{ logic:'and', children:[ {mark, logic, children:[...]}, ... ] }
     // mark: 'shishen' 十神分布 | 'ratio' 关系比例 | 'xiji' 喜忌 | 'base' 基础匹配
-    // xiji 分区内的规则节点：{ mark:'xiji_rule', ruleType, pref, relId / shen+cmpOp+cmpVal（十神强弱）, invert?, ratio?|presetId?, weight, conds:{logic,children} }
-    // 兼容旧强弱字段：shenA/shenB/weakOp/weakVal（读取时由 getTplXijiRules 归一化为 shen+cmpOp+cmpVal）
+    // xiji 分区内的规则节点：{ mark:'xiji_rule', ruleType, pref, relId / shen+cmpOp+cmpVal+shenB+incOp（十神强弱）, invert?, ratio?|presetId?, weight, conds:{logic,children} }
+    // 兼容旧强弱字段：shenA/shenB/weakOp/weakVal（读取时由 getTplXijiRules 归一化为 shen+cmpOp+cmpVal+shenB+incOp）
     // 旧四字段（values/relation_refs/match_conditions/relation_prefs）在保存时由 conditions 反编译生成，柱状图/生克表消费代码不变
 
     // 旧四字段 → conditions 树（迁移/兼容：读取旧模板时统一入口）
@@ -11555,7 +11567,20 @@
         (relationPrefs || []).forEach(function(p) {
             if (!p) return;
             const node = { mark: 'xiji_rule', ruleType: p.type === 'qiangruo' ? 'qiangruo' : 'shengke', pref: p.pref === 'ji' ? 'ji' : 'xi', conds: { logic: (p.conds && p.conds.logic) || 'and', children: ((p.conds && p.conds.children) || []).slice() } };
-            if (node.ruleType === 'qiangruo') { node.shenA = p.shenA; node.shenB = p.shenB; node.weakOp = p.weakOp || 'lte'; node.weakVal = p.weakVal !== undefined ? p.weakVal : 1; }
+            if (node.ruleType === 'qiangruo') {
+                if (p.shen || p.cmpOp !== undefined || p.cmpVal !== undefined || p.incOp !== undefined) {
+                    // 新结构：基准十神+比较符+数值+增量十神+增量方向
+                    node.shen = p.shen || p.shenA || null;
+                    node.cmpOp = p.cmpOp || (p.weakOp === 'lt' ? 'lt' : 'lte');
+                    node.cmpVal = p.cmpVal !== undefined ? p.cmpVal : (p.weakVal !== undefined ? p.weakVal : 1);
+                    node.shenB = p.shenB || node.shen;
+                    node.incOp = p.incOp === 'dec' ? 'dec' : 'inc';
+                } else {
+                    // 旧结构（shenA+shenB+weakOp+weakVal）
+                    node.shenA = p.shenA; node.shenB = p.shenB;
+                    node.weakOp = p.weakOp || 'lte'; node.weakVal = p.weakVal !== undefined ? p.weakVal : 1;
+                }
+            }
             else if (p.relId) node.relId = p.relId;
             xijiChildren.push(node);
         });
@@ -11636,15 +11661,20 @@
                     const invert = !!node.invert;
                     if (node.ruleType === 'qiangruo') {
                         const rec = { type: 'qiangruo', pref: node.pref, conds: conds };
-                        if (node.shen || node.cmpOp || node.cmpVal !== undefined) {
+                        if (node.shen || node.cmpOp || node.cmpVal !== undefined || node.shenB || node.incOp) {
+                            // 新结构：基准十神+比较符+数值+增量十神+增量方向
                             rec.shen = node.shen || null;
                             rec.cmpOp = node.cmpOp || 'lte';
                             rec.cmpVal = node.cmpVal !== undefined ? node.cmpVal : 1;
+                            rec.shenB = node.shenB || rec.shen;
+                            rec.incOp = node.incOp === 'dec' ? 'dec' : 'inc';
                         } else {
-                            // 旧结构（shenA+weakOp+weakVal）：归一化为单十神比较（增量部分不再输出）
+                            // 旧结构（shenA+weakOp+weakVal+增十神B）：归一化为基准十神比较+增量十神
                             rec.shen = node.shenA || null;
                             rec.cmpOp = node.weakOp === 'lt' ? 'lt' : 'lte';
                             rec.cmpVal = node.weakVal !== undefined ? node.weakVal : 1;
+                            rec.shenB = node.shenB || rec.shen;
+                            rec.incOp = 'inc';
                         }
                         if (invert) rec.invert = true;
                         relationPrefs.push(rec);
@@ -11754,19 +11784,26 @@
             if (!tree || !Array.isArray(tree.children)) return [];
             const xg = tree.children.find(function(g) { return g && g.mark === 'xiji'; });
             const list = (xg && Array.isArray(xg.children)) ? xg.children : [];
-            // 旧「十神强弱」结构（shenA+weakOp+weakVal+增量）自动归一化为新结构（shen+cmpOp+cmpVal）：
-            // 取弱十神A + 原弱判定（如「印星≤1」），增量部分因新形态不再适用而丢弃（编辑保存后落库）
+            // 旧「十神强弱」结构（shenA+weakOp+weakVal+增十神B）自动归一化为新结构（shen+cmpOp+cmpVal+shenB+incOp）：
+            // 基准=弱十神A+原弱判定（如「印星≤1」）；增量十神=旧增十神B（缺省回退A自身）、增量方向=增加；
+            // 新结构缺增量字段时补默认（B=基准自身、方向=增加），编辑保存后落库新结构
             return list.map(function(node) {
                 if (!node || node.mark !== 'xiji_rule' || node.ruleType !== 'qiangruo') return node;
-                if (node.shen && node.cmpOp) return node;
-                if (node.shenA) {
-                    return Object.assign({}, node, {
+                let out = node;
+                if (node.shen && node.cmpOp) {
+                    if (node.shenB === undefined || node.incOp === undefined) {
+                        out = Object.assign({}, node, { shenB: node.shenB || node.shen, incOp: node.incOp || 'inc' });
+                    }
+                } else if (node.shenA) {
+                    out = Object.assign({}, node, {
                         shen: node.shenA,
                         cmpOp: node.weakOp === 'lt' ? 'lt' : 'lte',
-                        cmpVal: (node.weakVal !== undefined && node.weakVal !== null) ? node.weakVal : 1
+                        cmpVal: (node.weakVal !== undefined && node.weakVal !== null) ? node.weakVal : 1,
+                        shenB: node.shenB || node.shenA,
+                        incOp: 'inc'
                     });
                 }
-                return node;
+                return out;
             });
         } catch (e) { return []; }
     }
@@ -12031,20 +12068,33 @@
         }
         let ruleOk = true;
         if (node.ruleType === 'qiangruo') {
-            // 单十神比较（≥/>/≤/<）：统计基准=上一级范围（缺失回退当前范围）
-            const shen = node.shen || node.shenA;
-            if (!shen) { ruleOk = false; }
+            // 基准十神A上一级范围数量满足条件（≥/>/≤/<） 且 增量十神B由上一级到当前范围数量按方向变化；
+            // 原局等无上一级范围（data 不含大运/流年/流月）→ 增量无从比较 → 整条规则不标注
+            const shenA = node.shen || node.shenA;
+            if (!shenA) { ruleOk = false; }
             else {
                 const cmpOp = node.cmpOp || (node.weakOp === 'lt' ? 'lt' : 'lte');
                 const cmpVal = node.cmpVal !== undefined ? node.cmpVal : (node.weakVal !== undefined ? node.weakVal : 1);
                 const base = prevScopeStatsForData(data) || stats;
                 const baseG = (base && base.groupCount) || null;
                 if (baseG) {
-                    const v = baseG[shen] !== undefined ? baseG[shen] : 0;
+                    const v = baseG[shenA] !== undefined ? baseG[shenA] : 0;
                     if (cmpOp === 'gte') ruleOk = v >= cmpVal;
                     else if (cmpOp === 'gt') ruleOk = v > cmpVal;
                     else if (cmpOp === 'lt') ruleOk = v < cmpVal;
                     else ruleOk = v <= cmpVal;
+                    // 增量判断（无上一级范围 → 整条不标注）
+                    const hasPrev = !!(data && (data.dayun || data.liunian || data.liuyue));
+                    if (ruleOk && hasPrev) {
+                        const shenB = node.shenB || shenA;
+                        const incOp = node.incOp === 'dec' ? 'dec' : 'inc';
+                        const curG = (stats && stats.groupCount) || null;
+                        const curB = curG && curG[shenB] !== undefined ? curG[shenB] : 0;
+                        const baseB = baseG[shenB] !== undefined ? baseG[shenB] : 0;
+                        ruleOk = incOp === 'dec' ? (curB <= baseB) : (curB > baseB);
+                    } else if (ruleOk) {
+                        ruleOk = false;  // 无上一级范围 → 不标注
+                    }
                 } else ruleOk = false;
             }
         } else if (node.ruleType === 'shengke') {
@@ -12725,6 +12775,10 @@
             else if (p.weakOp === 'lte') selCmpOp = 'lte';
         }
         const cmpValDef = (isStrong && p && (p.cmpVal !== undefined || p.weakVal !== undefined)) ? (p.cmpVal !== undefined ? p.cmpVal : p.weakVal) : 1;
+        // 增量十神B：新结构 p.shenB；旧结构 p.shenB（增十神）；缺省=基准十神自身
+        const incShenDef = (isStrong && p) ? (p.shenB || p.shen || p.shenA || null) : null;
+        // 增量方向：新结构 p.incOp；缺省=增加
+        const selIncOp = (isStrong && p && p.incOp === 'dec') ? 'dec' : 'inc';
         const row = document.createElement('div');
         row.className = 'ref-tpl-pref-row bg-white border border-rose-100 rounded p-2';
         row.innerHTML =
@@ -12746,7 +12800,7 @@
             '<select class="rtp-rel flex-1 min-w-[160px] text-sm p-1 border rounded">' + refTplRelOptionsHtml(!isStrong && p ? p.relId : null) + '</select>' +
             '</div>' +
             '<div class="rtp-strong-box flex items-center gap-1.5' + (isStrong ? '' : ' hidden') + '">' +
-            '<span class="text-xs font-bold text-gray-600">十神：</span>' +
+            '<span class="text-xs font-bold text-gray-600">基准十神：</span>' +
             '<select class="rtp-shen text-sm p-1 border rounded">' + refTplShenOptionsHtml(isStrong ? (p.shen || p.shenA || null) : null) + '</select>' +
             '<span class="text-xs font-bold text-gray-600">比较：</span>' +
             '<select class="rtp-cmp-op text-sm p-1 border rounded">' +
@@ -12756,7 +12810,14 @@
             '<option value="lt"' + (selCmpOp === 'lt' ? ' selected' : '') + '>&lt;</option>' +
             '</select>' +
             '<input type="number" class="rtp-cmp-val text-sm p-1 border rounded" style="width:56px" min="0" max="12" value="' + cmpValDef + '">' +
-            '<span class="text-xs text-gray-500">上一级范围该十神数量（如选原局+大运则统计原局）</span>' +
+            '<span class="text-xs font-bold text-gray-600">增量十神：</span>' +
+            '<select class="rtp-inc-shen text-sm p-1 border rounded">' + refTplShenOptionsHtml(incShenDef) + '</select>' +
+            '<span class="text-xs font-bold text-gray-600">增量：</span>' +
+            '<select class="rtp-inc-op text-sm p-1 border rounded">' +
+            '<option value="inc"' + (selIncOp === 'dec' ? '' : ' selected') + '>增加</option>' +
+            '<option value="dec"' + (selIncOp === 'dec' ? ' selected' : '') + '>未增加</option>' +
+            '</select>' +
+            '<span class="text-xs text-gray-500">上一级范围A十神数量满足条件 且 B十神数量较上一级增加（原局范围不标注）</span>' +
             '</div>' +
             '<button type="button" class="text-red-500 text-sm px-1 shrink-0" onclick="this.closest(\'.ref-tpl-pref-row\').remove()">✕ 删除</button>' +
             '</div>' +
@@ -12887,7 +12948,11 @@
                 const cmpOpSel = row.querySelector('.rtp-cmp-op');
                 const cmpOp = cmpOpSel ? (cmpOpSel.value === 'gte' || cmpOpSel.value === 'gt' || cmpOpSel.value === 'lt' ? cmpOpSel.value : 'lte') : 'lte';
                 const cmpVal = parseInt(row.querySelector('.rtp-cmp-val').value);
-                const rule = { mark: 'xiji_rule', ruleType: 'qiangruo', pref: pref, shen: shen, cmpOp: cmpOp, cmpVal: isNaN(cmpVal) ? 1 : cmpVal, conds: conds };
+                const shenBSel = row.querySelector('.rtp-inc-shen');
+                const shenB = shenBSel ? shenBSel.value : shen;
+                const incOpSel = row.querySelector('.rtp-inc-op');
+                const incOp = incOpSel && incOpSel.value === 'dec' ? 'dec' : 'inc';
+                const rule = { mark: 'xiji_rule', ruleType: 'qiangruo', pref: pref, shen: shen, cmpOp: cmpOp, cmpVal: isNaN(cmpVal) ? 1 : cmpVal, shenB: shenB, incOp: incOp, conds: conds };
                 if (invert) rule.invert = true;
                 xiji.push(rule);
             } else {
@@ -14902,7 +14967,7 @@
                         if (!p) return;
                         if (p.relId && String(p.relId) === String(def.id)) pref = p.pref === 'ji' ? 'ji' : 'xi';
                         else {
-                            const s = p.shen || p.shenB;
+                            const s = p.shenB || p.shen;
                             if (s && (s === def.shenA || s === def.shenB) && !pref) pref = p.pref === 'ji' ? 'ji' : 'xi';
                         }
                     });
@@ -36986,7 +37051,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <!-- 喜忌区 -->
             <div id="ref-tpl-tab-xiji" class="ref-tpl-tab-panel hidden">
-                <div class="mb-1.5 text-xs text-gray-500">生克喜忌标注：每条规则<b>相互独立</b>（互不影响）。规则可配置<b>关联关系（含比例条件）/ 十神强弱</b>＋<b>触发条件组</b>（普通条件、关系比例、生克命中满足/排除）＋<b>反转开关</b>（满足为喜/忌、不满足为相反）；触发条件满足且比例达标时才标注喜/忌，无法判定时不标注。</div>
+                <div class="mb-1.5 text-xs text-gray-500">生克喜忌标注：每条规则<b>相互独立</b>（互不影响）。规则可配置<b>关联关系（含比例条件）/ 十神强弱</b>（基准十神上一级范围数量满足条件 且 增量十神数量较上一级增加，原局范围不标注）＋<b>触发条件组</b>（普通条件、关系比例、生克命中满足/排除）＋<b>反转开关</b>（满足为喜/忌、不满足为相反）；触发条件满足且比例达标时才标注喜/忌，无法判定时不标注。</div>
                 <div id="ref-tpl-prefs-box" class="space-y-2 mb-2"></div>
                 <button type="button" onclick="addRefTplPrefRule()" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-sm">➕ 添加喜忌规则</button>
             </div>
