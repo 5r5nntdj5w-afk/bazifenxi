@@ -14849,7 +14849,10 @@
     function renderTplFitCell(col) {
         const esc = escapeHtml;
         const label = esc(col.label);
-        const g = (col.node && col.node.geju) || null;
+        // 原局列（label='原局'，node0=原局节点快照）优先取原局自身的格局候选，不受对比大运节点命中模板影响；
+        // 无原局快照时不用对比大运节点的候选（避免原局列显示大运模板），退化走下方 getScopeTplOptions 模板选项兜底
+        const isBaziCol = col.label === '原局';
+        const g = isBaziCol ? ((col.node0 && col.node0.geju) || null) : ((col.node && col.node.geju) || null);
         const candidates = (g && g.hasGeJu) ? (g.candidates || []) : [];
         const selKey = col.node.key + '#' + col.scopeIdx;
         const selTplId = window._tplFitSel ? (window._tplFitSel[selKey] || '') : '';
@@ -14953,11 +14956,11 @@
     function renderGeJuCompareRow(base, target) {
         const cols = [];
         if (base.type === 'dayun' && target.type === 'dayun') {
-            cols.push({ label: '原局', node: base, scopeIdx: 0 });
+            cols.push({ label: '原局', node: base, node0: (window.timelineNodeCache && window.timelineNodeCache['原局']) || null, scopeIdx: 0 });
             cols.push({ label: '原局+' + (base.dayun || ''), node: base, scopeIdx: 1 });
             cols.push({ label: '原局+' + (target.dayun || ''), node: target, scopeIdx: 1 });
         } else if (base.type === 'liunian' && target.type === 'liunian' && base.dayun === target.dayun) {
-            cols.push({ label: '原局', node: base, scopeIdx: 0 });
+            cols.push({ label: '原局', node: base, node0: (window.timelineNodeCache && window.timelineNodeCache['原局']) || null, scopeIdx: 0 });
             cols.push({ label: '原局+' + (base.dayun || ''), node: base, scopeIdx: 1 });
             cols.push({ label: '原局+' + (base.dayun || '') + '+' + (base.liunian || ''), node: base, scopeIdx: 2 });
             cols.push({ label: '原局+' + (target.dayun || '') + '+' + (target.liunian || ''), node: target, scopeIdx: 2 });
