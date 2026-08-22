@@ -10919,11 +10919,12 @@
 
         // 柱状图（十神强弱喜忌映射 { 十神B: 'xi'|'ji' }，徽章标注在增量十神B柱上）
         // 强弱评估按柱状图当前显示范围选取：含流月→主范围评估（基准=原局+大运+流年）；含流年→scope2；含大运→scope1；原局无上一级→不标注
+        // 注：liuyue/liunian 未选择时也存在为 {t:'',d:''} 空对象，须按干支非空判断实际显示层级
         const _chartData = window._lastCalcData || null;
         let strongList = null;
-        if (_chartData && _chartData.liuyue) strongList = cache.shenTplPrefs || [];
-        else if (_chartData && _chartData.liunian) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[2]) || [];
-        else if (_chartData && _chartData.dayun) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[1]) || [];
+        if (_chartData && _chartData.liuyue && _chartData.liuyue.t) strongList = cache.shenTplPrefs || [];
+        else if (_chartData && _chartData.liunian && _chartData.liunian.t) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[2]) || [];
+        else if (_chartData && _chartData.dayun && _chartData.dayun.t) strongList = (cache.shenTplPrefsByScope && cache.shenTplPrefsByScope[1]) || [];
         else strongList = [];
         const strongPrefMap = buildStrongPrefMap(strongList || []);
         chartBox.innerHTML = renderShenBarChart(stats, selRef, mode, strongPrefMap);
