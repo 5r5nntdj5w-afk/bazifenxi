@@ -14850,19 +14850,28 @@
         const esc = escapeHtml;
         const label = esc(col.label);
         const g = (col.node && col.node.geju) || null;
-        if (!g || !g.hasGeJu) {
-            return '<div class="flex-1 min-w-[190px] border border-gray-100 rounded p-1.5 bg-gray-50/40">' +
-                '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
-                '<span class="text-gray-400">无断语命中</span></div>';
-        }
-        const candidates = g.candidates || [];
-        if (!candidates.length) {
-            return '<div class="flex-1 min-w-[190px] border border-gray-100 rounded p-1.5 bg-gray-50/40">' +
-                '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
-                '<span class="text-gray-400">无格局候选</span></div>';
-        }
+        const candidates = (g && g.hasGeJu) ? (g.candidates || []) : [];
         const selKey = col.node.key + '#' + col.scopeIdx;
         const selTplId = window._tplFitSel ? (window._tplFitSel[selKey] || '') : '';
+        if (!candidates.length) {
+            // 无格局候选但有命中模板：退化为模板下拉（保证所有有标注的列都能独立切换标注模板，切换入口统一在格局对比行）
+            const opts = getScopeTplOptions(col.node, col.scopeIdx);
+            if (opts.length) {
+                const tplId = selTplId || resolveTimelineTplId(col.node, col.scopeIdx, null);
+                const optHtml = opts.map(function(o) {
+                    return '<option value="' + esc(o.tplId) + '"' + (o.tplId === tplId ? ' selected' : '') + '>' + esc(o.name) + '</option>';
+                }).join('');
+                return '<div class="flex-1 min-w-[190px] border border-violet-100 rounded p-1.5 bg-violet-50/40">' +
+                    '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
+                    '<div class="flex items-center gap-1 mb-1">' +
+                    '<span class="text-gray-500 shrink-0">标注：</span>' +
+                    '<select class="px-1 py-0.5 border rounded bg-white text-xs min-w-0 flex-1" onchange="setTimelineTplFit(\'' + esc(selKey) + '\', this.value)">' + optHtml + '</select>' +
+                    '</div></div>';
+            }
+            return '<div class="flex-1 min-w-[190px] border border-gray-100 rounded p-1.5 bg-gray-50/40">' +
+                '<div class="text-gray-500 font-bold mb-1">' + label + '</div>' +
+                '<span class="text-gray-400">无命中</span></div>';
+        }
         // 候选断语 → 绑定标注模板 id（无模板绑定则为空串）；选中状态=模板 id，显示第一个绑定该模板的候选
         const tplOf = function(c) {
             try { return (c && c.rule && c.rule.conditions && c.rule.conditions.referenceOutput && c.rule.conditions.referenceOutput.refTemplateId) ? String(c.rule.conditions.referenceOutput.refTemplateId) : ''; }
@@ -15113,18 +15122,7 @@
         });
         let headHtml = '<th class="py-1 pl-1 pr-1 text-left text-xs font-semibold">关系</th>';
         for (let ci = 0; ci < ranges.length; ci++) {
-            const rg = ranges[ci];
-            const nd = rg.node || null;
-            const tplId = resolveTimelineTplId(nd, rg.scopeIdx, selTplId);
-            let selHtml = '';
-            const opts = getScopeTplOptions(nd, rg.scopeIdx);
-            if (opts.length) {
-                const optHtml = opts.map(function(o) {
-                    return '<option value="' + escapeHtml(o.tplId) + '"' + (o.tplId === tplId ? ' selected' : '') + '>' + escapeHtml(o.name) + '</option>';
-                }).join('');
-                selHtml = '<div class="mt-0.5"><select class="px-1 py-0.5 border rounded bg-white text-[10px] w-full max-w-[120px]" onchange="setTimelineTplFit(\'' + escapeHtml(String(nd.key) + '#' + rg.scopeIdx) + '\', this.value)" title="该列标注模板（独立切换，喜忌/参考比例/格局联动）">' + optHtml + '</select></div>';
-            }
-            headHtml += '<th class="py-1 px-1 text-center text-xs font-semibold">' + escapeHtml(ranges[ci].label) + selHtml + '</th>';
+            headHtml += '<th class="py-1 px-1 text-center text-xs font-semibold">' + escapeHtml(ranges[ci].label) + '</th>';
             if (ci < ranges.length - 1) headHtml += '<th class="py-1 px-1 text-center text-[10px] font-semibold text-gray-400">' + escapeHtml(changes[ci].label) + '</th>';
         }
         return '<div class="font-bold ' + titleColor + ' text-base mb-1">' + title + '</div>' +
